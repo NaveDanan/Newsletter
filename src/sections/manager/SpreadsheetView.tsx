@@ -160,12 +160,10 @@ export function SpreadsheetView() {
           <table className="w-full">
             <thead>
               <tr className="bg-[#F9FAFB]">
-                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Issue</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Owner</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Project</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Department</th>
                 <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Status</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Due Date</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Notes</th>
-                <th className="text-right py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Actions</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Due Date</th>                
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E5E5]">
@@ -243,23 +241,8 @@ export function SpreadsheetView() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-[#737373]">{row.dueDate}</td>
-                      <td className="py-3 px-4 text-[#737373]">{row.notes}</td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
-                            onClick={() => handleEdit(row)}
-                            className="p-1 text-[#A3A3A3] hover:text-[#171717] hover:bg-[#F3F4F6] rounded"
-                          >
-                            <HugeiconsIcon icon={Edit02Icon} className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(row.id)}
-                            className="p-1 text-[#A3A3A3] hover:text-red-600 hover:bg-red-100 rounded"
-                          >
-                            <HugeiconsIcon icon={Delete02Icon} className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
+
+                      
                     </>
                   )}
                 </tr>
@@ -273,19 +256,6 @@ export function SpreadsheetView() {
             No results found for &ldquo;{searchTerm}&rdquo;
           </div>
         )}
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {statusOptions.map(status => {
-          const count = data.filter(row => row.status === status).length;
-          return (
-            <div key={status} className="dashboard-card">
-              <p className="text-sm text-[#737373] mb-1">{status}</p>
-              <p className="text-2xl font-bold text-[#171717]">{count}</p>
-            </div>
-          );
-        })}
       </div>
 
       {/* Add Row Modal */}

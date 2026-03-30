@@ -1,72 +1,130 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { AnalyticsDownIcon, AnalyticsUpIcon, Cancel01Icon, Edit02Icon, MinusSignIcon, Target01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
-import { useState } from 'react';
-import { toast } from 'sonner';
+import { AnalyticsDownIcon, AnalyticsUpIcon, MinusSignIcon, Target01Icon } from "@hugeicons/core-free-icons";
+import { useMemo } from 'react';
+import { useProjects } from '@/hooks/useProjects';
+import { getTaskProgress, getTaskSpanDays } from '@/lib/gantt';
+import { parseISO } from 'date-fns';
+import type { GanttTask } from '@/types/gantt';
 
-interface Goal {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type GoalStatus = 'ahead' | 'on-track' | 'behind';
+
+interface ComputedGoal {
   id: string;
-  title: string;
-  target: string;
-  current: string;
-  progress: number;
-  status: 'ahead' | 'on-track' | 'behind';
-  deadline: string;
+  projectTitle: string;
+  milestoneName: string;
+  milestoneDate: string;
+  progress: number;        // 0-100, based on task-day completion up to this milestone
+  status: GoalStatus;
 }
 
-const initialGoals: Goal[] = [
-  {
-    id: '1',
-    title: 'Grow Subscribers',
-    target: '+15%',
-    current: '+12%',
-    progress: 80,
-    status: 'on-track',
-    deadline: 'Q3 2024'
-  },
-  {
-    id: '2',
-    title: 'Improve Open Rate',
-    target: '42%',
-    current: '38.5%',
-    progress: 92,
-    status: 'ahead',
-    deadline: 'Q3 2024'
-  },
-  {
-    id: '3',
-    title: 'Launch Short-form Series',
-    target: '10 episodes',
-    current: '4 episodes',
-    progress: 40,
-    status: 'behind',
-    deadline: 'Aug 2024'
-  },
-  {
-    id: '4',
-    title: 'Increase Click-through Rate',
-    target: '8%',
-    current: '6.2%',
-    progress: 78,
-    status: 'on-track',
-    deadline: 'Q3 2024'
-  },
-  {
-    id: '5',
-    title: 'Reduce Unsubscribe Rate',
-    target: '< 0.5%',
-    current: '0.3%',
-    progress: 100,
-    status: 'ahead',
-    deadline: 'Ongoing'
-  }
-];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * For a given milestone task, collect all tasks in the project that end on or
+ * before the milestone's start date (i.e. tasks that are "leading up to" it).
+ * Then compute progress as:
+ *   (sum of completed task-day units) / (sum of all task-day units) * 100
+ */
+function computeGoalProgress(tasks: GanttTask[], milestone: GanttTask): number {
+  const milestoneDate = parseISO(milestone.startDate);
+
+  // Tasks that are scheduled to be done before or on the milestone date,
+  // excluding other milestones and the milestone itself.
+  const precedingTasks = tasks.filter((t) => {
+    if (t.id === milestone.id) return false;
+    if (t.milestone) return false;
+    const taskEnd = parseISO(t.endDate);
+    return taskEnd <= milestoneDate;
+  });
+
+  // Include the milestone itself (it contributes 1 day unit)
+  const allRelevantTasks = [...precedingTasks, milestone];
+
+  const totalDays = allRelevantTasks.reduce((sum, t) => sum + getTaskSpanDays(t), 0);
+  if (totalDays === 0) return 0;
+
+  const completedDays = allRelevantTasks.reduce(
+    (sum, t) => sum + (getTaskSpanDays(t) * getTaskProgress(t)) / 100,
+    0,
+  );
+
+  return Math.round((completedDays / totalDays) * 100);
+}
+
+/**
+ * Determine the status badge based on the tasks leading up to the milestone.
+ *
+ * Logic:
+ * - If the milestone itself is 'completed' → 'ahead'
+ * - If any task is 'delayed' (and milestone not completed) → 'behind'
+ * - If all preceding tasks are 'completed' (milestone still pending) → 'ahead'
+ * - Otherwise → 'on-track'
+ */
+function computeGoalStatus(tasks: GanttTask[], milestone: GanttTask): GoalStatus {
+  if (milestone.status === 'completed') return 'ahead';
+
+  const milestoneDate = parseISO(milestone.startDate);
+  const precedingTasks = tasks.filter((t) => {
+    if (t.id === milestone.id) return false;
+    if (t.milestone) return false;
+    return parseISO(t.endDate) <= milestoneDate;
+  });
+
+  if (precedingTasks.some((t) => t.status === 'delayed')) return 'behind';
+  if (precedingTasks.length > 0 && precedingTasks.every((t) => t.status === 'completed')) return 'ahead';
+
+  return 'on-track';
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function GoalsView() {
-  const [goals, setGoals] = useState<Goal[]>(initialGoals);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const { projects } = useProjects();
 
-  const getStatusIcon = (status: Goal['status']) => {
+  // ── Build computed goals from every project's milestone tasks ──
+  const goals = useMemo<ComputedGoal[]>(() => {
+    const result: ComputedGoal[] = [];
+
+    for (const project of projects) {
+      const tasks = project.gantt?.tasks ?? [];
+      const milestones = tasks.filter((t) => t.milestone);
+
+      for (const ms of milestones) {
+        result.push({
+          id: `${project.id}-${ms.id}`,
+          projectTitle: project.title || project.department,
+          milestoneName: ms.name,
+          milestoneDate: ms.startDate,
+          progress: computeGoalProgress(tasks, ms),
+          status: computeGoalStatus(tasks, ms),
+        });
+      }
+    }
+
+    return result;
+  }, [projects]);
+
+  // ── Overall Progress ──
+  // ((sum of completed MS across projects) / (sum of all MS across projects)) * 100
+  const overallProgress = useMemo(() => {
+    let completedCount = 0;
+    let totalCount = 0;
+
+    for (const project of projects) {
+      const tasks = project.gantt?.tasks ?? [];
+      const milestones = tasks.filter((t) => t.milestone);
+      totalCount += milestones.length;
+      completedCount += milestones.filter((t) => t.status === 'completed').length;
+    }
+
+    if (totalCount === 0) return 0;
+    return Math.round((completedCount / totalCount) * 100);
+  }, [projects]);
+
+  // ── Badge / icon helpers ──
+  const getStatusIcon = (status: GoalStatus) => {
     switch (status) {
       case 'ahead':
         return <HugeiconsIcon icon={AnalyticsUpIcon} className="w-5 h-5 text-green-600" />;
@@ -77,65 +135,54 @@ export function GoalsView() {
     }
   };
 
-  const getStatusBadge = (status: Goal['status']) => {
+  const getStatusBadgeClass = (status: GoalStatus) => {
     switch (status) {
-      case 'ahead':
-        return 'bg-green-100 text-green-700';
-      case 'on-track':
-        return 'bg-[#D93A3A]/10 text-[#D93A3A]';
-      case 'behind':
-        return 'bg-red-100 text-red-700';
+      case 'ahead': return 'bg-green-100 text-green-700';
+      case 'on-track': return 'bg-[#D93A3A]/10 text-[#D93A3A]';
+      case 'behind': return 'bg-red-100 text-red-700';
     }
   };
 
-  const getProgressColor = (_progress: number, status: Goal['status']) => {
+  const getProgressBarClass = (status: GoalStatus) => {
     if (status === 'ahead') return 'bg-green-600';
     if (status === 'behind') return 'bg-red-600';
     return 'bg-[#D93A3A]';
   };
 
-  const handleEdit = (goal: Goal) => {
-    setEditingId(goal.id);
-    setEditValue(goal.current);
-  };
-
-  const handleSave = () => {
-    if (editingId && editValue) {
-      setGoals(goals.map(goal => {
-        if (goal.id === editingId) {
-          const newProgress = Math.min(100, goal.progress + 5);
-          return { ...goal, current: editValue, progress: newProgress };
-        }
-        return goal;
-      }));
-      setEditingId(null);
-      toast.success('Goal updated');
-    }
-  };
-
-  const handleCancel = () => {
-    setEditingId(null);
-    setEditValue('');
-  };
-
-  const overallProgress = Math.round(goals.reduce((acc, g) => acc + g.progress, 0) / goals.length);
+  // ── Empty state ──
+  if (goals.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="dashboard-card flex flex-col items-center justify-center py-16 text-center">
+          <HugeiconsIcon icon={Target01Icon} className="w-12 h-12 text-[#D93A3A]/40 mb-4" />
+          <h2 className="text-lg font-bold text-[#171717] mb-1">No Milestones Found</h2>
+          <p className="text-sm text-[#737373] max-w-xs">
+            Add milestone tasks to your projects in the Gantt editor to track goals here.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Overall progress */}
+      {/* Overall Progress */}
       <div className="dashboard-card">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-bold text-[#171717]">Overall Progress</h2>
-            <p className="text-sm text-[#737373]">Track your key objectives</p>
+            <p className="text-sm text-[#737373]">
+              {goals.filter((g) => g.status === 'ahead' && g.progress === 100).length} of{' '}
+              {goals.length} milestones completed
+            </p>
           </div>
           <div className="text-right">
             <p className="text-3xl font-bold text-[#D93A3A]">{overallProgress}%</p>
-            <p className="text-sm text-[#737373]">of goals achieved</p>
+            <p className="text-sm text-[#737373]">of milestones achieved</p>
           </div>
         </div>
         <div className="h-3 bg-[#E5E5E5] rounded-full overflow-hidden">
-          <div 
+          <div
             className="h-full bg-gradient-to-r from-[#D93A3A] to-green-600 transition-all duration-500"
             style={{ width: `${overallProgress}%` }}
           />
@@ -145,15 +192,17 @@ export function GoalsView() {
       {/* Goals grid */}
       <div className="grid md:grid-cols-2 gap-4">
         {goals.map((goal) => (
-          <div key={goal.id} className="dashboard-card">
+          <div key={goal.id} className="dashboard-card group">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#D93A3A]/10 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-[#D93A3A]/10 rounded-lg flex items-center justify-center flex-shrink-0">
                   <HugeiconsIcon icon={Target01Icon} className="w-5 h-5 text-[#D93A3A]" />
                 </div>
-                <div>
-                  <h3 className="font-medium text-[#171717]">{goal.title}</h3>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(goal.status)}`}>
+                <div className="min-w-0">
+                  <h3 className="font-medium text-[#171717] truncate">{goal.milestoneName}</h3>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadgeClass(goal.status)}`}
+                  >
                     {goal.status.replace('-', ' ')}
                   </span>
                 </div>
@@ -163,50 +212,15 @@ export function GoalsView() {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#737373]">Target</span>
-                <span className="font-medium text-[#171717]">{goal.target}</span>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-[#737373]">Current</span>
-                {editingId === goal.id ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      className="w-24 py-1 text-sm"
-                      autoFocus
-                    />
-                    <button 
-                      onClick={handleSave}
-                      className="p-1 text-green-600 hover:bg-green-100 rounded"
-                    >
-                      <HugeiconsIcon icon={Tick01Icon} className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={handleCancel}
-                      className="p-1 text-red-600 hover:bg-red-100 rounded"
-                    >
-                      <HugeiconsIcon icon={Cancel01Icon} className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[#D93A3A] font-medium">{goal.current}</span>
-                    <button 
-                      onClick={() => handleEdit(goal)}
-                      className="p-1 text-[#A3A3A3] hover:text-[#171717] opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <HugeiconsIcon icon={Edit02Icon} className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
+                <span className="text-sm text-[#737373]">Project</span>
+                <span className="font-medium text-[#171717] text-sm truncate max-w-[60%] text-right">
+                  {goal.projectTitle}
+                </span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#737373]">Deadline</span>
-                <span className="text-sm text-[#171717]">{goal.deadline}</span>
+                <span className="text-sm text-[#737373]">Target Date</span>
+                <span className="text-sm text-[#171717]">{goal.milestoneDate}</span>
               </div>
 
               {/* Progress bar */}
@@ -216,8 +230,8 @@ export function GoalsView() {
                   <span className="text-[#171717]">{goal.progress}%</span>
                 </div>
                 <div className="h-2 bg-[#E5E5E5] rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full ${getProgressColor(goal.progress, goal.status)} transition-all duration-500`}
+                  <div
+                    className={`h-full ${getProgressBarClass(goal.status)} transition-all duration-500`}
                     style={{ width: `${goal.progress}%` }}
                   />
                 </div>

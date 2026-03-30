@@ -141,7 +141,7 @@ export function normalizeRole(role: Partial<GanttRole>, index: number): GanttRol
     budget: typeof role.budget === 'number' && Number.isFinite(role.budget)
       ? Math.max(0, Math.round(role.budget * 100) / 100)
       : 0,
-    paidBy: paidBy === 'hourly' || paidBy === 'weekly' || paidBy === 'monthly' || paidBy === 'yearly' || paidBy === 'one-time'
+    paidBy: paidBy === 'hourly' || paidBy === 'daily' || paidBy === 'weekly' || paidBy === 'monthly' || paidBy === 'yearly' || paidBy === 'one-time'
       ? paidBy
       : DEFAULT_ROLE_PERIOD,
     currency: currency === 'ILS' || currency === 'USD' || currency === 'EUR' || currency === 'GBP'

@@ -1,7 +1,7 @@
 export type GanttTaskStatus = 'completed' | 'in-progress' | 'pending' | 'delayed';
 
 export type GanttZoom = 'day' | 'week';
-export type GanttRoleBillingPeriod = 'hourly' | 'weekly' | 'monthly' | 'yearly' | 'one-time';
+export type GanttRoleBillingPeriod = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'one-time';
 export type GanttCurrency = 'ILS' | 'USD' | 'EUR' | 'GBP';
 
 export interface GanttTask {

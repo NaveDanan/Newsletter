@@ -250,7 +250,7 @@ function moveTaskSubtree(tasks: GanttTask[], taskId: string, dropTarget: TaskDro
   return nextTasks;
 }
 
-const roleBillingOptions: GanttRoleBillingPeriod[] = ['hourly', 'weekly', 'monthly', 'yearly', 'one-time'];
+const roleBillingOptions: GanttRoleBillingPeriod[] = ['hourly', 'daily', 'weekly', 'monthly', 'yearly', 'one-time'];
 const currencyOptions: GanttCurrency[] = ['ILS', 'USD', 'EUR', 'GBP'];
 const timelineHeaderHeight = 56;
 const taskMainRowHeight = 56;

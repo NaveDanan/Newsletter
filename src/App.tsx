@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Navigation } from './components/Navigation';
 import { HeroBanner } from './sections/HeroBanner';
 import { PopularArticles } from './sections/PopularArticles';
 import { LatestArticles } from './sections/LatestArticles';
 import { Sidebar } from './sections/Sidebar';
-import { ManagerDashboard } from './sections/ManagerDashboard';
+import { ManagerDashboard, type Tab as ManagerTab } from './sections/ManagerDashboard';
+import { GanttEditorPage } from './sections/manager/GanttEditorPage';
 import { NewsletterViewer } from './sections/NewsletterViewer';
 import { SignIn } from './components/auth/SignIn';
 import { SSOCallback } from './components/auth/SSOCallback';
@@ -16,12 +17,16 @@ import { toast } from 'sonner';
 import type { Newsletter, NewsletterComment } from './types/newsletter';
 import './App.css';
 
-export type View = 'home' | 'manager' | 'article' | 'signin' | 'sso-callback';
+export type View = 'home' | 'manager' | 'article' | 'signin' | 'sso-callback' | 'gantt-editor';
+
+const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet'];
 
 interface RouteState {
   view: View;
   pathname: string;
   articleId?: string;
+  managerSection?: ManagerTab;
+  projectId?: string;
 }
 
 function normalizePathname(pathname: string): string {
@@ -74,6 +79,10 @@ function matchesNewsletterSearch(newsletter: Newsletter, query: string): boolean
     .every((term) => searchableText.includes(term));
 }
 
+function isManagerSection(value: string): value is ManagerTab {
+  return managerSections.includes(value as ManagerTab);
+}
+
 function resolveRoute(pathname: string): RouteState {
   const normalizedPathname = normalizePathname(pathname);
 
@@ -82,7 +91,35 @@ function resolveRoute(pathname: string): RouteState {
   }
 
   if (normalizedPathname === '/manager') {
-    return { view: 'manager', pathname: '/manager' };
+    return { view: 'manager', pathname: '/manager', managerSection: 'newsletters' };
+  }
+
+  if (normalizedPathname.startsWith('/manager/')) {
+    const [, , section] = normalizedPathname.split('/');
+
+    if (section && isManagerSection(section)) {
+      return {
+        view: 'manager',
+        pathname: section === 'newsletters' ? '/manager' : `/manager/${section}`,
+        managerSection: section,
+      };
+    }
+  }
+
+  if (normalizedPathname === '/gantt-editor') {
+    return { view: 'manager', pathname: '/manager/gantt', managerSection: 'gantt' };
+  }
+
+  if (normalizedPathname.startsWith('/gantt-editor/')) {
+    const [, , projectId] = normalizedPathname.split('/');
+
+    if (projectId) {
+      return {
+        view: 'gantt-editor',
+        pathname: `/gantt-editor/${projectId}`,
+        projectId: decodeURIComponent(projectId),
+      };
+    }
   }
 
   if (normalizedPathname === '/sign-in' || normalizedPathname === '/signin') {
@@ -108,6 +145,20 @@ function resolveRoute(pathname: string): RouteState {
   return { view: 'home', pathname: '/' };
 }
 
+function subscribeToRouteChanges(callback: () => void) {
+  window.addEventListener('popstate', callback);
+  window.addEventListener('app:navigate', callback);
+
+  return () => {
+    window.removeEventListener('popstate', callback);
+    window.removeEventListener('app:navigate', callback);
+  };
+}
+
+function getCurrentPathnameSnapshot() {
+  return normalizePathname(window.location.pathname);
+}
+
 function App() {
   const {
     isAuthenticated: isUserAuthenticated,
@@ -130,8 +181,12 @@ function App() {
     currentUser: user,
     currentUserRole: userRole,
   });
-  const [currentRoute, setCurrentRoute] = useState<RouteState>(() => resolveRoute(window.location.pathname));
-  const [selectedArticle, setSelectedArticle] = useState<Newsletter | null>(null);
+  const currentPathname = useSyncExternalStore(
+    subscribeToRouteChanges,
+    getCurrentPathnameSnapshot,
+    () => '/',
+  );
+  const currentRoute = useMemo(() => resolveRoute(currentPathname), [currentPathname]);
   const [searchQuery, setSearchQuery] = useState('');
   const managerToastRouteRef = useRef<string | null>(null);
   const publishedNewsletters = newsletters
@@ -142,67 +197,44 @@ function App() {
     ? publishedNewsletters.filter((newsletter) => matchesNewsletterSearch(newsletter, trimmedSearchQuery))
     : publishedNewsletters;
   const isSearchActive = trimmedSearchQuery.length > 0;
-
-  const syncRoute = useCallback((pathname = window.location.pathname) => {
-    const nextRoute = resolveRoute(pathname);
-
-    if (
-      pathname === window.location.pathname &&
-      nextRoute.view !== 'article' &&
-      window.location.pathname !== nextRoute.pathname
-    ) {
-      window.history.replaceState({}, '', `${nextRoute.pathname}${window.location.search}`);
-    }
-
-    setCurrentRoute(nextRoute);
-  }, []);
+  const selectedArticle = useMemo(() => (
+    currentRoute.view === 'article' && currentRoute.articleId
+      ? newsletters.find((newsletter) => newsletter.id === currentRoute.articleId) ?? null
+      : null
+  ), [currentRoute.articleId, currentRoute.view, newsletters]);
 
   const navigateTo = useCallback((pathname: string, { replace = false }: { replace?: boolean } = {}) => {
     const nextRoute = resolveRoute(pathname);
     const historyMethod = replace ? 'replaceState' : 'pushState';
 
     window.history[historyMethod]({}, '', nextRoute.pathname);
-    syncRoute(nextRoute.pathname);
-  }, [syncRoute]);
-
-  useEffect(() => {
-    syncRoute();
-
-    const handlePopState = () => {
-      syncRoute();
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [syncRoute]);
+    window.dispatchEvent(new Event('app:navigate'));
+  }, []);
 
   useEffect(() => {
     if (currentRoute.view !== 'article' || !currentRoute.articleId) {
-      setSelectedArticle(null);
       return;
     }
 
-    const article = newsletters.find((newsletter) => newsletter.id === currentRoute.articleId) ?? null;
-    if (!article) {
+    if (!selectedArticle) {
       if (areNewslettersLoaded) {
-        window.history.replaceState({}, '', '/');
-        setCurrentRoute({ view: 'home', pathname: '/' });
+        navigateTo('/', { replace: true });
       }
-      setSelectedArticle(null);
       return;
     }
 
-    const canonicalArticlePath = getArticlePath(article);
+    const canonicalArticlePath = getArticlePath(selectedArticle);
     if (window.location.pathname !== canonicalArticlePath) {
       window.history.replaceState({}, '', canonicalArticlePath);
+      window.dispatchEvent(new Event('app:navigate'));
     }
-
-    setSelectedArticle(article);
-  }, [areNewslettersLoaded, currentRoute.articleId, currentRoute.view, newsletters]);
+  }, [areNewslettersLoaded, currentRoute.articleId, currentRoute.view, navigateTo, selectedArticle]);
 
   useEffect(() => {
-    if (currentRoute.view !== 'manager' || isAuthLoading) {
-      if (currentRoute.view !== 'manager') {
+    const isManagerRoute = currentRoute.view === 'manager' || currentRoute.view === 'gantt-editor';
+
+    if (!isManagerRoute || isAuthLoading) {
+      if (!isManagerRoute) {
         managerToastRouteRef.current = null;
       }
       return;
@@ -228,6 +260,14 @@ function App() {
   const handleManagerClick = () => {
     navigateTo('/manager');
   };
+
+  const handleManagerTabChange = useCallback((tab: ManagerTab) => {
+    navigateTo(tab === 'newsletters' ? '/manager' : `/manager/${tab}`);
+  }, [navigateTo]);
+
+  const handleOpenGanttEditor = useCallback((projectId: string) => {
+    navigateTo(`/gantt-editor/${encodeURIComponent(projectId)}`);
+  }, [navigateTo]);
 
   const handleArticleClick = (article: Newsletter) => {
     navigateTo(getArticlePath(article));
@@ -293,8 +333,8 @@ function App() {
     return (
       <div className="min-h-screen bg-white">
         <Toaster position="top-right" richColors />
-        <NewsletterViewer 
-          newsletter={selectedArticle} 
+        <NewsletterViewer
+          newsletter={selectedArticle}
           currentUser={user}
           onBack={handleBackToHome}
           onRequireAuth={handleRequireAuth}
@@ -317,8 +357,8 @@ function App() {
     );
   }
 
-  // Render manager dashboard
-  if (currentRoute.view === 'manager') {
+  // Render manager dashboard and manager-only editor
+  if (currentRoute.view === 'manager' || currentRoute.view === 'gantt-editor') {
     if (isAuthLoading) {
       return (
         <div className="min-h-screen bg-white">
@@ -334,10 +374,26 @@ function App() {
       return null;
     }
 
+    if (currentRoute.view === 'gantt-editor' && currentRoute.projectId) {
+      return (
+        <div className="min-h-screen bg-white">
+          <Toaster position="top-right" richColors />
+          <GanttEditorPage
+            key={currentRoute.projectId}
+            projectId={currentRoute.projectId}
+            onBack={() => navigateTo('/manager/gantt')}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-white">
         <Toaster position="top-right" richColors />
         <ManagerDashboard
+          activeTab={currentRoute.managerSection ?? 'newsletters'}
+          onTabChange={handleManagerTabChange}
+          onOpenGanttEditor={handleOpenGanttEditor}
           onLogout={handleSignOut}
           onHomeClick={handleHomeClick}
           currentUser={user}

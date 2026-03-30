@@ -1,6 +1,6 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AnalyticsUpIcon, BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Logout01Icon, Mail01Icon, Menu01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ProjectView } from './manager/ProjectView';
 import { GoalsView } from './manager/GoalsView';
 import { GanttView } from './manager/GanttView';
@@ -27,10 +27,13 @@ import {
 import type { PocketBaseUser, UserRole } from '@/lib/pocketbase/client';
 import type { Newsletter, NewsletterComment, NewsletterFormData } from '../types/newsletter';
 
-type Tab = 'newsletters' | 'projects' | 'goals' | 'gantt' | 'spreadsheet';
+export type Tab = 'newsletters' | 'projects' | 'goals' | 'gantt' | 'spreadsheet';
 type ViewMode = 'list' | 'editor' | 'viewer';
 
 interface ManagerDashboardProps {
+  activeTab: Tab;
+  onTabChange: (tab: Tab) => void;
+  onOpenGanttEditor: (projectId: string) => void;
   onLogout: () => void;
   onHomeClick: () => void;
   currentUser: PocketBaseUser | null;
@@ -46,6 +49,9 @@ interface ManagerDashboardProps {
 }
 
 export function ManagerDashboard({
+  activeTab,
+  onTabChange,
+  onOpenGanttEditor,
   onLogout,
   onHomeClick,
   currentUser,
@@ -59,7 +65,6 @@ export function ManagerDashboard({
   onAddNewsletterComment,
   onToggleCommentLike,
 }: ManagerDashboardProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('newsletters');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [editingNewsletter, setEditingNewsletter] = useState<Newsletter | null>(null);
   const [viewingNewsletter, setViewingNewsletter] = useState<Newsletter | null>(null);
@@ -67,6 +72,9 @@ export function ManagerDashboard({
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const editorRef = useRef<NewsletterEditorHandle | null>(null);
   const pendingLeaveActionRef = useRef<(() => void) | null>(null);
+  const activeViewingNewsletter = viewingNewsletter
+    ? newsletters.find((newsletter) => newsletter.id === viewingNewsletter.id) ?? null
+    : null;
 
   const tabs = [
     { id: 'newsletters' as Tab, label: 'Newsletters', icon: FileAttachmentIcon },
@@ -75,24 +83,6 @@ export function ManagerDashboard({
     { id: 'gantt' as Tab, label: 'Gantt', icon: BarChartIcon },
     { id: 'spreadsheet' as Tab, label: 'Spreadsheet', icon: FileSpreadsheetIcon },
   ].filter((tab) => canAccessManagerTab(currentUserRole, tab.id));
-
-  useEffect(() => {
-    if (!viewingNewsletter) {
-      return;
-    }
-
-    const latestViewingNewsletter = newsletters.find((newsletter) => newsletter.id === viewingNewsletter.id) ?? null;
-    if (!latestViewingNewsletter) {
-      setViewMode('list');
-      setEditingNewsletter(null);
-      setViewingNewsletter(null);
-      return;
-    }
-
-    if (latestViewingNewsletter !== viewingNewsletter) {
-      setViewingNewsletter(latestViewingNewsletter);
-    }
-  }, [newsletters, viewingNewsletter]);
 
   const handleCreateNewsletter = () => {
     if (!canCreateNewsletter(currentUserRole)) {
@@ -197,15 +187,30 @@ export function ManagerDashboard({
         );
       }
 
-      if (viewMode === 'viewer' && viewingNewsletter) {
+      if (viewMode === 'viewer' && activeViewingNewsletter) {
         return (
           <NewsletterViewer
-            newsletter={viewingNewsletter}
+            newsletter={activeViewingNewsletter}
             onBack={handleBackToList}
             currentUser={currentUser}
             onToggleLike={onToggleNewsletterLike}
             onAddComment={onAddNewsletterComment}
             onToggleCommentLike={onToggleCommentLike}
+          />
+        );
+      }
+
+      if (viewMode === 'viewer' && !activeViewingNewsletter) {
+        return (
+          <NewsletterList
+            newsletters={newsletters}
+            onCreate={handleCreateNewsletter}
+            onEdit={handleEditNewsletter}
+            onDelete={handleDeleteNewsletter}
+            onView={handleViewNewsletter}
+            canCreate={canCreateNewsletter(currentUserRole)}
+            canEdit={(newsletter) => canEditNewsletter(currentUserRole, currentUser?.id, newsletter)}
+            canDelete={() => canDeleteNewsletter(currentUserRole)}
           />
         );
       }
@@ -230,7 +235,7 @@ export function ManagerDashboard({
       case 'goals':
         return <GoalsView />;
       case 'gantt':
-        return <GanttView />;
+        return <GanttView onEditProjectGantt={onOpenGanttEditor} />;
       case 'spreadsheet':
         return <SpreadsheetView />;
       default:
@@ -325,8 +330,10 @@ export function ManagerDashboard({
                 key={tab.id}
                 onClick={() => {
                   requestLeaveEditor(() => {
-                    setActiveTab(tab.id);
-                    setViewMode('list');
+                    onTabChange(tab.id);
+                    if (tab.id !== 'newsletters') {
+                      setViewMode('list');
+                    }
                     setShowMobileMenu(false);
                   });
                 }}

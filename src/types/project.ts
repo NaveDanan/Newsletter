@@ -1,4 +1,6 @@
-export type ProjectStatus = 'completed' | 'in-progress' | 'pending' | 'delayed';
+import type { GanttTaskStatus, ProjectGantt } from './gantt';
+
+export type ProjectStatus = GanttTaskStatus;
 
 export interface Project {
   id: string;
@@ -9,6 +11,7 @@ export interface Project {
   description: string;
   status: ProjectStatus;
   isVisibleInGantt: boolean;
+  gantt: ProjectGantt;
 }
 
 export interface ProjectFormData {

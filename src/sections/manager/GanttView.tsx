@@ -1,8 +1,10 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowLeft01Icon, ArrowRight01Icon, Calendar01Icon, Edit02Icon, ViewIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Calendar01Icon, Edit02Icon, ViewIcon, ViewOffIcon } from '@hugeicons/core-free-icons';
+import { format, parseISO } from 'date-fns';
 import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { useProjects } from '../../hooks/useProjects';
+import { getProjectProgress, getTaskCalendarSpanDays, getTaskOffsetDays, getTimelineDays } from '../../lib/gantt';
+import type { GanttTask } from '../../types/gantt';
 import {
   Dialog,
   DialogContent,
@@ -11,251 +13,97 @@ import {
   DialogTitle,
 } from '../../components/ui/dialog';
 
-interface GanttTask {
-  id: string;
-  name: string;
-  track: string;
-  startWeek: number;
-  duration: number;
-  status: 'completed' | 'in-progress' | 'pending' | 'delayed';
-  owner: string;
+interface GanttViewProps {
+  onEditProjectGantt: (projectId: string) => void;
 }
 
-const tracks = ['Draft', 'Review', 'Design', 'Publish'];
-
-const tasks: GanttTask[] = [
-  { id: '1', name: 'AI Trends Research', track: 'Draft', startWeek: 1, duration: 2, status: 'completed', owner: 'Alex' },
-  { id: '2', name: 'Content Outline', track: 'Draft', startWeek: 2, duration: 1, status: 'completed', owner: 'Sarah' },
-  { id: '3', name: 'Editorial Review', track: 'Review', startWeek: 3, duration: 1, status: 'in-progress', owner: 'Marcus' },
-  { id: '4', name: 'Visual Assets', track: 'Design', startWeek: 3, duration: 2, status: 'in-progress', owner: 'Lisa' },
-  { id: '5', name: 'Newsletter Layout', track: 'Design', startWeek: 4, duration: 1, status: 'pending', owner: 'Emily' },
-  { id: '6', name: 'Issue #45 Publish', track: 'Publish', startWeek: 5, duration: 1, status: 'delayed', owner: 'Alex' },
-  { id: '7', name: 'Multimodal Deep Dive', track: 'Draft', startWeek: 4, duration: 2, status: 'pending', owner: 'David' },
-  { id: '8', name: 'Policy Analysis', track: 'Draft', startWeek: 5, duration: 2, status: 'pending', owner: 'Sarah' },
-  { id: '9', name: 'Fact Check', track: 'Review', startWeek: 6, duration: 1, status: 'pending', owner: 'Marcus' },
-  { id: '10', name: 'Social Media Kit', track: 'Design', startWeek: 6, duration: 1, status: 'delayed', owner: 'Lisa' },
-];
-
-const weeks = Array.from({ length: 6 }, (_, i) => `Week ${i + 1}`);
 const statusOrder: GanttTask['status'][] = ['pending', 'in-progress', 'completed', 'delayed'];
 
-export function GanttView() {
-  const [currentWeek, setCurrentWeek] = useState(0);
+function getStatusBadge(status: GanttTask['status']) {
+  switch (status) {
+    case 'completed':
+      return 'bg-green-100 text-green-700';
+    case 'in-progress':
+      return 'bg-[#D93A3A]/10 text-[#D93A3A]';
+    case 'pending':
+      return 'bg-[#F3F4F6] text-[#737373]';
+    case 'delayed':
+      return 'bg-yellow-100 text-yellow-700';
+  }
+}
+
+function getStatusBarColor(status: GanttTask['status']) {
+  switch (status) {
+    case 'completed':
+      return '#16A34A';
+    case 'in-progress':
+      return '#D93A3A';
+    case 'pending':
+      return '#A3A3A3';
+    case 'delayed':
+      return '#EAB308';
+  }
+}
+
+export function GanttView({ onEditProjectGantt }: GanttViewProps) {
   const [activeStatuses, setActiveStatuses] = useState<GanttTask['status'][]>([]);
   const [showManageModal, setShowManageModal] = useState(false);
-  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
-  const [projectForm, setProjectForm] = useState({
-    department: '',
-    devision: '',
-    field: '',
-    title: '',
-    description: '',
-  });
-  const { projects, updateProject, setProjectGanttVisibility } = useProjects();
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const { projects, setProjectGanttVisibility } = useProjects();
 
   const visibleProjects = useMemo(
     () => projects.filter((project) => project.isVisibleInGantt),
     [projects],
   );
 
-  const getStatusColor = (status: GanttTask['status']) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-600';
-      case 'in-progress':
-        return 'bg-[#D93A3A]';
-      case 'pending':
-        return 'bg-[#D4D4D4]';
-      case 'delayed':
-        return 'bg-yellow-500';
-    }
-  };
-
-  const getStatusBadge = (status: GanttTask['status']) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-700';
-      case 'in-progress':
-        return 'bg-[#D93A3A]/10 text-[#D93A3A]';
-      case 'pending':
-        return 'bg-[#F3F4F6] text-[#737373]';
-      case 'delayed':
-        return 'bg-yellow-100 text-yellow-700';
-    }
-  };
-
-  const getLegendClasses = (status: GanttTask['status'], isActive: boolean) => {
-    if (!isActive) {
-      return 'border-[#E5E5E5] bg-white text-[#737373] hover:border-[#D4D4D4] hover:bg-[#FAFAFA]';
+  const effectiveSelectedProjectId = selectedProjectId && visibleProjects.some((project) => project.id === selectedProjectId)
+    ? selectedProjectId
+    : visibleProjects[0]?.id ?? null;
+  const selectedProject = visibleProjects.find((project) => project.id === effectiveSelectedProjectId) ?? null;
+  const filteredTasks = useMemo(() => {
+    if (!selectedProject) {
+      return [];
     }
 
-    switch (status) {
-      case 'completed':
-        return 'border-green-300 bg-green-500/15 text-green-700 shadow-[0_0_0_1px_rgba(34,197,94,0.18)]';
-      case 'in-progress':
-        return 'border-[#D93A3A]/40 bg-[#D93A3A]/15 text-[#B42323] shadow-[0_0_0_1px_rgba(217,58,58,0.16)]';
-      case 'pending':
-        return 'border-[#CFCFCF] bg-[#E5E5E5]/70 text-[#525252] shadow-[0_0_0_1px_rgba(212,212,212,0.28)]';
-      case 'delayed':
-        return 'border-yellow-300 bg-yellow-400/20 text-yellow-800 shadow-[0_0_0_1px_rgba(234,179,8,0.18)]';
-    }
-  };
-
-  const getTaskPosition = (task: GanttTask) => {
-    const cellWidth = 100 / 6;
-    const left = (task.startWeek - 1) * cellWidth;
-    const width = task.duration * cellWidth;
-    return { left: `${left}%`, width: `${width}%` };
-  };
-
-  const visibleTasks = useMemo(() => {
     if (activeStatuses.length === 0) {
-      return tasks;
+      return selectedProject.gantt.tasks;
     }
 
-    return tasks.filter((task) => activeStatuses.includes(task.status));
-  }, [activeStatuses]);
+    return selectedProject.gantt.tasks.filter((task) => activeStatuses.includes(task.status));
+  }, [activeStatuses, selectedProject]);
+  const previewTimelineDays = useMemo(
+    () => getTimelineDays(selectedProject?.gantt.tasks ?? []),
+    [selectedProject?.gantt.tasks],
+  );
+  const timelineStart = previewTimelineDays[0] ?? new Date();
+  const dayWidth = 30;
+  const timelineWidth = Math.max(previewTimelineDays.length * dayWidth, 640);
+  const selectedProjectProgress = getProjectProgress(selectedProject?.gantt.tasks ?? []);
 
   const toggleStatusFilter = (status: GanttTask['status']) => {
-    setActiveStatuses((current) =>
+    setActiveStatuses((current) => (
       current.includes(status)
         ? current.filter((value) => value !== status)
-        : [...current, status],
-    );
+        : [...current, status]
+    ));
   };
 
-  const handleToggleProjectVisibility = (projectId: string, isVisibleInGantt: boolean) => {
-    setProjectGanttVisibility(projectId, !isVisibleInGantt);
-  };
-
-  const handleEditProject = (projectId: string) => {
-    const project = projects.find((entry) => entry.id === projectId);
-    if (!project) {
-      return;
-    }
-
-    setProjectForm({
-      department: project.department,
-      devision: project.devision,
-      field: project.field,
-      title: project.title,
-      description: project.description,
-    });
-    setEditingProjectId(project.id);
-  };
-
-  const handleCloseEditDialog = () => {
-    setEditingProjectId(null);
-    setProjectForm({
-      department: '',
-      devision: '',
-      field: '',
-      title: '',
-      description: '',
-    });
-  };
-
-  const handleSaveProject = () => {
-    if (!editingProjectId) {
-      return;
-    }
-
-    if (!projectForm.department || !projectForm.devision || !projectForm.field || !projectForm.title) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    updateProject(editingProjectId, projectForm);
-    handleCloseEditDialog();
-    toast.success('Project updated successfully');
+  const handleOpenEditor = (projectId: string) => {
+    setShowManageModal(false);
+    onEditProjectGantt(projectId);
   };
 
   return (
     <div className="space-y-6">
-      <Dialog open={Boolean(editingProjectId)} onOpenChange={(open) => {
-        if (!open) {
-          handleCloseEditDialog();
-        }
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Project</DialogTitle>
-            <DialogDescription>Update the selected project from the Gantt manager.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm text-[#737373] mb-1 block">Title *</label>
-              <input
-                type="text"
-                value={projectForm.title}
-                onChange={(event) => setProjectForm({ ...projectForm, title: event.target.value })}
-                placeholder="Enter project title"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-[#737373] mb-1 block">Devision *</label>
-              <input
-                type="text"
-                value={projectForm.devision}
-                onChange={(event) => setProjectForm({ ...projectForm, devision: event.target.value })}
-                placeholder="Enter devision"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-[#737373] mb-1 block">Field *</label>
-              <input
-                type="text"
-                value={projectForm.field}
-                onChange={(event) => setProjectForm({ ...projectForm, field: event.target.value })}
-                placeholder="Enter field"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-[#737373] mb-1 block">Department *</label>
-              <input
-                type="text"
-                value={projectForm.department}
-                onChange={(event) => setProjectForm({ ...projectForm, department: event.target.value })}
-                placeholder="Enter department"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-[#737373] mb-1 block">Description</label>
-              <textarea
-                value={projectForm.description}
-                onChange={(event) => setProjectForm({ ...projectForm, description: event.target.value })}
-                placeholder="Enter description"
-                rows={3}
-                className="w-full"
-              />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={handleCloseEditDialog}
-                className="flex-1 btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveProject}
-                className="flex-1 btn-primary"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={showManageModal} onOpenChange={setShowManageModal}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Manage Gantts</DialogTitle>
-            <DialogDescription>Show or hide projects from the Gantt page, or edit them directly from here.</DialogDescription>
+            <DialogDescription>
+              Show or hide projects on the overview and jump into the dedicated schedule editor.
+            </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[420px] overflow-y-auto rounded-xl border border-[#E5E5E5]">
+          <div className="max-h-[480px] overflow-y-auto rounded-2xl border border-[#E5E5E5]">
             {projects.length === 0 ? (
               <div className="p-8 text-center text-sm text-[#737373]">No projects available yet.</div>
             ) : (
@@ -263,40 +111,43 @@ export function GanttView() {
                 {projects.map((project) => (
                   <div
                     key={project.id}
-                    className="group flex items-start justify-between gap-4 p-4 hover:bg-[#F9FAFB] transition-colors"
+                    className="group flex items-start justify-between gap-4 p-4 transition-colors hover:bg-[#F9FAFB]"
                   >
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h4 className="font-medium text-[#171717]">{project.title}</h4>
-                        <span className="text-xs px-2 py-1 rounded-full bg-[#F3F4F6] text-[#737373]">
+                        <span className="rounded-full bg-[#F3F4F6] px-2 py-1 text-xs text-[#737373]">
                           {project.department}
                         </span>
+                        <span className="rounded-full bg-[#FEF2F2] px-2 py-1 text-xs text-[#D93A3A]">
+                          {project.gantt.tasks.length} tasks
+                        </span>
                       </div>
-                      <p className="mt-1 text-sm text-[#737373] line-clamp-2">
+                      <p className="mt-1 line-clamp-2 text-sm text-[#737373]">
                         {project.description || 'No description'}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       <button
                         type="button"
-                        onClick={() => handleToggleProjectVisibility(project.id, project.isVisibleInGantt)}
-                        className={`p-2 rounded-lg transition-colors ${
+                        onClick={() => setProjectGanttVisibility(project.id, !project.isVisibleInGantt)}
+                        className={`rounded-lg p-2 transition-colors ${
                           project.isVisibleInGantt
                             ? 'text-[#D93A3A] hover:bg-[#D93A3A]/10'
                             : 'text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717]'
                         }`}
-                        title={project.isVisibleInGantt ? 'Hide project from Gantt page' : 'Show project on Gantt page'}
+                        title={project.isVisibleInGantt ? 'Hide from Gantt overview' : 'Show on Gantt overview'}
                       >
-                        <HugeiconsIcon icon={project.isVisibleInGantt ? ViewOffIcon : ViewIcon} className="w-4 h-4" />
+                        <HugeiconsIcon icon={project.isVisibleInGantt ? ViewOffIcon : ViewIcon} className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleEditProject(project.id)}
-                        className="p-2 rounded-lg text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717] transition-colors"
-                        title="Edit"
+                        onClick={() => handleOpenEditor(project.id)}
+                        className="rounded-lg p-2 text-[#737373] transition-colors hover:bg-[#F3F4F6] hover:text-[#171717]"
+                        title="Edit schedule"
                       >
-                        <HugeiconsIcon icon={Edit02Icon} className="w-4 h-4" />
+                        <HugeiconsIcon icon={Edit02Icon} className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
@@ -310,7 +161,9 @@ export function GanttView() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-bold text-[#171717]">Gantt Projects</h2>
-          <p className="text-sm text-[#737373]">Manage which projects are currently shown on the Gantt page.</p>
+          <p className="text-sm text-[#737373]">
+            Pick a visible project to preview its saved schedule, or manage which projects appear here.
+          </p>
         </div>
         <button
           type="button"
@@ -321,179 +174,210 @@ export function GanttView() {
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {visibleProjects.length === 0 ? (
-          <span className="text-sm text-[#737373]">No projects are visible in Gantt right now.</span>
-        ) : (
-          visibleProjects.map((project) => (
-            <span
-              key={project.id}
-              className="inline-flex items-center rounded-full border border-[#E5E5E5] bg-white px-3 py-1 text-xs text-[#525252]"
-            >
-              {project.title}
-            </span>
-          ))
-        )}
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-[#171717]">Content Timeline</h2>
-          <p className="text-sm text-[#737373]">6-week publishing schedule</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCurrentWeek(Math.max(0, currentWeek - 1))}
-            className="p-2 text-[#737373] hover:text-[#171717] hover:bg-[#F3F4F6] rounded-lg transition-colors"
-          >
-            <HugeiconsIcon icon={ArrowLeft01Icon} className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E5E5E5] rounded-lg">
-            <HugeiconsIcon icon={Calendar01Icon} className="w-4 h-4 text-[#D93A3A]" />
-            <span className="text-sm text-[#171717]">Jul - Aug 2024</span>
+      {visibleProjects.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-[#D4D4D8] bg-white px-6 py-14 text-center">
+          <div className="mx-auto inline-flex rounded-full bg-[#FEF2F2] p-4 text-[#D93A3A]">
+            <HugeiconsIcon icon={Calendar01Icon} className="h-7 w-7" />
           </div>
-          <button
-            onClick={() => setCurrentWeek(Math.min(4, currentWeek + 1))}
-            className="p-2 text-[#737373] hover:text-[#171717] hover:bg-[#F3F4F6] rounded-lg transition-colors"
-          >
-            <HugeiconsIcon icon={ArrowRight01Icon} className="w-5 h-5" />
-          </button>
+          <h3 className="mt-5 text-xl font-semibold text-[#171717]">No visible Gantt projects</h3>
+          <p className="mt-2 text-sm text-[#737373]">
+            Use Manage Gantts to make one or more projects visible on the overview.
+          </p>
         </div>
-      </div>
-
-      <div className="bg-white border border-[#E5E5E5] rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[180px_1fr] border-b border-[#E5E5E5]">
-          <div className="p-4 border-r border-[#E5E5E5]">
-            <span className="text-xs font-medium text-[#737373] uppercase tracking-wider">Project</span>
-          </div>
-          <div className="grid grid-cols-6">
-            {weeks.map((week, i) => (
-              <div
-                key={week}
-                className={`p-4 text-center border-r border-[#E5E5E5] last:border-r-0 ${
-                  i === currentWeek ? 'bg-[#D93A3A]/5' : ''
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            {visibleProjects.map((project) => (
+              <button
+                key={project.id}
+                type="button"
+                onClick={() => setSelectedProjectId(project.id)}
+                className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                  project.id === effectiveSelectedProjectId
+                    ? 'border-[#D93A3A] bg-[#FEF2F2] text-[#D93A3A]'
+                    : 'border-[#E5E5E5] bg-white text-[#525252] hover:border-[#D4D4D4] hover:bg-[#FAFAFA]'
                 }`}
               >
-                <span className={`text-sm ${i === currentWeek ? 'text-[#D93A3A] font-medium' : 'text-[#737373]'}`}>
-                  {week}
-                </span>
-              </div>
+                {project.title}
+              </button>
             ))}
           </div>
-        </div>
 
-        <div className="divide-y divide-[#E5E5E5]">
-          {tracks.map((track) => {
-            const trackTasks = visibleTasks.filter((task) => task.track === track);
-
-            return (
-              <div key={track} className="grid grid-cols-[180px_1fr]">
-                <div className="p-4 border-r border-[#E5E5E5] bg-[#F9FAFB]">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-[#D93A3A]" />
-                    <span className="font-medium text-[#171717]">{track}</span>
+          {selectedProject ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_220px_220px]">
+                <div className="rounded-3xl border border-[#E5E5E5] bg-white p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#D93A3A]">Selected Project</p>
+                      <h3 className="mt-2 text-2xl font-bold text-[#171717]">{selectedProject.title}</h3>
+                      <p className="mt-2 text-sm text-[#737373]">{selectedProject.description || 'No description yet.'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditor(selectedProject.id)}
+                      className="btn-primary inline-flex items-center gap-2"
+                    >
+                      <HugeiconsIcon icon={Edit02Icon} className="h-4 w-4" />
+                      Edit Schedule
+                    </button>
                   </div>
                 </div>
+                <div className="rounded-3xl border border-[#E5E5E5] bg-white p-6">
+                  <p className="text-xs uppercase tracking-[0.18em] text-[#737373]">Tasks</p>
+                  <p className="mt-3 text-3xl font-semibold text-[#171717]">{selectedProject.gantt.tasks.length}</p>
+                  <p className="mt-2 text-sm text-[#737373]">Saved in this project schedule.</p>
+                </div>
+                <div className="rounded-3xl border border-[#E5E5E5] bg-white p-6">
+                  <p className="text-xs uppercase tracking-[0.18em] text-[#737373]">Resources</p>
+                  <p className="mt-3 text-3xl font-semibold text-[#171717]">{selectedProject.gantt.resources.length}</p>
+                  <p className="mt-2 text-sm text-[#737373]">Assignable people in the editor.</p>
+                </div>
+                <div className="rounded-3xl border border-[#E5E5E5] bg-white p-6">
+                  <p className="text-xs uppercase tracking-[0.18em] text-[#737373]">Progress</p>
+                  <p className="mt-3 text-3xl font-semibold text-[#171717]">{selectedProjectProgress}%</p>
+                  <p className="mt-2 text-sm text-[#737373]">
+                    {selectedProject.gantt.lastEditedAt
+                      ? `Updated ${format(parseISO(selectedProject.gantt.lastEditedAt), 'MMM d, yyyy')}`
+                      : 'No saved schedule yet'}
+                  </p>
+                </div>
+              </div>
 
-                <div className="relative grid grid-cols-6">
-                  {weeks.map((week, i) => (
-                    <div
-                      key={week}
-                      className={`border-r border-[#E5E5E5] last:border-r-0 ${
-                        i === currentWeek ? 'bg-[#D93A3A]/5' : ''
-                      }`}
-                    />
-                  ))}
+              {selectedProject.gantt.tasks.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-[#D4D4D8] bg-white px-6 py-14 text-center">
+                  <h3 className="text-xl font-semibold text-[#171717]">This project has no schedule yet</h3>
+                  <p className="mt-2 text-sm text-[#737373]">
+                    Open the editor to add tasks, dependencies, resources, and timeline bars.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditor(selectedProject.id)}
+                    className="btn-primary mt-6 inline-flex items-center gap-2"
+                  >
+                    <HugeiconsIcon icon={Edit02Icon} className="h-4 w-4" />
+                    Create Schedule
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {statusOrder.map((status) => {
+                      const isActive = activeStatuses.includes(status);
+                      return (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => toggleStatusFilter(status)}
+                          className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'border-[#D93A3A] bg-[#FEF2F2] text-[#D93A3A]'
+                              : 'border-[#E5E5E5] bg-white text-[#525252] hover:border-[#D4D4D4]'
+                          }`}
+                        >
+                          {status.replace('-', ' ')}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                  <div className="absolute inset-0 py-2">
-                    {trackTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className="absolute h-5 mx-1 rounded cursor-pointer group"
-                        style={{
-                          ...getTaskPosition(task),
-                          top: '10px',
-                        }}
-                      >
-                        <div
-                          className={`h-full rounded ${getStatusColor(task.status)} opacity-80 group-hover:opacity-100 transition-opacity`}
-                        />
-                        <div className="absolute inset-0 flex items-center px-2">
-                          <span className="text-xs text-white font-medium truncate">
-                            {task.name}
-                          </span>
+                  {filteredTasks.length === 0 ? (
+                    <div className="rounded-3xl border border-[#E5E5E5] bg-white px-6 py-10 text-center text-sm text-[#737373]">
+                      No tasks match the current status filters.
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden rounded-3xl border border-[#E5E5E5] bg-white">
+                      <div className="grid grid-cols-[320px_minmax(0,1fr)]">
+                        <div className="border-r border-[#E5E5E5]">
+                          <div className="grid h-14 grid-cols-[52px_minmax(0,1fr)_92px] border-b border-[#E5E5E5] bg-[#F8FAFC] text-xs font-semibold uppercase tracking-[0.18em] text-[#737373]">
+                            <div className="flex items-center justify-center border-r border-[#E5E5E5]">#</div>
+                            <div className="flex items-center border-r border-[#E5E5E5] px-4">Task</div>
+                            <div className="flex items-center px-4">Status</div>
+                          </div>
+                          {filteredTasks.map((task) => {
+                            const resource = selectedProject.gantt.resources.find((entry) => entry.id === task.resourceId);
+
+                            return (
+                              <div key={task.id} className="grid h-14 grid-cols-[52px_minmax(0,1fr)_92px] border-b border-[#E5E5E5] last:border-b-0">
+                                <div className="flex items-center justify-center border-r border-[#E5E5E5] text-xs font-semibold text-[#525252]">
+                                  {selectedProject.gantt.tasks.findIndex((entry) => entry.id === task.id) + 1}
+                                </div>
+                                <div className="border-r border-[#E5E5E5] px-4 py-3">
+                                  <p className="truncate text-sm font-medium text-[#171717]">{task.name}</p>
+                                  <p className="truncate text-xs text-[#737373]">{resource?.name ?? 'Unassigned'}</p>
+                                </div>
+                                <div className="flex items-center px-3">
+                                  <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${getStatusBadge(task.status)}`}>
+                                    {task.status.replace('-', ' ')}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
 
-                        <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-10">
-                          <div className="bg-white border border-[#E5E5E5] rounded-lg shadow-lg p-3 min-w-[180px]">
-                            <p className="font-medium text-[#171717] mb-1">{task.name}</p>
-                            <p className="text-xs text-[#737373]">Owner: {task.owner}</p>
-                            <p className="text-xs text-[#737373]">Status: {task.status}</p>
+                        <div className="overflow-x-auto">
+                          <div style={{ width: timelineWidth }}>
+                            <div
+                              className="grid h-14 border-b border-[#E5E5E5] bg-[#F8FAFC]"
+                              style={{ gridTemplateColumns: `repeat(${previewTimelineDays.length}, minmax(${dayWidth}px, 1fr))` }}
+                            >
+                              {previewTimelineDays.map((day) => (
+                                <div key={day.toISOString()} className="border-r border-[#E5E5E5] px-1 py-2 text-center text-xs last:border-r-0">
+                                  <p className="uppercase tracking-[0.18em] text-[#A3A3A3]">{format(day, 'EEE')}</p>
+                                  <p className="mt-1 font-medium text-[#171717]">{format(day, 'd')}</p>
+                                </div>
+                              ))}
+                            </div>
+
+                            {filteredTasks.map((task) => {
+                              const resource = selectedProject.gantt.resources.find((entry) => entry.id === task.resourceId) ?? null;
+                              const barColor = resource?.color ?? getStatusBarColor(task.status);
+                              const left = getTaskOffsetDays(task, timelineStart) * dayWidth + 4;
+                              const width = task.milestone ? 18 : Math.max((getTaskCalendarSpanDays(task) * dayWidth) - 8, 24);
+
+                              return (
+                                <div key={task.id} className="relative h-14 border-b border-[#E5E5E5] last:border-b-0">
+                                  <div
+                                    className="absolute inset-0 grid"
+                                    style={{ gridTemplateColumns: `repeat(${previewTimelineDays.length}, minmax(${dayWidth}px, 1fr))` }}
+                                  >
+                                    {previewTimelineDays.map((day) => (
+                                      <div key={`${task.id}-${day.toISOString()}`} className="border-r border-[#F1F5F9] last:border-r-0" />
+                                    ))}
+                                  </div>
+                                  <div
+                                    className={`absolute top-1/2 -translate-y-1/2 ${
+                                      task.milestone ? '' : 'rounded-full'
+                                    }`}
+                                    style={{
+                                      left,
+                                      width,
+                                      height: task.milestone ? 18 : 26,
+                                      backgroundColor: task.milestone ? 'transparent' : barColor,
+                                    }}
+                                  >
+                                    {task.milestone ? (
+                                      <div
+                                        className="h-[18px] w-[18px] rotate-45 rounded-[4px] border-2 border-white"
+                                        style={{ backgroundColor: barColor }}
+                                      />
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        {statusOrder.map((status) => {
-          const isActive = activeStatuses.includes(status);
-
-          return (
-            <button
-              key={status}
-              type="button"
-              onClick={() => toggleStatusFilter(status)}
-              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition-all ${getLegendClasses(status, isActive)}`}
-            >
-              <div className={`w-3 h-3 rounded-full ${getStatusColor(status)}`} />
-              <span className="capitalize">{status.replace('-', ' ')}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="bg-white border border-[#E5E5E5] rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-[#E5E5E5]">
-          <h3 className="font-bold text-[#171717]">Task Details</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#E5E5E5]">
-                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Project</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Track</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Owner</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Start</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Duration</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E5E5E5]">
-              {visibleTasks.map((task) => (
-                <tr key={task.id} className="hover:bg-[#F9FAFB]">
-                  <td className="py-3 px-4 text-[#171717]">{task.name}</td>
-                  <td className="py-3 px-4 text-[#737373]">{task.track}</td>
-                  <td className="py-3 px-4 text-[#737373]">{task.owner}</td>
-                  <td className="py-3 px-4 text-[#737373]">Week {task.startWeek}</td>
-                  <td className="py-3 px-4 text-[#737373]">{task.duration} week(s)</td>
-                  <td className="py-3 px-4">
-                    <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadge(task.status)}`}>
-                      {task.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

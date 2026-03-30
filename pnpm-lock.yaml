@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@fortawesome/free-solid-svg-icons':
+        specifier: ^7.2.0
+        version: 7.2.0
+      '@fortawesome/react-fontawesome':
+        specifier: ^3.3.0
+        version: 3.3.0(@fortawesome/fontawesome-svg-core@7.2.0)(react@19.2.4)
       '@gsap/react':
         specifier: ^2.1.2
         version: 2.1.2(gsap@3.14.2)(react@19.2.4)
@@ -188,6 +194,9 @@ importers:
       input-otp:
         specifier: ^1.4.2
         version: 1.4.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      lucide-react:
+        specifier: ^1.7.0
+        version: 1.7.0(react@19.2.4)
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -584,6 +593,25 @@ packages:
 
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
+
+  '@fortawesome/fontawesome-common-types@7.2.0':
+    resolution: {integrity: sha512-IpR0bER9FY25p+e7BmFH25MZKEwFHTfRAfhOyJubgiDnoJNsSvJ7nigLraHtp4VOG/cy8D7uiV0dLkHOne5Fhw==}
+    engines: {node: '>=6'}
+
+  '@fortawesome/fontawesome-svg-core@7.2.0':
+    resolution: {integrity: sha512-6639htZMjEkwskf3J+e6/iar+4cTNM9qhoWuRfj9F3eJD6r7iCzV1SWnQr2Mdv0QT0suuqU8BoJCZUyCtP9R4Q==}
+    engines: {node: '>=6'}
+
+  '@fortawesome/free-solid-svg-icons@7.2.0':
+    resolution: {integrity: sha512-YTVITFGN0/24PxzXrwqCgnyd7njDuzp5ZvaCx5nq/jg55kUYd94Nj8UTchBdBofi/L0nwRfjGOg0E41d2u9T1w==}
+    engines: {node: '>=6'}
+
+  '@fortawesome/react-fontawesome@3.3.0':
+    resolution: {integrity: sha512-EHmHeTf8WgO29sdY3iX/7ekE3gNUdlc2RW6mm/FzELlHFKfTrA9S4MlyquRR+RRCRCn8+jXfLFpLGB2l7wCWyw==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@fortawesome/fontawesome-svg-core': ~6 || ~7
+      react: ^18.0.0 || ^19.0.0
 
   '@gsap/react@2.1.2':
     resolution: {integrity: sha512-JqliybO1837UcgH2hVOM4VO+38APk3ECNrsuSM4MuXp+rbf+/2IG2K1YJiqfTcXQHH7XlA0m3ykniFYstfq0Iw==}
@@ -2357,6 +2385,11 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
+  lucide-react@1.7.0:
+    resolution: {integrity: sha512-yI7BeItCLZJTXikmK4KNUGCKoGzSvbKlfCvw44bU4fXAL6v3gYS4uHD1jzsLkfwODYwI6Drw5Tu9Z5ulDe0TSg==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   markdown-it@14.1.1:
     resolution: {integrity: sha512-BuU2qnTti9YKgK5N+IeMubp14ZUKUUw7yeJbkjtosvHiP0AZ5c8IAgEMk79D0eC8F23r4Ac/q8cAIFdm2FtyoA==}
     hasBin: true
@@ -3221,6 +3254,21 @@ snapshots:
       react-dom: 19.2.4(react@19.2.4)
 
   '@floating-ui/utils@0.2.11': {}
+
+  '@fortawesome/fontawesome-common-types@7.2.0': {}
+
+  '@fortawesome/fontawesome-svg-core@7.2.0':
+    dependencies:
+      '@fortawesome/fontawesome-common-types': 7.2.0
+
+  '@fortawesome/free-solid-svg-icons@7.2.0':
+    dependencies:
+      '@fortawesome/fontawesome-common-types': 7.2.0
+
+  '@fortawesome/react-fontawesome@3.3.0(@fortawesome/fontawesome-svg-core@7.2.0)(react@19.2.4)':
+    dependencies:
+      '@fortawesome/fontawesome-svg-core': 7.2.0
+      react: 19.2.4
 
   '@gsap/react@2.1.2(gsap@3.14.2)(react@19.2.4)':
     dependencies:
@@ -4984,6 +5032,10 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  lucide-react@1.7.0(react@19.2.4):
+    dependencies:
+      react: 19.2.4
 
   markdown-it@14.1.1:
     dependencies:

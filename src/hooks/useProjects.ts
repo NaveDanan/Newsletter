@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { readStoredValue, writeStoredValue } from '../lib/localStorage';
+import { createEmptyProjectGantt, normalizeProjectGantt } from '../lib/gantt';
 import type { Project, ProjectFormData, ProjectStatus } from '../types/project';
+import type { ProjectGantt } from '../types/gantt';
 
 const STORAGE_KEY = 'pulse_ai_projects';
 
@@ -26,18 +28,16 @@ function normalizeProject(rawProject: unknown, index: number): Project | null {
     description: typeof candidate.description === 'string' ? candidate.description : '',
     status: candidate.status ?? 'pending',
     isVisibleInGantt: typeof candidate.isVisibleInGantt === 'boolean' ? candidate.isVisibleInGantt : true,
+    gantt: normalizeProjectGantt(candidate.gantt),
   };
 }
 
 export function useProjects() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
+  const [projects, setProjects] = useState<Project[]>(() => {
     const storedProjects = readStoredValue<unknown[]>(STORAGE_KEY, []);
-    setProjects(storedProjects.map(normalizeProject).filter((project): project is Project => project !== null));
-    setIsLoaded(true);
-  }, []);
+    return storedProjects.map(normalizeProject).filter((project): project is Project => project !== null);
+  });
+  const isLoaded = true;
 
   useEffect(() => {
     if (!isLoaded) {
@@ -57,6 +57,7 @@ export function useProjects() {
       description: data.description,
       status: 'pending',
       isVisibleInGantt: true,
+      gantt: createEmptyProjectGantt(),
     };
 
     setProjects((currentProjects) => [...currentProjects, newProject]);
@@ -134,6 +135,27 @@ export function useProjects() {
     return updatedProject;
   }, []);
 
+  const updateProjectGantt = useCallback((id: string, gantt: ProjectGantt): Project | null => {
+    let updatedProject: Project | null = null;
+
+    setProjects((currentProjects) =>
+      currentProjects.map((project) => {
+        if (project.id !== id) {
+          return project;
+        }
+
+        updatedProject = {
+          ...project,
+          gantt: normalizeProjectGantt(gantt),
+        };
+
+        return updatedProject;
+      }),
+    );
+
+    return updatedProject;
+  }, []);
+
   return {
     projects,
     isLoaded,
@@ -142,5 +164,6 @@ export function useProjects() {
     deleteProject,
     setProjectGanttVisibility,
     updateProjectStatus,
+    updateProjectGantt,
   };
 }

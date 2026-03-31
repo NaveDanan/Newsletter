@@ -696,7 +696,7 @@ export function SpreadsheetView() {
           lastEditedAt: new Date().toISOString(),
         };
 
-        addProject({
+        await addProject({
           title,
           department,
           devision:    resolveCell(row['Division']    ?? row['Devision']    ?? ''),

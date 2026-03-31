@@ -585,7 +585,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
       lastEditedAt: new Date().toISOString(),
     };
 
-    updateProjectGantt(project.id, nextGantt);
+    void updateProjectGantt(project.id, nextGantt);
     setSavedSnapshot(JSON.stringify(nextGantt));
     applyDraftGantt(nextGantt);
     toast.success('Gantt schedule saved');

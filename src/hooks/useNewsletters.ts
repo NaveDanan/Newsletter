@@ -1,28 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { writeStoredValue } from '../lib/localStorage';
+import { toast } from 'sonner';
 import { canCreateNewsletter, canDeleteNewsletter, canEditNewsletter } from '@/lib/auth/permissions';
 import { stripCommentFormatting } from '@/lib/comment-formatting';
+import {
+  fetchNewsletters,
+  createNewsletter,
+  patchNewsletter,
+  removeNewsletter,
+} from '@/lib/pocketbase/newsletters';
 import type { PocketBaseUser, UserRole } from '@/lib/pocketbase/client';
 import type { Newsletter, NewsletterComment, NewsletterFormData } from '../types/newsletter';
-import {
-  calculateReadTime,
-  extractExcerpt,
-  loadNewsletters,
-  NEWSLETTER_STORAGE_KEY,
-} from '../lib/newsletters';
-
-function hasMeaningfulDraftContent(data: Partial<NewsletterFormData>): boolean {
-  const plainContent = (data.content ?? '').replace(/<[^>]*>/g, '').trim();
-
-  return Boolean(
-    data.title?.trim() ||
-    data.subtitle?.trim() ||
-    plainContent ||
-    data.author?.trim() ||
-    data.coverImage?.trim() ||
-    data.tags?.length
-  );
-}
 
 interface UseNewslettersOptions {
   currentUser: PocketBaseUser | null;
@@ -34,219 +21,213 @@ function createClientId(): string {
 }
 
 export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersOptions) {
-  const [newsletters, setNewsletters] = useState<Newsletter[]>(() => loadNewsletters());
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load from localStorage on mount
+  // ---------------------------------------------------------------------------
+  // Initial fetch from PocketBase
+  // ---------------------------------------------------------------------------
   useEffect(() => {
-    setIsLoaded(true);
-  }, []);
+    let cancelled = false;
 
-  // Save to localStorage whenever newsletters change
-  useEffect(() => {
-    if (isLoaded) {
-      writeStoredValue(NEWSLETTER_STORAGE_KEY, newsletters);
-    }
-  }, [newsletters, isLoaded]);
-
-  const addNewsletter = useCallback((data: NewsletterFormData): Newsletter | null => {
-    if (!canCreateNewsletter(currentUserRole)) {
-      return null;
-    }
-
-    const newNewsletter: Newsletter = {
-      id: createClientId(),
-      ...data,
-      createdById: currentUser?.id,
-      excerpt: extractExcerpt(data.content),
-      publishedAt: new Date().toISOString().split('T')[0],
-      readTime: calculateReadTime(data.content),
-      likes: 0,
-      comments: 0,
-      shares: 0,
-      likedByUserIds: [],
-      commentItems: [],
-    };
-    setNewsletters(prev => {
-      const next = [newNewsletter, ...prev];
-      writeStoredValue(NEWSLETTER_STORAGE_KEY, next);
-      return next;
-    });
-    return newNewsletter;
-  }, [currentUser?.id, currentUserRole]);
-
-  const upsertDraftNewsletter = useCallback((
-    id: string | null,
-    data: Partial<NewsletterFormData>,
-  ): Newsletter | null => {
-    if (!canCreateNewsletter(currentUserRole)) {
-      return null;
-    }
-
-    if (id) {
-      let updated: Newsletter | null = null;
-
-      setNewsletters(prev => {
-        const index = prev.findIndex(n => n.id === id);
-        if (index === -1) {
-          return prev;
+    setIsLoading(true);
+    fetchNewsletters()
+      .then((data) => {
+        if (!cancelled) {
+          setNewsletters(data);
+          setError(null);
         }
-
-        const existing = prev[index];
-        if (!canEditNewsletter(currentUserRole, currentUser?.id, existing)) {
-          return prev;
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : 'Failed to load newsletters';
+          console.error('useNewsletters fetch error:', err);
+          setError(message);
+          toast.error(`Newsletters: ${message}`);
         }
-
-        updated = {
-          ...existing,
-          ...data,
-          status: 'draft',
-          excerpt: extractExcerpt(data.content ?? existing.content),
-          readTime: calculateReadTime(data.content ?? existing.content),
-        };
-
-        const next = [...prev];
-        next[index] = updated;
-        writeStoredValue(NEWSLETTER_STORAGE_KEY, next);
-        return next;
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
       });
 
-      return updated;
-    }
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-    if (!hasMeaningfulDraftContent(data)) {
+  // ---------------------------------------------------------------------------
+  // Add (publish immediately)
+  // ---------------------------------------------------------------------------
+  const addNewsletter = useCallback(async (data: NewsletterFormData): Promise<Newsletter | null> => {
+    if (!canCreateNewsletter(currentUserRole)) {
+      return null;
+    }
+    try {
+      const created = await createNewsletter(data, {
+        createdById: currentUser?.id,
+        authorAvatar: currentUser?.avatar,
+      });
+      setNewsletters((prev) => [created, ...prev]);
+      return created;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create newsletter';
+      toast.error(message);
+      return null;
+    }
+  }, [currentUser, currentUserRole]);
+
+  // ---------------------------------------------------------------------------
+  // Upsert draft (auto-save while editing)
+  // ---------------------------------------------------------------------------
+  const upsertDraftNewsletter = useCallback(async (
+    id: string | null,
+    data: Partial<NewsletterFormData>,
+  ): Promise<Newsletter | null> => {
+    if (!canCreateNewsletter(currentUserRole)) {
       return null;
     }
 
-    const newDraft: Newsletter = {
-      id: createClientId(),
-      title: data.title?.trim() || 'Untitled Draft',
-      subtitle: data.subtitle ?? '',
-      content: data.content ?? '',
-      excerpt: extractExcerpt(data.content ?? ''),
-      author: data.author ?? currentUser?.name ?? '',
-      authorAvatar: currentUser?.avatar ?? '',
-      createdById: currentUser?.id,
-      publishedAt: new Date().toISOString().split('T')[0],
-      readTime: calculateReadTime(data.content ?? ''),
-      coverImage: data.coverImage ?? '',
-      likes: 0,
-      comments: 0,
-      shares: 0,
-      tags: data.tags ?? [],
-      status: 'draft',
-      likedByUserIds: [],
-      commentItems: [],
-    };
+    // Update existing draft
+    if (id) {
+      const existing = newsletters.find((n) => n.id === id);
+      if (!existing) return null;
+      if (!canEditNewsletter(currentUserRole, currentUser?.id, existing)) return null;
 
-    setNewsletters(prev => {
-      const next = [newDraft, ...prev];
-      writeStoredValue(NEWSLETTER_STORAGE_KEY, next);
-      return next;
-    });
-    return newDraft;
-  }, [currentUser?.avatar, currentUser?.id, currentUser?.name, currentUserRole]);
-
-  const updateNewsletter = useCallback((id: string, data: Partial<NewsletterFormData>): Newsletter | null => {
-    let updated: Newsletter | null = null;
-    setNewsletters(prev => {
-      const index = prev.findIndex(n => n.id === id);
-      if (index === -1) return prev;
-      
-      const existing = prev[index];
-      if (!canEditNewsletter(currentUserRole, currentUser?.id, existing)) {
-        return prev;
+      try {
+        const updated = await patchNewsletter(id, { ...data, status: 'draft' });
+        setNewsletters((prev) => prev.map((n) => (n.id === id ? updated : n)));
+        return updated;
+      } catch (err) {
+        console.error('upsertDraftNewsletter update error:', err);
+        return null;
       }
+    }
 
-      updated = {
-        ...existing,
-        ...data,
-        excerpt: data.content !== undefined
-          ? extractExcerpt(data.content)
-          : existing.excerpt,
-        readTime: data.content !== undefined
-          ? calculateReadTime(data.content)
-          : existing.readTime,
+    // Check there's something meaningful to save
+    const plainContent = (data.content ?? '').replace(/<[^>]*>/g, '').trim();
+    const hasMeaningfulContent = Boolean(
+      data.title?.trim() || data.subtitle?.trim() || plainContent || data.author?.trim(),
+    );
+    if (!hasMeaningfulContent) return null;
+
+    // Create new draft
+    try {
+      const draftData: NewsletterFormData = {
+        title: data.title?.trim() || 'Untitled Draft',
+        subtitle: data.subtitle ?? '',
+        content: data.content ?? '',
+        author: data.author ?? currentUser?.name ?? '',
+        coverImage: data.coverImage ?? '',
+        tags: data.tags ?? [],
+        status: 'draft',
       };
-      
-      const newArray = [...prev];
-      newArray[index] = updated;
-      writeStoredValue(NEWSLETTER_STORAGE_KEY, newArray);
-      return newArray;
-    });
-    return updated;
-  }, [currentUser?.id, currentUserRole]);
+      const created = await createNewsletter(draftData, {
+        createdById: currentUser?.id,
+        authorAvatar: currentUser?.avatar,
+      });
+      setNewsletters((prev) => [created, ...prev]);
+      return created;
+    } catch (err) {
+      console.error('upsertDraftNewsletter create error:', err);
+      return null;
+    }
+  }, [currentUser, currentUserRole, newsletters]);
 
-  const deleteNewsletter = useCallback((id: string): boolean => {
+  // ---------------------------------------------------------------------------
+  // Update newsletter
+  // ---------------------------------------------------------------------------
+  const updateNewsletter = useCallback(async (id: string, data: Partial<NewsletterFormData>): Promise<Newsletter | null> => {
+    const existing = newsletters.find((n) => n.id === id);
+    if (!existing) return null;
+    if (!canEditNewsletter(currentUserRole, currentUser?.id, existing)) return null;
+
+    try {
+      const updated = await patchNewsletter(id, data);
+      setNewsletters((prev) => prev.map((n) => (n.id === id ? updated : n)));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update newsletter';
+      toast.error(message);
+      return null;
+    }
+  }, [currentUser?.id, currentUserRole, newsletters]);
+
+  // ---------------------------------------------------------------------------
+  // Delete
+  // ---------------------------------------------------------------------------
+  const deleteNewsletter = useCallback(async (id: string): Promise<boolean> => {
     if (!canDeleteNewsletter(currentUserRole)) {
       return false;
     }
-
-    let found = false;
-    setNewsletters(prev => {
-      const filtered = prev.filter(n => n.id !== id);
-      found = filtered.length !== prev.length;
-      writeStoredValue(NEWSLETTER_STORAGE_KEY, filtered);
-      return filtered;
-    });
-    return found;
+    try {
+      await removeNewsletter(id);
+      setNewsletters((prev) => prev.filter((n) => n.id !== id));
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete newsletter';
+      toast.error(message);
+      return false;
+    }
   }, [currentUserRole]);
 
+  // ---------------------------------------------------------------------------
+  // Getters
+  // ---------------------------------------------------------------------------
   const getNewsletter = useCallback((id: string): Newsletter | undefined => {
-    return newsletters.find(n => n.id === id);
+    return newsletters.find((n) => n.id === id);
   }, [newsletters]);
 
   const getPublishedNewsletters = useCallback((): Newsletter[] => {
-    return newsletters.filter(n => n.status === 'published');
+    return newsletters.filter((n) => n.status === 'published');
   }, [newsletters]);
 
   const getDraftNewsletters = useCallback((): Newsletter[] => {
-    return newsletters.filter(n => n.status === 'draft');
+    return newsletters.filter((n) => n.status === 'draft');
   }, [newsletters]);
 
-  const toggleNewsletterLike = useCallback((id: string): Newsletter | null => {
-    if (!currentUser?.id) {
+  // ---------------------------------------------------------------------------
+  // Like toggle (optimistic)
+  // ---------------------------------------------------------------------------
+  const toggleNewsletterLike = useCallback(async (id: string): Promise<Newsletter | null> => {
+    if (!currentUser?.id) return null;
+
+    const existing = newsletters.find((n) => n.id === id);
+    if (!existing) return null;
+
+    const hasLiked = existing.likedByUserIds.includes(currentUser.id);
+    const likedByUserIds = hasLiked
+      ? existing.likedByUserIds.filter((uid) => uid !== currentUser.id)
+      : [...existing.likedByUserIds, currentUser.id];
+    const likes = Math.max(0, existing.likes + (hasLiked ? -1 : 1));
+
+    // Optimistic
+    const optimistic: Newsletter = { ...existing, likes, likedByUserIds };
+    setNewsletters((prev) => prev.map((n) => (n.id === id ? optimistic : n)));
+
+    try {
+      const updated = await patchNewsletter(id, { likes, likedByUserIds });
+      setNewsletters((prev) => prev.map((n) => (n.id === id ? updated : n)));
+      return updated;
+    } catch (err) {
+      // Revert
+      setNewsletters((prev) => prev.map((n) => (n.id === id ? existing : n)));
+      console.error('toggleNewsletterLike error:', err);
       return null;
     }
+  }, [currentUser?.id, newsletters]);
 
-    let updated: Newsletter | null = null;
-
-    setNewsletters(prev => {
-      const index = prev.findIndex(n => n.id === id);
-      if (index === -1) {
-        return prev;
-      }
-
-      const existing = prev[index];
-      const hasLiked = existing.likedByUserIds.includes(currentUser.id);
-      const likedByUserIds = hasLiked
-        ? existing.likedByUserIds.filter((userId) => userId !== currentUser.id)
-        : [...existing.likedByUserIds, currentUser.id];
-
-      updated = {
-        ...existing,
-        likes: Math.max(0, existing.likes + (hasLiked ? -1 : 1)),
-        likedByUserIds,
-      };
-
-      const next = [...prev];
-      next[index] = updated;
-      writeStoredValue(NEWSLETTER_STORAGE_KEY, next);
-      return next;
-    });
-
-    return updated;
-  }, [currentUser?.id]);
-
-  const addNewsletterComment = useCallback((id: string, body: string): NewsletterComment | null => {
-    if (!currentUser?.id) {
-      return null;
-    }
+  // ---------------------------------------------------------------------------
+  // Add comment (optimistic)
+  // ---------------------------------------------------------------------------
+  const addNewsletterComment = useCallback(async (id: string, body: string): Promise<NewsletterComment | null> => {
+    if (!currentUser?.id) return null;
 
     const trimmedBody = body.trim();
-    if (!trimmedBody || !stripCommentFormatting(trimmedBody)) {
-      return null;
-    }
+    if (!trimmedBody || !stripCommentFormatting(trimmedBody)) return null;
+
+    const existing = newsletters.find((n) => n.id === id);
+    if (!existing) return null;
 
     const newComment: NewsletterComment = {
       id: createClientId(),
@@ -259,77 +240,73 @@ export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersO
       likedByUserIds: [],
     };
 
-    setNewsletters(prev => {
-      const index = prev.findIndex(n => n.id === id);
-      if (index === -1) {
-        return prev;
-      }
+    const commentItems = [newComment, ...existing.commentItems];
+    const comments = existing.comments + 1;
 
-      const existing = prev[index];
-      const updated: Newsletter = {
-        ...existing,
-        comments: existing.comments + 1,
-        commentItems: [newComment, ...existing.commentItems],
-      };
+    // Optimistic
+    setNewsletters((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, comments, commentItems } : n)),
+    );
 
-      const next = [...prev];
-      next[index] = updated;
-      writeStoredValue(NEWSLETTER_STORAGE_KEY, next);
-      return next;
-    });
-
-    return newComment;
-  }, [currentUser]);
-
-  const toggleCommentLike = useCallback((newsletterId: string, commentId: string): NewsletterComment | null => {
-    if (!currentUser?.id) {
+    try {
+      const updated = await patchNewsletter(id, { comments, commentItems });
+      setNewsletters((prev) => prev.map((n) => (n.id === id ? updated : n)));
+      return newComment;
+    } catch (err) {
+      // Revert
+      setNewsletters((prev) => prev.map((n) => (n.id === id ? existing : n)));
+      console.error('addNewsletterComment error:', err);
       return null;
     }
+  }, [currentUser, newsletters]);
 
-    let updatedComment: NewsletterComment | null = null;
+  // ---------------------------------------------------------------------------
+  // Toggle comment like (optimistic)
+  // ---------------------------------------------------------------------------
+  const toggleCommentLike = useCallback(async (newsletterId: string, commentId: string): Promise<NewsletterComment | null> => {
+    if (!currentUser?.id) return null;
 
-    setNewsletters(prev => {
-      const newsletterIndex = prev.findIndex(n => n.id === newsletterId);
-      if (newsletterIndex === -1) {
-        return prev;
-      }
+    const newsletter = newsletters.find((n) => n.id === newsletterId);
+    if (!newsletter) return null;
 
-      const newsletter = prev[newsletterIndex];
-      const commentIndex = newsletter.commentItems.findIndex((comment) => comment.id === commentId);
-      if (commentIndex === -1) {
-        return prev;
-      }
+    const commentIndex = newsletter.commentItems.findIndex((c) => c.id === commentId);
+    if (commentIndex === -1) return null;
 
-      const existingComment = newsletter.commentItems[commentIndex];
-      const hasLiked = existingComment.likedByUserIds.includes(currentUser.id);
-      updatedComment = {
-        ...existingComment,
-        likes: Math.max(0, existingComment.likes + (hasLiked ? -1 : 1)),
-        likedByUserIds: hasLiked
-          ? existingComment.likedByUserIds.filter((userId) => userId !== currentUser.id)
-          : [...existingComment.likedByUserIds, currentUser.id],
-      };
+    const existingComment = newsletter.commentItems[commentIndex];
+    const hasLiked = existingComment.likedByUserIds.includes(currentUser.id);
+    const updatedComment: NewsletterComment = {
+      ...existingComment,
+      likes: Math.max(0, existingComment.likes + (hasLiked ? -1 : 1)),
+      likedByUserIds: hasLiked
+        ? existingComment.likedByUserIds.filter((uid) => uid !== currentUser.id)
+        : [...existingComment.likedByUserIds, currentUser.id],
+    };
 
-      const commentItems = [...newsletter.commentItems];
-      commentItems[commentIndex] = updatedComment;
+    const commentItems = [...newsletter.commentItems];
+    commentItems[commentIndex] = updatedComment;
 
-      const updatedNewsletter: Newsletter = {
-        ...newsletter,
-        commentItems,
-      };
+    // Optimistic
+    setNewsletters((prev) =>
+      prev.map((n) => (n.id === newsletterId ? { ...n, commentItems } : n)),
+    );
 
-      const next = [...prev];
-      next[newsletterIndex] = updatedNewsletter;
-      writeStoredValue(NEWSLETTER_STORAGE_KEY, next);
-      return next;
-    });
-
-    return updatedComment;
-  }, [currentUser?.id]);
+    try {
+      const updated = await patchNewsletter(newsletterId, { commentItems });
+      setNewsletters((prev) => prev.map((n) => (n.id === newsletterId ? updated : n)));
+      return updatedComment;
+    } catch (err) {
+      // Revert
+      setNewsletters((prev) => prev.map((n) => (n.id === newsletterId ? newsletter : n)));
+      console.error('toggleCommentLike error:', err);
+      return null;
+    }
+  }, [currentUser?.id, newsletters]);
 
   return {
     newsletters,
-    isLoaded,
+    isLoading,
+    isLoaded: !isLoading,   // backwards-compat alias used in App.tsx
+    error,
     addNewsletter,
     upsertDraftNewsletter,
     updateNewsletter,

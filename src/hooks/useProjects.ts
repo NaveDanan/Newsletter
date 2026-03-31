@@ -1,167 +1,168 @@
 import { useCallback, useEffect, useState } from 'react';
-import { readStoredValue, writeStoredValue } from '../lib/localStorage';
-import { createEmptyProjectGantt, normalizeProjectGantt } from '../lib/gantt';
+import { toast } from 'sonner';
+import {
+  fetchProjects,
+  createProject,
+  updateProject,
+  deleteProject,
+} from '../lib/pocketbase/projects';
+import { normalizeProjectGantt } from '../lib/gantt';
 import type { Project, ProjectFormData, ProjectStatus } from '../types/project';
 import type { ProjectGantt } from '../types/gantt';
 
-const STORAGE_KEY = 'pulse_ai_projects';
-
-function normalizeProject(rawProject: unknown, index: number): Project | null {
-  if (!rawProject || typeof rawProject !== 'object') {
-    return null;
-  }
-
-  const candidate = rawProject as Partial<Project> & { owner?: string };
-
-  return {
-    id: typeof candidate.id === 'string' && candidate.id
-      ? candidate.id
-      : `${Date.now()}-${index}`,
-    department: typeof candidate.department === 'string' && candidate.department.trim()
-      ? candidate.department.trim()
-      : typeof candidate.owner === 'string' && candidate.owner.trim()
-        ? candidate.owner.trim()
-        : 'Unassigned',
-    devision: typeof candidate.devision === 'string' ? candidate.devision : '',
-    field: typeof candidate.field === 'string' ? candidate.field : '',
-    title: typeof candidate.title === 'string' ? candidate.title : '',
-    description: typeof candidate.description === 'string' ? candidate.description : '',
-    status: candidate.status ?? 'pending',
-    isVisibleInGantt: typeof candidate.isVisibleInGantt === 'boolean' ? candidate.isVisibleInGantt : true,
-    gantt: normalizeProjectGantt(candidate.gantt),
-  };
-}
-
 export function useProjects() {
-  const [projects, setProjects] = useState<Project[]>(() => {
-    const storedProjects = readStoredValue<unknown[]>(STORAGE_KEY, []);
-    return storedProjects.map(normalizeProject).filter((project): project is Project => project !== null);
-  });
-  const isLoaded = true;
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // -------------------------------------------------------------------------
+  // Initial fetch
+  // -------------------------------------------------------------------------
   useEffect(() => {
-    if (!isLoaded) {
-      return;
-    }
+    let cancelled = false;
 
-    writeStoredValue(STORAGE_KEY, projects);
-  }, [isLoaded, projects]);
+    setIsLoading(true);
+    fetchProjects()
+      .then((data) => {
+        if (!cancelled) {
+          setProjects(data);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : 'Failed to load projects';
+          console.error('useProjects fetch error:', err);
+          setError(message);
+          toast.error(`Projects: ${message}`);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
 
-  const addProject = useCallback((data: ProjectFormData, gantt?: ProjectGantt): Project => {
-    const newProject: Project = {
-      id: Date.now().toString(),
-      department: data.department,
-      devision: data.devision,
-      field: data.field,
-      title: data.title,
-      description: data.description,
-      status: 'pending',
-      isVisibleInGantt: true,
-      gantt: gantt ? normalizeProjectGantt(gantt) : createEmptyProjectGantt(),
+    return () => {
+      cancelled = true;
     };
-
-    setProjects((currentProjects) => [...currentProjects, newProject]);
-    return newProject;
   }, []);
 
-  const updateProject = useCallback((id: string, data: ProjectFormData): Project | null => {
-    let updatedProject: Project | null = null;
+  // -------------------------------------------------------------------------
+  // Add
+  // -------------------------------------------------------------------------
+  const addProject = useCallback(async (data: ProjectFormData, gantt?: ProjectGantt): Promise<Project | null> => {
+    try {
+      const newProject = await createProject(data, gantt);
+      setProjects((prev) => [newProject, ...prev]);
+      return newProject;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create project';
+      console.error('addProject error:', err);
+      toast.error(message);
+      return null;
+    }
+  }, []);
 
-    setProjects((currentProjects) =>
-      currentProjects.map((project) => {
-        if (project.id !== id) {
-          return project;
-        }
+  // -------------------------------------------------------------------------
+  // Update metadata
+  // -------------------------------------------------------------------------
+  const updateProjectData = useCallback(async (id: string, data: ProjectFormData): Promise<Project | null> => {
+    try {
+      const updated = await updateProject(id, data);
+      setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update project';
+      console.error('updateProject error:', err);
+      toast.error(message);
+      return null;
+    }
+  }, []);
 
-        updatedProject = {
-          ...project,
-          department: data.department,
-          devision: data.devision,
-          field: data.field,
-          title: data.title,
-          description: data.description,
-        };
+  // -------------------------------------------------------------------------
+  // Delete
+  // -------------------------------------------------------------------------
+  const deleteProjectById = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      await deleteProject(id);
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete project';
+      console.error('deleteProject error:', err);
+      toast.error(message);
+      return false;
+    }
+  }, []);
 
-        return updatedProject;
-      }),
+  // -------------------------------------------------------------------------
+  // Gantt visibility
+  // -------------------------------------------------------------------------
+  const setProjectGanttVisibility = useCallback(async (id: string, isVisibleInGantt: boolean): Promise<Project | null> => {
+    // Optimistic update
+    setProjects((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, isVisibleInGantt } : p)),
     );
-
-    return updatedProject;
+    try {
+      const updated = await updateProject(id, { isVisibleInGantt });
+      setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      return updated;
+    } catch (err) {
+      // Revert
+      setProjects((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, isVisibleInGantt: !isVisibleInGantt } : p)),
+      );
+      const message = err instanceof Error ? err.message : 'Failed to update visibility';
+      toast.error(message);
+      return null;
+    }
   }, []);
 
-  const deleteProject = useCallback((id: string): boolean => {
-    let found = false;
-
-    setProjects((currentProjects) => {
-      const filteredProjects = currentProjects.filter((project) => project.id !== id);
-      found = filteredProjects.length !== currentProjects.length;
-      return filteredProjects;
-    });
-
-    return found;
-  }, []);
-
-  const setProjectGanttVisibility = useCallback((id: string, isVisibleInGantt: boolean): Project | null => {
-    let updatedProject: Project | null = null;
-
-    setProjects((currentProjects) =>
-      currentProjects.map((project) => {
-        if (project.id !== id) {
-          return project;
-        }
-
-        updatedProject = { ...project, isVisibleInGantt };
-        return updatedProject;
-      }),
+  // -------------------------------------------------------------------------
+  // Status
+  // -------------------------------------------------------------------------
+  const updateProjectStatus = useCallback(async (id: string, status: ProjectStatus): Promise<Project | null> => {
+    // Optimistic update
+    setProjects((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, status } : p)),
     );
-
-    return updatedProject;
+    try {
+      const updated = await updateProject(id, { status });
+      setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update status';
+      toast.error(message);
+      return null;
+    }
   }, []);
 
-  const updateProjectStatus = useCallback((id: string, status: ProjectStatus): Project | null => {
-    let updatedProject: Project | null = null;
-
-    setProjects((currentProjects) =>
-      currentProjects.map((project) => {
-        if (project.id !== id) {
-          return project;
-        }
-
-        updatedProject = { ...project, status };
-        return updatedProject;
-      }),
+  // -------------------------------------------------------------------------
+  // Gantt data
+  // -------------------------------------------------------------------------
+  const updateProjectGantt = useCallback(async (id: string, gantt: ProjectGantt): Promise<Project | null> => {
+    const normalizedGantt = normalizeProjectGantt(gantt);
+    // Optimistic update
+    setProjects((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, gantt: normalizedGantt } : p)),
     );
-
-    return updatedProject;
-  }, []);
-
-  const updateProjectGantt = useCallback((id: string, gantt: ProjectGantt): Project | null => {
-    let updatedProject: Project | null = null;
-
-    setProjects((currentProjects) =>
-      currentProjects.map((project) => {
-        if (project.id !== id) {
-          return project;
-        }
-
-        updatedProject = {
-          ...project,
-          gantt: normalizeProjectGantt(gantt),
-        };
-
-        return updatedProject;
-      }),
-    );
-
-    return updatedProject;
+    try {
+      const updated = await updateProject(id, { gantt: normalizedGantt });
+      setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save Gantt data';
+      toast.error(message);
+      return null;
+    }
   }, []);
 
   return {
     projects,
-    isLoaded,
+    isLoading,
+    error,
     addProject,
-    updateProject,
-    deleteProject,
+    updateProject: updateProjectData,
+    deleteProject: deleteProjectById,
     setProjectGanttVisibility,
     updateProjectStatus,
     updateProjectGantt,

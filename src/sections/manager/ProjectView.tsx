@@ -44,11 +44,13 @@ export function ProjectView() {
     }
 
     if (editingProjectId) {
-      updateProject(editingProjectId, newProject);
-      toast.success('Project updated successfully');
+      void updateProject(editingProjectId, newProject).then((result) => {
+        if (result) toast.success('Project updated successfully');
+      });
     } else {
-      addProject(newProject);
-      toast.success('Project added successfully');
+      void addProject(newProject).then((result) => {
+        if (result) toast.success('Project added successfully');
+      });
     }
 
     setNewProject({ department: '', devision: '', field: '', title: '', description: '' });
@@ -57,8 +59,9 @@ export function ProjectView() {
   };
 
   const handleDeleteProject = (id: string) => {
-    deleteProject(id);
-    toast.success('Project deleted');
+    void deleteProject(id).then((ok) => {
+      if (ok) toast.success('Project deleted');
+    });
   };
 
   const handleEditProject = (project: Project) => {
@@ -88,7 +91,7 @@ export function ProjectView() {
     const statuses: Project['status'][] = ['pending', 'in-progress', 'completed', 'delayed'];
     const currentIndex = statuses.indexOf(project.status);
     const nextStatus = statuses[(currentIndex + 1) % statuses.length];
-    updateProjectStatus(id, nextStatus);
+    void updateProjectStatus(id, nextStatus);
   };
 
   const stats = {

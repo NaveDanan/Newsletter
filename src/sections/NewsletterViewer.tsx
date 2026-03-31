@@ -14,7 +14,7 @@ interface NewsletterViewerProps {
   currentUser?: PocketBaseUser | null;
   onRequireAuth?: () => void;
   onToggleLike?: (newsletterId: string) => void;
-  onAddComment?: (newsletterId: string, body: string) => NewsletterComment | null;
+  onAddComment?: (newsletterId: string, body: string) => Promise<NewsletterComment | null> | NewsletterComment | null;
   onToggleCommentLike?: (newsletterId: string, commentId: string) => void;
 }
 
@@ -103,17 +103,19 @@ export function NewsletterViewer({
     onToggleLike?.(newsletter.id);
   };
 
-  const handleCommentSubmit = () => {
+  const handleCommentSubmit = async () => {
     if (!isAuthenticated) {
       onRequireAuth?.();
       return;
     }
 
-    const newComment = onAddComment?.(newsletter.id, commentDraft);
+    if (!stripCommentFormatting(commentDraft)) {
+      toast.error('Write a comment before posting.');
+      return;
+    }
+
+    const newComment = await onAddComment?.(newsletter.id, commentDraft);
     if (!newComment) {
-      if (!stripCommentFormatting(commentDraft)) {
-        toast.error('Write a comment before posting.');
-      }
       return;
     }
 

@@ -263,7 +263,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                     <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       <button
                         type="button"
-                        onClick={() => setProjectGanttVisibility(project.id, !project.isVisibleInGantt)}
+                        onClick={() => void setProjectGanttVisibility(project.id, !project.isVisibleInGantt)}
                         className={`rounded-lg p-2 transition-colors ${
                           project.isVisibleInGantt
                             ? 'text-[#D93A3A] hover:bg-[#D93A3A]/10'

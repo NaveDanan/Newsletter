@@ -39,7 +39,7 @@ interface NewsletterEditorProps {
   newsletter?: Newsletter | null;
   onSave: (data: NewsletterFormData) => void;
   onUpdate?: (id: string, data: Partial<NewsletterFormData>) => void;
-  onAutoSave?: (id: string | null, data: Partial<NewsletterFormData>) => Newsletter | null;
+  onAutoSave?: (id: string | null, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
   onCancel: () => void;
   isEditing?: boolean;
 }
@@ -128,13 +128,20 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
       autoSaveTimeoutRef.current = null;
     }
 
-    const savedDraft = onAutoSave?.(autoSaveDraftId, { ...nextFormData, status: 'draft' });
-    if (savedDraft) {
-      setAutoSaveDraftId(savedDraft.id);
+    const result = onAutoSave?.(autoSaveDraftId, { ...nextFormData, status: 'draft' });
+    if (result instanceof Promise) {
+      result.then(savedDraft => {
+        if (savedDraft) {
+          setAutoSaveDraftId(savedDraft.id);
+          setLastAutoSavedAt(new Date());
+        }
+      });
+    } else if (result) {
+      setAutoSaveDraftId(result.id);
       setLastAutoSavedAt(new Date());
     }
 
-    return savedDraft;
+    return result;
   }, [autoSaveDraftId, getCurrentFormData, isAutoSaveEnabled, onAutoSave]);
 
   useEffect(() => {

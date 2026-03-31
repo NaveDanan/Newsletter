@@ -9,15 +9,16 @@ import { GanttEditorPage } from './sections/manager/GanttEditorPage';
 import { NewsletterViewer } from './sections/NewsletterViewer';
 import { SignIn } from './components/auth/SignIn';
 import { SSOCallback } from './components/auth/SSOCallback';
+import { MigratePage } from './sections/MigratePage';
 import { useAuth } from './contexts/AuthContext';
 import { useNewsletters } from './hooks/useNewsletters';
 import { hasManagerAccess } from './lib/auth/permissions';
 import { Toaster } from 'sonner';
 import { toast } from 'sonner';
-import type { Newsletter, NewsletterComment } from './types/newsletter';
+import type { Newsletter } from './types/newsletter';
 import './App.css';
 
-export type View = 'home' | 'manager' | 'article' | 'signin' | 'sso-callback' | 'gantt-editor';
+export type View = 'home' | 'manager' | 'article' | 'signin' | 'sso-callback' | 'gantt-editor' | 'migrate';
 
 const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet'];
 
@@ -120,6 +121,10 @@ function resolveRoute(pathname: string): RouteState {
         projectId: decodeURIComponent(projectId),
       };
     }
+  }
+
+  if (normalizedPathname === '/migrate') {
+    return { view: 'migrate', pathname: '/migrate' };
   }
 
   if (normalizedPathname === '/sign-in' || normalizedPathname === '/signin') {
@@ -310,7 +315,7 @@ function App() {
     toggleNewsletterLike(newsletterId);
   };
 
-  const handleArticleComment = (newsletterId: string, body: string): NewsletterComment | null => {
+  const handleArticleComment = (newsletterId: string, body: string) => {
     if (!isUserAuthenticated) {
       handleRequireAuth();
       return null;
@@ -407,6 +412,15 @@ function App() {
           onAddNewsletterComment={handleArticleComment}
           onToggleCommentLike={handleCommentLike}
         />
+      </div>
+    );
+  }
+
+  if (currentRoute.view === 'migrate') {
+    return (
+      <div className="min-h-screen bg-white">
+        <Toaster position="top-right" richColors />
+        <MigratePage onBack={handleHomeClick} />
       </div>
     );
   }

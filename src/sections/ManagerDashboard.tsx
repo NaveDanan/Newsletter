@@ -39,12 +39,12 @@ interface ManagerDashboardProps {
   currentUser: PocketBaseUser | null;
   currentUserRole: UserRole | null;
   newsletters: Newsletter[];
-  addNewsletter: (data: NewsletterFormData) => Newsletter | null;
-  upsertDraftNewsletter: (id: string | null, data: Partial<NewsletterFormData>) => Newsletter | null;
-  updateNewsletter: (id: string, data: Partial<NewsletterFormData>) => Newsletter | null;
-  deleteNewsletter: (id: string) => boolean;
+  addNewsletter: (data: NewsletterFormData) => Promise<Newsletter | null> | Newsletter | null;
+  upsertDraftNewsletter: (id: string | null, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
+  updateNewsletter: (id: string, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
+  deleteNewsletter: (id: string) => Promise<boolean> | boolean;
   onToggleNewsletterLike: (newsletterId: string) => void;
-  onAddNewsletterComment: (newsletterId: string, body: string) => NewsletterComment | null;
+  onAddNewsletterComment: (newsletterId: string, body: string) => Promise<NewsletterComment | null> | NewsletterComment | null;
   onToggleCommentLike: (newsletterId: string, commentId: string) => void;
 }
 
@@ -104,30 +104,48 @@ export function ManagerDashboard({
   };
 
   const handleSaveNewsletter = (data: NewsletterFormData) => {
-    const created = addNewsletter(data);
-    if (created) {
+    const result = addNewsletter(data);
+    if (result instanceof Promise) {
+      result.then((created) => {
+        if (created) handleBackToList();
+      });
+    } else if (result) {
       handleBackToList();
     }
   };
 
   const handleUpdateNewsletter = (id: string, data: Partial<NewsletterFormData>) => {
-    const updated = updateNewsletter(id, data);
-    if (updated) {
+    const result = updateNewsletter(id, data);
+    if (result instanceof Promise) {
+      result.then((updated) => {
+        if (updated) handleBackToList();
+      });
+    } else if (result) {
       handleBackToList();
     }
   };
 
   const handleAutoSaveNewsletter = (id: string | null, data: Partial<NewsletterFormData>) => {
-    const draft = upsertDraftNewsletter(id, data);
-    if (draft && (!editingNewsletter || editingNewsletter.id !== draft.id)) {
-      setEditingNewsletter(draft);
+    const draftOrPromise = upsertDraftNewsletter(id, data);
+    
+    if (draftOrPromise instanceof Promise) {
+      draftOrPromise.then((draft) => {
+        if (draft && (!editingNewsletter || editingNewsletter.id !== draft.id)) {
+          setEditingNewsletter(draft);
+        }
+      });
+    } else {
+      const draft = draftOrPromise;
+      if (draft && (!editingNewsletter || editingNewsletter.id !== draft.id)) {
+        setEditingNewsletter(draft);
+      }
     }
 
-    return draft;
+    return draftOrPromise;
   };
 
   const handleDeleteNewsletter = (id: string) => {
-    deleteNewsletter(id);
+    void deleteNewsletter(id);
   };
 
   const handleBackToList = () => {

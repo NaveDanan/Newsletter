@@ -1,73 +1,95 @@
-# React + TypeScript + Vite
+<div align="center">
+  <img src="docs/assets/home_page_1774918582850.png" alt="AI-BREAK Newsletter Banner" width="800"/>
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+  <h1>📰 Newsletter Dashboard & Manager</h1>
 
-Currently, two official plugins are available:
+  <p>A modern, powerful React + Vite application for comprehensive newsletter production, project management, and task tracking.</p>
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+  <p>
+    <img src="https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react" alt="React" />
+    <img src="https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/Vite-7-blue?style=for-the-badge&logo=vite" alt="Vite" />
+    <img src="https://img.shields.io/badge/TailwindCSS-3-blue?style=for-the-badge&logo=tailwindcss" alt="Tailwind CSS" />
+  </p>
 
-## React Compiler
+</div>
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## ✨ Features
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Newsletter Management:** Curate and write professional newsletters with a built-in rich text editor.
+- **Projects & Goals:** Maintain progress across concurrent efforts. Track key milestones.
+- **Gantt Edior:** Powerful interactive timeline to organize project schedules at scale.
+- **Data Spreadsheets:** Advanced management grids to bulk-update and import tasks seamlessly.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 📸 Guided Tour
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Gantt Editor
+Plan intricate task dependencies visually on an interactive drag-and-drop timeline.
+![Gantt Editor](docs/assets/gantt_editor_1774918646973.png)
+
+### Projects Portfolio
+Oversee all current projects, manage resourcing, and stay updated on milestones.
+![Manager Projects](docs/assets/manager_projects_1774918602442.png)
+
+### Goals & Progress Tracking
+Track organizational milestones and KPIs against targeted timelines.
+![Manager Goals](docs/assets/manager_goals_1774918610316.png)
+
+### Spreadsheet View
+Easily analyze, import, and structure bulk data for advanced planning.
+![Manager Spreadsheet](docs/assets/manager_spreadsheet_1774918630705.png)
+
+### Production Pipelines
+Manage the end-to-end scope from timeline conception to the final curated newsletter.
+![Manager Gantt](docs/assets/manager_gantt_1774918623414.png)
+![Manager Newsletters](docs/assets/manager_newsletters_1774918593384.png)
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- [Node.js](https://nodejs.org/) (v18 or higher recommended)
+
+### Installation
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/NaveDanan/Newsletter.git
+   ```
+2. Navigate to the directory:
+   ```bash
+   cd Newsletter
+   ```
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+### Running Locally
+To run the development server:
+```bash
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Your app will be automatically served locally via Vite (default: `http://localhost:5173/` or `5174`).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Build for Production
+```bash
+npm run build
 ```
+
+---
+
+## 🛠 Tech Stack Overview
+
+- **Frontend Core:** React, TypeScript, Vite
+- **Styling:** Tailwind CSS, Radix UI Primitives, Framer Motion
+- **Tooling:** ESLint, Prettier
+- **Data Parsing:** `xlsx`, `exceljs`
+- **Editor:** Tiptap Headless Editor
+
+> Designed with modern aesthetics and performance built-in.

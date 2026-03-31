@@ -1167,8 +1167,9 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
 
     const handleMouseMove = (event: MouseEvent) => {
       event.preventDefault();
+      const widthDelta = (event.clientX - taskGridResizeState.startX) * (isRTL ? -1 : 1);
       const nextWidth = clamp(
-        taskGridResizeState.startWidth + (event.clientX - taskGridResizeState.startX),
+        taskGridResizeState.startWidth + widthDelta,
         minTaskGridWidth,
         maxTaskGridWidth,
       );
@@ -1191,7 +1192,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isTaskGridCollapsed, taskGridResizeState]);
+  }, [isRTL, isTaskGridCollapsed, taskGridResizeState]);
 
   const handleTimelineWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
     if (!timelineScrollRef.current) {

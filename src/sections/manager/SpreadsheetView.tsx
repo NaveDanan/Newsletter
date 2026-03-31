@@ -11,8 +11,29 @@ import ExcelJS, { type Worksheet } from 'exceljs';
 import { format, parseISO, eachDayOfInterval, differenceInCalendarDays, startOfDay, isToday } from 'date-fns';
 import { useProjects } from '@/hooks/useProjects';
 import type { Project } from '@/types/project';
-import type { GanttTask } from '@/types/gantt';
-import { getTimelineRange, getTaskProgress } from '@/lib/gantt';
+import type { GanttTask, GanttRole, GanttResource, ProjectGantt, GanttTaskStatus, GanttRoleBillingPeriod, GanttCurrency } from '@/types/gantt';
+import { getTimelineRange, getTaskProgress, createTaskId, createResourceId, createRoleId, getNextResourceColor, normalizeTask } from '@/lib/gantt';
+
+// ─── Import Parse Helpers ─────────────────────────────────────────────────────
+
+function parseTaskStatus(s: string): GanttTaskStatus {
+  const n = s.toLowerCase().trim().replace(/\s+/g, '-');
+  if (n === 'completed' || n === 'done') return 'completed';
+  if (n === 'in-progress' || n === 'in progress') return 'in-progress';
+  if (n === 'delayed' || n === 'late') return 'delayed';
+  return 'pending';
+}
+
+function parseRolePeriod(s: string): GanttRoleBillingPeriod {
+  const v = s.toLowerCase().trim() as GanttRoleBillingPeriod;
+  const valid: GanttRoleBillingPeriod[] = ['hourly', 'daily', 'weekly', 'monthly', 'yearly', 'one-time'];
+  return valid.includes(v) ? v : 'monthly';
+}
+
+function parseCurrency(s: string): GanttCurrency {
+  const v = s.toUpperCase().trim() as GanttCurrency;
+  return (['ILS', 'USD', 'EUR', 'GBP'] as GanttCurrency[]).includes(v) ? v : 'ILS';
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -436,7 +457,7 @@ export function SpreadsheetView() {
       });
     };
 
-    // Projects sheet
+    // Projects sheet — each project title goes in column A starting row 2
     const projWs = wb.addWorksheet('Projects');
     projWs.columns = [
       { header: 'Title', key: 'title', width: 30 }, { header: 'Department', key: 'dept', width: 20 },
@@ -445,12 +466,25 @@ export function SpreadsheetView() {
       { header: 'Due Date', key: 'due', width: 15 },
     ];
     styleHeader(projWs);
-    toExport.forEach(p => projWs.addRow({ title: p.title, dept: p.department, div: p.devision, field: p.field, desc: p.description, status: fmtStatus(p.status), due: getProjectDueDate(p) }));
+    // Track each project's row number in the Projects sheet (header = row 1, data starts row 2)
+    const projRowNum = new Map<string, number>();
+    toExport.forEach((p, i) => {
+      projRowNum.set(p.id, i + 2);
+      projWs.addRow({ title: p.title, dept: p.department, div: p.devision, field: p.field, desc: p.description, status: fmtStatus(p.status), due: getProjectDueDate(p) });
+    });
+
+    // Helper: returns a formula cell value referencing the Projects sheet title cell
+    const projRef = (p: { id: string; title: string }) => {
+      const row = projRowNum.get(p.id) ?? 2;
+      return { formula: `Projects!$A$${row}`, result: p.title } as const;
+    };
 
     // Goals sheet
     const goalsForExport = selectedProject
       ? allGoals.filter(g => g.projectTitle === (selectedProject.title || selectedProject.department))
       : allGoals;
+    // Build a map from projectTitle -> project object for formula lookup
+    const projByTitle = new Map(toExport.map(p => [p.title || p.department, p]));
     const goalsWs = wb.addWorksheet('Goals');
     goalsWs.columns = [
       { header: 'Project', key: 'project', width: 25 }, { header: 'Milestone', key: 'ms', width: 30 },
@@ -458,7 +492,10 @@ export function SpreadsheetView() {
       { header: 'Status', key: 'status', width: 15 },
     ];
     styleHeader(goalsWs);
-    goalsForExport.forEach(g => goalsWs.addRow({ project: g.projectTitle, ms: g.milestoneName, date: g.milestoneDate, prog: g.progress, status: g.status }));
+    goalsForExport.forEach(g => {
+      const p = projByTitle.get(g.projectTitle);
+      goalsWs.addRow({ project: p ? projRef(p) : g.projectTitle, ms: g.milestoneName, date: g.milestoneDate, prog: g.progress, status: g.status });
+    });
 
     // Gantt data sheet
     const ganttWs = wb.addWorksheet('Gantt');
@@ -478,7 +515,7 @@ export function SpreadsheetView() {
       for (const t of tasks) {
         const predNums = t.predecessorIds.map(pid => taskNums.get(pid) ?? '').filter(Boolean).join(', ');
         ganttWs.addRow({
-          num: taskNums.get(t.id) ?? '', proj: p.title, name: t.name,
+          num: taskNums.get(t.id) ?? '', proj: projRef(p), name: t.name,
           start: t.startDate, end: t.endDate, dur: t.durationDays,
           prog: t.progress, status: fmtStatus(t.status),
           ms: t.milestone ? 'Yes' : 'No',
@@ -499,7 +536,7 @@ export function SpreadsheetView() {
     for (const p of toExport) {
       const roleById = new Map((p.gantt?.roles ?? []).map(r => [r.id, r.name]));
       for (const r of (p.gantt?.resources ?? [])) {
-        resWs.addRow({ proj: p.title, name: r.name, role: r.roleId ? (roleById.get(r.roleId) ?? r.role) : r.role, color: r.color, cap: r.capacityPercent });
+        resWs.addRow({ proj: projRef(p), name: r.name, role: r.roleId ? (roleById.get(r.roleId) ?? r.role) : r.role, color: r.color, cap: r.capacityPercent });
       }
     }
 
@@ -513,7 +550,7 @@ export function SpreadsheetView() {
     styleHeader(rolesWs);
     for (const p of toExport) {
       for (const rl of (p.gantt?.roles ?? [])) {
-        rolesWs.addRow({ proj: p.title, name: rl.name, budget: rl.budget, paidBy: rl.paidBy, currency: rl.currency });
+        rolesWs.addRow({ proj: projRef(p), name: rl.name, budget: rl.budget, paidBy: rl.paidBy, currency: rl.currency });
       }
     }
 
@@ -538,27 +575,143 @@ export function SpreadsheetView() {
     toast.success(`Exported ${toExport.length} project${toExport.length !== 1 ? 's' : ''} (6 sheets)`);
   }, [selectedProject, projects, allGoals]);
 
-  // ── Import (using xlsx for parsing) ───────────────────────────────────────
+  // ── Full Multi-Sheet Import ───────────────────────────────────────
 
   const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
+      const wb = XLSX.read(buf, { type: 'array', cellFormula: true });
+
+      // Build row→title map from Projects sheet for formula resolution
+      const projSheetRows = wb.Sheets['Projects']
+        ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['Projects'])
+        : [];
+      const projRowTitleMap = new Map<number, string>();
+      projSheetRows.forEach((r, i) => projRowTitleMap.set(i + 2, String(r['Title'] || r['title'] || '')));
+
+      const resolveCell = (v: unknown): string => {
+        const s = String(v ?? '').trim();
+        const m = s.match(/^=Projects!\$A\$(\d+)$/i);
+        if (m) return projRowTitleMap.get(parseInt(m[1])) ?? s;
+        return s;
+      };
+
+      // Parse all sheets
       const sheetName = wb.SheetNames.includes('Projects') ? 'Projects' : wb.SheetNames[0];
       if (!sheetName) { toast.error('No sheets found'); return; }
-      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(wb.Sheets[sheetName]);
+      const projRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName]);
+
+      const rolesRows = wb.Sheets['Roles']
+        ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['Roles']) : [];
+      const resRows = wb.Sheets['Resources']
+        ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['Resources']) : [];
+      const ganttRows = wb.Sheets['Gantt']
+        ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['Gantt']) : [];
+
+      // Group side-tables by project title
+      const group = <T,>(arr: T[], key: (r: T) => string) =>
+        arr.reduce((m, r) => { const k = key(r); m.set(k, [...(m.get(k) ?? []), r]); return m; }, new Map<string, T[]>());
+
+      const rolesByProj  = group(rolesRows,  r => resolveCell(r['Project']));
+      const resByProj    = group(resRows,    r => resolveCell(r['Project']));
+      const ganttByProj  = group(ganttRows,  r => resolveCell(r['Project']));
+
       let imported = 0, skipped = 0;
-      for (const row of rows) {
-        const title = (row['Title'] || row['title'] || row['Name'] || '').trim();
-        const department = (row['Department'] || row['department'] || '').trim();
+
+      for (const row of projRows) {
+        const title      = resolveCell(row['Title']       ?? row['title']      ?? row['Name'] ?? '');
+        const department = resolveCell(row['Department'] ?? row['department'] ?? '');
         if (!title || !department) { skipped++; continue; }
-        addProject({ title, department, devision: (row['Division'] || row['Devision'] || '').trim(), field: (row['Field'] || '').trim(), description: (row['Description'] || '').trim() });
+
+        // Build roles
+        const roles: GanttRole[] = (rolesByProj.get(title) ?? []).map(r => ({
+          id:       createRoleId(),
+          name:     String(r['Name']     ?? 'Role'),
+          budget:   parseFloat(String(r['Budget']   ?? '0')) || 0,
+          paidBy:   parseRolePeriod(String(r['Paid By']  ?? 'monthly')),
+          currency: parseCurrency(String(r['Currency'] ?? 'ILS')),
+        }));
+
+        // Build resources (link role name → role id)
+        const roleByName = new Map(roles.map(r => [r.name, r.id]));
+        const resources: GanttResource[] = (resByProj.get(title) ?? []).map((r, i) => {
+          const roleName = String(r['Role'] ?? '').trim();
+          return {
+            id:              createResourceId(),
+            name:            String(r['Name']           ?? `Resource ${i + 1}`),
+            role:            roleName,
+            roleId:          roleByName.get(roleName) ?? null,
+            color:           String(r['Color']          ?? getNextResourceColor(i)),
+            capacityPercent: parseInt(String(r['Capacity (%)'] ?? '100')) || 100,
+          };
+        });
+
+        // Build tasks — two passes: assign IDs, then resolve predecessors
+        const projGanttRows = ganttByProj.get(title) ?? [];
+        const resourceByName = new Map(resources.map(r => [r.name, r.id]));
+        const taskIdByNum = new Map<string, string>();
+
+        // Pass 1: allocate IDs and index task numbers
+        const rawEntries = projGanttRows.map(r => {
+          const num = String(r['Task ID'] ?? '').trim();
+          const id  = createTaskId();
+          if (num) taskIdByNum.set(num, id);
+          return { id, r, num };
+        });
+
+        // Pass 2: build normalised GanttTask objects
+        const tasks: GanttTask[] = rawEntries.map(({ id, r, num }) => {
+          const predStr  = String(r['PRED'] ?? '').trim();
+          const predNums = predStr && predStr !== '—' ? predStr.split(',').map(s => s.trim()) : [];
+          const predecessorIds = predNums.map(n => taskIdByNum.get(n) ?? '').filter(Boolean);
+
+          const resName    = String(r['Resource'] ?? '').trim();
+          const resourceId = resName && resName !== '—' ? (resourceByName.get(resName) ?? null) : null;
+          const milestone  = String(r['Milestone'] ?? 'No').toLowerCase() === 'yes';
+          const indentLevel = num ? num.split('.').length - 1 : 0;
+
+          return normalizeTask({
+            id,
+            name:         String(r['Task Name']      ?? 'Task'),
+            startDate:    String(r['Start Date']     ?? ''),
+            endDate:      String(r['End Date']       ?? ''),
+            durationDays: parseInt(String(r['Duration (Days)'] ?? '1')) || 1,
+            progress:     parseInt(String(r['Progress (%)']    ?? '0')) || 0,
+            status:       parseTaskStatus(String(r['Status']   ?? 'pending')),
+            indentLevel,
+            predecessorIds,
+            resourceId,
+            milestone,
+          });
+        });
+
+        // Assemble full ProjectGantt and create project with it in one atomic call
+        const gantt: ProjectGantt = {
+          tasks,
+          resources,
+          roles,
+          zoom: 'day',
+          lastEditedAt: new Date().toISOString(),
+        };
+
+        addProject({
+          title,
+          department,
+          devision:    resolveCell(row['Division']    ?? row['Devision']    ?? ''),
+          field:       resolveCell(row['Field']       ?? ''),
+          description: resolveCell(row['Description'] ?? ''),
+        }, gantt);
+
         imported++;
       }
-      if (imported > 0) toast.success(`Imported ${imported} project${imported !== 1 ? 's' : ''}${skipped ? ` (${skipped} skipped)` : ''}`);
-      else toast.warning('No projects imported. Ensure "Title" and "Department" columns exist.');
+
+      if (imported > 0) {
+        toast.success(`Imported ${imported} project${imported !== 1 ? 's' : ''} with full Gantt data${skipped ? ` (${skipped} skipped)` : ''}`);
+      } else {
+        toast.warning('No projects imported. Ensure a "Projects" sheet with "Title" and "Department" columns exists.');
+      }
     } catch (err) {
       console.error(err);
       toast.error('Failed to parse file.');
@@ -714,7 +867,9 @@ export function SpreadsheetView() {
                         <td className="py-2 px-4 text-[#737373] whitespace-nowrap">{p.devision}</td>
                         <td className="py-2 px-4 text-[#737373] whitespace-nowrap">{p.field}</td>
                         <td className="py-2 px-4 whitespace-nowrap">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadgeClass(p.status)}`}>{fmtStatus(p.status)}</span>
+                          {viewMode === 'visual'
+                            ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadgeClass(p.status)}`}>{fmtStatus(p.status)}</span>
+                            : <span className="text-xs text-[#737373]">{fmtStatus(p.status)}</span>}
                         </td>
                         <td className="py-2 px-4 text-[#737373] font-mono text-xs whitespace-nowrap">{getProjectDueDate(p)}</td>
                         <td className="py-2 px-4 text-[#737373] max-w-xs truncate">{p.description}</td>
@@ -736,7 +891,7 @@ export function SpreadsheetView() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead><tr className="bg-[#F9FAFB] border-b border-[#E5E5E5]">
-                      {['Project', 'Milestone', 'Date', 'Progress', 'Status'].map(c => (
+                      {['Project', 'Milestone', 'Date', 'Progress (%)', 'Status'].map(c => (
                         <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>
                       ))}
                     </tr></thead>
@@ -745,21 +900,27 @@ export function SpreadsheetView() {
                         <tr key={g.id} className="hover:bg-[#FAFAFA]">
                           <td className="py-2.5 px-4 font-medium text-[#171717] whitespace-nowrap">{g.projectTitle}</td>
                           <td className="py-2.5 px-4 text-[#737373] whitespace-nowrap">
-                            <span className="flex items-center gap-1.5"><HugeiconsIcon icon={Target01Icon} className="w-3.5 h-3.5 text-[#D93A3A] flex-shrink-0" />{g.milestoneName}</span>
+                            {viewMode === 'visual'
+                              ? <span className="flex items-center gap-1.5"><HugeiconsIcon icon={Target01Icon} className="w-3.5 h-3.5 text-[#D93A3A] flex-shrink-0" />{g.milestoneName}</span>
+                              : <span className="text-[#737373]">{g.milestoneName}</span>}
                           </td>
                           <td className="py-2.5 px-4 text-[#737373] font-mono text-xs whitespace-nowrap">{g.milestoneDate}</td>
                           <td className="py-2.5 px-4 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <div className="w-20 h-1.5 bg-[#E5E5E5] rounded-full overflow-hidden">
-                                <div className="h-full bg-[#D93A3A] rounded-full" style={{ width: `${g.progress}%` }} />
-                              </div>
-                              <span className="text-xs text-[#737373]">{g.progress}%</span>
-                            </div>
+                            {viewMode === 'visual'
+                              ? <div className="flex items-center gap-2">
+                                  <div className="w-20 h-1.5 bg-[#E5E5E5] rounded-full overflow-hidden">
+                                    <div className="h-full bg-[#D93A3A] rounded-full" style={{ width: `${g.progress}%` }} />
+                                  </div>
+                                  <span className="text-xs text-[#737373]">{g.progress}%</span>
+                                </div>
+                              : <span className="text-xs text-[#737373]">{g.progress}%</span>}
                           </td>
                           <td className="py-2.5 px-4">
-                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${goalBadge(g.status)}`}>
-                              {goalIcon(g.status)}{g.status.replace('-', ' ')}
-                            </span>
+                            {viewMode === 'visual'
+                              ? <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${goalBadge(g.status)}`}>
+                                  {goalIcon(g.status)}{g.status.replace('-', ' ')}
+                                </span>
+                              : <span className="text-xs text-[#737373]">{g.status.replace('-', ' ')}</span>}
                           </td>
                         </tr>
                       ))}
@@ -783,7 +944,7 @@ export function SpreadsheetView() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead><tr className="bg-[#F9FAFB] border-b border-[#E5E5E5]">
-                      {['Name', 'Role', 'Color', 'Capacity'].map(c => <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>)}
+                      {['Name', 'Role', 'Color', 'Capacity (%)'].map(c => <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>)}
                     </tr></thead>
                     <tbody className="divide-y divide-[#F3F4F6]">
                       {resources.map(r => {
@@ -791,17 +952,23 @@ export function SpreadsheetView() {
                         return (
                           <tr key={r.id} className="hover:bg-[#FAFAFA]">
                             <td className="py-2.5 px-4 font-medium text-[#171717] whitespace-nowrap">
-                              <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full flex-shrink-0 inline-block" style={{ background: r.color }} />{r.name}</span>
+                              {viewMode === 'visual'
+                                ? <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full flex-shrink-0 inline-block" style={{ background: r.color }} />{r.name}</span>
+                                : <span>{r.name}</span>}
                             </td>
                             <td className="py-2.5 px-4 text-[#737373] whitespace-nowrap">{role?.name ?? r.role ?? '—'}</td>
                             <td className="py-2.5 px-4 whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1.5 font-mono text-xs text-[#737373]"><span className="w-4 h-4 rounded" style={{ background: r.color }} />{r.color}</span>
+                              {viewMode === 'visual'
+                                ? <span className="inline-flex items-center gap-1.5 font-mono text-xs text-[#737373]"><span className="w-4 h-4 rounded" style={{ background: r.color }} />{r.color}</span>
+                                : <span className="font-mono text-xs text-[#737373]">{r.color}</span>}
                             </td>
                             <td className="py-2.5 px-4 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <div className="w-16 h-1.5 bg-[#E5E5E5] rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${r.capacityPercent}%`, background: r.color }} /></div>
-                                <span className="text-xs text-[#737373]">{r.capacityPercent}%</span>
-                              </div>
+                              {viewMode === 'visual'
+                                ? <div className="flex items-center gap-2">
+                                    <div className="w-16 h-1.5 bg-[#E5E5E5] rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${r.capacityPercent}%`, background: r.color }} /></div>
+                                    <span className="text-xs text-[#737373]">{r.capacityPercent}%</span>
+                                  </div>
+                                : <span className="text-xs text-[#737373]">{r.capacityPercent}%</span>}
                             </td>
                           </tr>
                         );
@@ -832,7 +999,9 @@ export function SpreadsheetView() {
                           <td className="py-2.5 px-4 font-medium text-[#171717] whitespace-nowrap">{rl.name}</td>
                           <td className="py-2.5 px-4 text-[#737373] whitespace-nowrap font-mono">{rl.budget.toLocaleString()} {rl.currency}</td>
                           <td className="py-2.5 px-4 whitespace-nowrap">
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-[#F3F4F6] text-[#737373] font-medium capitalize">{rl.paidBy}</span>
+                            {viewMode === 'visual'
+                              ? <span className="text-xs px-2 py-0.5 rounded-full bg-[#F3F4F6] text-[#737373] font-medium capitalize">{rl.paidBy}</span>
+                              : <span className="text-xs text-[#737373] capitalize">{rl.paidBy}</span>}
                           </td>
                           <td className="py-2.5 px-4 text-[#737373] whitespace-nowrap">{rl.currency}</td>
                         </tr>

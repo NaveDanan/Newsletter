@@ -47,7 +47,7 @@ export function useProjects() {
     writeStoredValue(STORAGE_KEY, projects);
   }, [isLoaded, projects]);
 
-  const addProject = useCallback((data: ProjectFormData): Project => {
+  const addProject = useCallback((data: ProjectFormData, gantt?: ProjectGantt): Project => {
     const newProject: Project = {
       id: Date.now().toString(),
       department: data.department,
@@ -57,7 +57,7 @@ export function useProjects() {
       description: data.description,
       status: 'pending',
       isVisibleInGantt: true,
-      gantt: createEmptyProjectGantt(),
+      gantt: gantt ? normalizeProjectGantt(gantt) : createEmptyProjectGantt(),
     };
 
     setProjects((currentProjects) => [...currentProjects, newProject]);

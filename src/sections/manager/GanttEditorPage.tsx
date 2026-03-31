@@ -68,6 +68,12 @@ interface GanttEditorPageProps {
   onBack: () => void;
 }
 
+interface GanttEditorPageInternalProps {
+  project: import('@/types/project').Project;
+  updateProjectGantt: (id: string, gantt: ProjectGantt) => Promise<unknown>;
+  onBack: () => void;
+}
+
 type DragMode = 'move' | 'resize-start' | 'resize-end';
 
 interface DragState {
@@ -294,9 +300,48 @@ function CurrencyIcon({ currency }: { currency: GanttCurrency }) {
 }
 
 export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
+  const { isRTL, t } = useLocale();
+  const { projects, isLoading, updateProjectGantt } = useProjects();
+  const backIcon = isRTL ? ArrowRight01Icon : ArrowLeft01Icon;
+
+  if (isLoading) {
+    return (
+      <div
+        className="flex h-screen w-full items-center justify-center bg-white text-sm font-medium text-[#737373]"
+        dir={isRTL ? 'rtl' : 'ltr'}
+      >
+        {t('ganttEditor.loading')}
+      </div>
+    );
+  }
+
+  const project = projects.find((entry) => entry.id === projectId);
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] px-4 py-10" dir={isRTL ? 'rtl' : 'ltr'}>
+        <div className="mx-auto max-w-3xl rounded-3xl border border-[#E5E7EB] bg-white p-8 shadow-sm">
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-6 inline-flex items-center gap-2 text-sm text-[#737373] hover:text-[#171717]"
+          >
+            <HugeiconsIcon icon={backIcon} className="h-4 w-4" />
+            {t('ganttEditor.backToOverview')}
+          </button>
+          <h1 className="text-2xl font-bold text-[#171717]">{t('ganttEditor.projectNotFound')}</h1>
+          <p className="mt-3 text-sm text-[#737373]">
+            {t('ganttEditor.projectLoadFailed')}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return <GanttEditorPageInternal project={project} updateProjectGantt={updateProjectGantt} onBack={onBack} />;
+}
+
+function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttEditorPageInternalProps) {
   const { formatDate, formatNumber, isRTL, locale, t } = useLocale();
-  const { projects, updateProjectGantt } = useProjects();
-  const project = projects.find((entry) => entry.id === projectId) ?? null;
   const calendarLocale = locale === 'he' ? heLocale : enUS;
   const backIcon = isRTL ? ArrowRight01Icon : ArrowLeft01Icon;
   const formatBillingLabel = useCallback((value: GanttRoleBillingPeriod) => {
@@ -333,7 +378,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
     const weekNumber = Number.parseInt(format(value, 'w'), 10);
     return `${t('editor.weekShort')} ${formatNumber(Number.isFinite(weekNumber) ? weekNumber : 0)}`;
   }, [formatNumber, t]);
-  const initialGantt = normalizeProjectGantt(project?.gantt);
+  const initialGantt = normalizeProjectGantt(project.gantt);
   const [draftGantt, setDraftGantt] = useState<ProjectGantt>(initialGantt);
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(initialGantt));
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
@@ -1293,27 +1338,6 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
       setShowTimelineYears(false);
     }
   }, [activeVisibleTimelineDate]);
-
-  if (!project) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] px-4 py-10">
-        <div className="mx-auto max-w-3xl rounded-3xl border border-[#E5E7EB] bg-white p-8 shadow-sm">
-          <button
-            type="button"
-            onClick={onBack}
-            className="mb-6 inline-flex items-center gap-2 text-sm text-[#737373] hover:text-[#171717]"
-          >
-            <HugeiconsIcon icon={backIcon} className="h-4 w-4" />
-            {t('ganttEditor.backToOverview')}
-          </button>
-          <h1 className="text-2xl font-bold text-[#171717]">{t('ganttEditor.projectNotFound')}</h1>
-          <p className="mt-3 text-sm text-[#737373]">
-            {t('ganttEditor.projectLoadFailed')}
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div

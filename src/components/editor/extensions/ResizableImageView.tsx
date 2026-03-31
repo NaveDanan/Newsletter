@@ -41,7 +41,7 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
   } = node.attrs;
   
   const [width, setWidth] = useState(normalizeDimension(initialWidth, '100%'));
-  const [height, setHeight] = useState(normalizeDimension(initialHeight, 'auto'));
+  const [, setHeight] = useState(normalizeDimension(initialHeight, 'auto'));
   const [rotation, setRotation] = useState(initialRotation || 0);
   const [textWrap, setTextWrap] = useState<ResizableImageTextWrap>(initialTextWrap || 'break');
   const [isResizing, setIsResizing] = useState(false);
@@ -54,25 +54,60 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const dragStartRef = useRef({ x: 0, y: 0 });
   const aspectRatioRef = useRef(1);
+  const widthRef = useRef(normalizeDimension(initialWidth, '100%'));
+  const heightRef = useRef(normalizeDimension(initialHeight, 'auto'));
+  const rotationRef = useRef(initialRotation || 0);
+  const textWrapRef = useRef<ResizableImageTextWrap>(initialTextWrap || 'break');
 
-  // Update attributes when values change
   useEffect(() => {
+    const nextWidth = normalizeDimension(node.attrs.width, '100%');
+    const nextHeight = normalizeDimension(node.attrs.height, 'auto');
+    const nextRotation = Number(node.attrs.rotation || 0);
+    const nextTextWrap = (node.attrs.textWrap || 'break') as ResizableImageTextWrap;
+
+    widthRef.current = nextWidth;
+    heightRef.current = nextHeight;
+    rotationRef.current = nextRotation;
+    textWrapRef.current = nextTextWrap;
+
+    setWidth(nextWidth);
+    setHeight(nextHeight);
+    setRotation(nextRotation);
+    setTextWrap(nextTextWrap);
+  }, [node.attrs.height, node.attrs.rotation, node.attrs.textWrap, node.attrs.width]);
+
+  const commitAttributes = useCallback((overrides: Partial<{
+    width: string;
+    height: string;
+    rotation: number;
+    textWrap: ResizableImageTextWrap;
+  }> = {}) => {
+    const nextWidth = normalizeDimension(overrides.width ?? widthRef.current, '100%');
+    const nextHeight = normalizeDimension(overrides.height ?? heightRef.current, 'auto');
+    const nextRotation = Number(overrides.rotation ?? rotationRef.current ?? 0);
+    const nextTextWrap = (overrides.textWrap ?? textWrapRef.current ?? 'break') as ResizableImageTextWrap;
+
+    const currentWidth = normalizeDimension(node.attrs.width, '100%');
+    const currentHeight = normalizeDimension(node.attrs.height, 'auto');
+    const currentRotation = Number(node.attrs.rotation || 0);
+    const currentTextWrap = (node.attrs.textWrap || 'break') as ResizableImageTextWrap;
+
     if (
-      node.attrs.width === width &&
-      node.attrs.height === height &&
-      node.attrs.rotation === rotation &&
-      node.attrs.textWrap === textWrap
+      currentWidth === nextWidth &&
+      currentHeight === nextHeight &&
+      currentRotation === nextRotation &&
+      currentTextWrap === nextTextWrap
     ) {
       return;
     }
 
     updateAttributes({
-      width,
-      height,
-      rotation,
-      textWrap,
+      width: nextWidth,
+      height: nextHeight,
+      rotation: nextRotation,
+      textWrap: nextTextWrap,
     });
-  }, [height, node.attrs.height, node.attrs.rotation, node.attrs.textWrap, node.attrs.width, rotation, textWrap, updateAttributes, width]);
+  }, [node.attrs.height, node.attrs.rotation, node.attrs.textWrap, node.attrs.width, updateAttributes]);
 
   // Handle resize start
   const handleResizeStart = useCallback((e: React.MouseEvent, corner: string) => {
@@ -124,35 +159,56 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
       const editorWidth = containerRef.current?.closest('.ProseMirror')?.clientWidth ?? resizeStartRef.current.width;
       const maxWidth = Math.max(MIN_IMAGE_WIDTH, editorWidth);
       const boundedWidth = Math.min(maxWidth, Math.max(MIN_IMAGE_WIDTH, newWidth));
+      const nextWidth = `${Math.round(boundedWidth)}px`;
 
-      setWidth(`${Math.round(boundedWidth)}px`);
+      widthRef.current = nextWidth;
+      heightRef.current = 'auto';
+      setWidth(nextWidth);
       setHeight('auto');
     };
 
     const handleResizeEnd = () => {
       setIsResizing(false);
+      commitAttributes({
+        width: widthRef.current,
+        height: heightRef.current,
+      });
       document.removeEventListener('mousemove', handleResizeMove);
       document.removeEventListener('mouseup', handleResizeEnd);
     };
 
     document.addEventListener('mousemove', handleResizeMove);
     document.addEventListener('mouseup', handleResizeEnd);
-  }, []);
+  }, [commitAttributes]);
 
   // Handle rotation
   const handleRotate = useCallback((direction: number) => {
-    setRotation((prev: number) => (prev + direction * 90) % 360);
-  }, []);
+    const nextRotation = (rotationRef.current + direction * 90 + 360) % 360;
+    rotationRef.current = nextRotation;
+    setRotation(nextRotation);
+    commitAttributes({ rotation: nextRotation });
+  }, [commitAttributes]);
 
   const handleWrapChange = useCallback((nextWrap: ResizableImageTextWrap) => {
+    textWrapRef.current = nextWrap;
     setTextWrap(nextWrap);
+    heightRef.current = 'auto';
     setHeight('auto');
     setPosition({ x: 0, y: 0 });
 
+    let nextWidth = widthRef.current;
     if (nextWrap !== 'break') {
-      setWidth((currentWidth) => getWrapPresetWidth(normalizeDimension(currentWidth, '100%'), containerRef.current));
+      nextWidth = getWrapPresetWidth(normalizeDimension(widthRef.current, '100%'), containerRef.current);
+      widthRef.current = nextWidth;
+      setWidth(nextWidth);
     }
-  }, []);
+
+    commitAttributes({
+      width: nextWidth,
+      height: heightRef.current,
+      textWrap: nextWrap,
+    });
+  }, [commitAttributes]);
 
   // Handle copy
   const handleCopy = useCallback(() => {

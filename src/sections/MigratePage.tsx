@@ -31,6 +31,7 @@ function readFromLocalStorage<T>(key: string): T[] {
 export function MigratePage({ onBack }: { onBack: () => void }) {
   const [status, setStatus] = useState<MigrationStatus>('idle');
   const [result, setResult] = useState<MigrationResult | null>(null);
+  const [hasCleared, setHasCleared] = useState(false);
 
   const localProjects = readFromLocalStorage<Project>(PROJECTS_LS_KEY);
   const localNewsletters = readFromLocalStorage<Newsletter>(NEWSLETTERS_LS_KEY);
@@ -71,7 +72,13 @@ export function MigratePage({ onBack }: { onBack: () => void }) {
         });
         projectsMigrated++;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        let msg = err instanceof Error ? err.message : String(err);
+        if (err && typeof err === 'object' && 'response' in err) {
+          const resp = (err as any).response;
+          if (resp?.data && Object.keys(resp.data).length > 0) {
+            msg += ' - ' + JSON.stringify(resp.data);
+          }
+        }
         errors.push(`Project "${project.title}": ${msg}`);
       }
     }
@@ -101,16 +108,18 @@ export function MigratePage({ onBack }: { onBack: () => void }) {
         });
         newslettersMigrated++;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        let msg = err instanceof Error ? err.message : String(err);
+        if (err && typeof err === 'object' && 'response' in err) {
+          const resp = (err as any).response;
+          if (resp?.data && Object.keys(resp.data).length > 0) {
+            msg += ' - ' + JSON.stringify(resp.data);
+          }
+        }
         errors.push(`Newsletter "${newsletter.title}": ${msg}`);
       }
     }
 
-    // ── Clear localStorage if everything migrated cleanly ─────────────────
-    if (errors.length === 0) {
-      window.localStorage.removeItem(PROJECTS_LS_KEY);
-      window.localStorage.removeItem(NEWSLETTERS_LS_KEY);
-    }
+    // Removed automatic localStorage clearing here.
 
     setResult({
       projectsFound: localProjects.length,
@@ -120,6 +129,12 @@ export function MigratePage({ onBack }: { onBack: () => void }) {
       errors,
     });
     setStatus(errors.length === 0 ? 'done' : 'error');
+  }
+
+  function handleClearLocalData() {
+    window.localStorage.removeItem(PROJECTS_LS_KEY);
+    window.localStorage.removeItem(NEWSLETTERS_LS_KEY);
+    setHasCleared(true);
   }
 
   return (
@@ -203,14 +218,38 @@ export function MigratePage({ onBack }: { onBack: () => void }) {
               <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 text-left space-y-1">
                 <p>✅ Projects migrated: <strong>{result.projectsMigrated} / {result.projectsFound}</strong></p>
                 <p>✅ Newsletters migrated: <strong>{result.newslettersMigrated} / {result.newslettersFound}</strong></p>
-                <p className="text-xs text-green-700 mt-2">localStorage has been cleared for these keys.</p>
+                {hasCleared && <p className="text-xs text-green-700 mt-2">localStorage has been safely cleared.</p>}
               </div>
-              <button
-                onClick={onBack}
-                className="mt-6 w-full py-3 bg-[#171717] hover:bg-[#525252] text-white font-semibold rounded-xl transition-colors"
-              >
-                Back to app
-              </button>
+              
+              {!hasCleared ? (
+                <div className="mt-6 p-5 border border-amber-200 bg-amber-50 rounded-xl text-left">
+                  <p className="font-bold text-amber-900 mb-2">Delete Local Data?</p>
+                  <p className="text-sm text-amber-800 mb-4">
+                    Your data has been successfully pushed to PocketBase. You can now safely delete the copies left over in your browser's localStorage to avoid duplicates.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleClearLocalData}
+                      className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors"
+                    >
+                      Delete Local Data
+                    </button>
+                    <button
+                      onClick={onBack}
+                      className="flex-1 py-2.5 bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 font-semibold rounded-lg transition-colors"
+                    >
+                      Keep It
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={onBack}
+                  className="mt-6 w-full py-3 bg-[#171717] hover:bg-[#525252] text-white font-semibold rounded-xl transition-colors"
+                >
+                  Back to app
+                </button>
+              )}
             </div>
           )}
 

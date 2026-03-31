@@ -5,7 +5,7 @@ import { loadProjectEnv } from './pocketbase/load-env.mjs';
 // Field helpers — match PocketBase 0.22+ field schema
 // ---------------------------------------------------------------------------
 
-const text = (name) => ({ name, type: 'text', required: false });
+const text = (name, max = 0) => ({ name, type: 'text', required: false, max });
 const number = (name, min = 0) => ({ name, type: 'number', required: false, min, onlyInt: false });
 const bool = (name) => ({ name, type: 'bool', required: false });
 const json = (name) => ({ name, type: 'json', required: false, maxSize: 5000000 });
@@ -21,8 +21,8 @@ const PROJECTS_SCHEMA = {
   fields: [
     autodate('created', true, false),
     autodate('updated', true, true),
-    text('title'),
-    text('description'),
+    text('title', 10000),
+    text('description', 20000000),
     text('department'),
     text('devision'),   // ⚠️ intentional spelling — matches our app code
     text('field'),
@@ -43,16 +43,16 @@ const NEWSLETTERS_SCHEMA = {
   fields: [
     autodate('created', true, false),
     autodate('updated', true, true),
-    text('title'),
-    text('subtitle'),
-    text('content'),          // stores HTML content
-    text('excerpt'),
+    text('title', 10000),
+    text('subtitle', 10000),
+    text('content', 20000000),          // stores HTML content (large)
+    text('excerpt', 20000000),
     text('author'),
-    text('authorAvatar'),
+    text('authorAvatar', 20000000),
     text('createdById'),
     text('publishedAt'),
     text('readTime'),
-    text('coverImage'),
+    text('coverImage', 20000000),
     bool('hasAudio'),
     text('audioDuration'),
     number('likes'),

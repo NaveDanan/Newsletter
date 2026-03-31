@@ -67,6 +67,12 @@ interface GanttEditorPageProps {
   onBack: () => void;
 }
 
+interface GanttEditorPageInternalProps {
+  project: import('@/types/project').Project;
+  updateProjectGantt: (id: string, gantt: ProjectGantt) => Promise<unknown>;
+  onBack: () => void;
+}
+
 type DragMode = 'move' | 'resize-start' | 'resize-end';
 
 interface DragState {
@@ -297,9 +303,35 @@ function CurrencyIcon({ currency }: { currency: GanttCurrency }) {
 }
 
 export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
-  const { projects, updateProjectGantt } = useProjects();
-  const project = projects.find((entry) => entry.id === projectId) ?? null;
-  const initialGantt = normalizeProjectGantt(project?.gantt);
+  const { projects, isLoading, updateProjectGantt } = useProjects();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-white text-sm font-medium text-[#737373]">
+        Loading Gantt...
+      </div>
+    );
+  }
+
+  const project = projects.find((entry) => entry.id === projectId);
+  if (!project) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-white">
+        <div className="text-center">
+          <p className="text-xl font-bold text-[#171717] mb-2">Project not found</p>
+          <button onClick={onBack} className="text-sm text-[#D93A3A] hover:underline hover:text-[#B91C1C]">
+            Return to dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <GanttEditorPageInternal project={project} updateProjectGantt={updateProjectGantt} onBack={onBack} />;
+}
+
+function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttEditorPageInternalProps) {
+  const initialGantt = normalizeProjectGantt(project.gantt);
   const [draftGantt, setDraftGantt] = useState<ProjectGantt>(initialGantt);
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(initialGantt));
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);

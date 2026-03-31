@@ -22,6 +22,7 @@ import CharacterCount from '@tiptap/extension-character-count';
 import Typography from '@tiptap/extension-typography';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useLocale } from '@/contexts/LocaleContext';
 import { ResizableImage } from './extensions/ResizableImage';
 import { TextDirection } from './extensions/TextDirection';
 import { FontSelector } from './toolbar/FontSelector';
@@ -52,16 +53,51 @@ export interface AdvancedEditorHandle {
   getHTML: () => string;
 }
 
+interface ToolbarButtonProps {
+  onClick: () => void;
+  active?: boolean;
+  icon: IconSvgElement;
+  title: string;
+  disabled?: boolean;
+}
+
+function ToolbarButton({ onClick, active = false, icon: Icon, title, disabled = false }: ToolbarButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`p-1.5 rounded transition-colors ${
+        active
+          ? 'bg-[#D93A3A] text-white'
+          : disabled
+            ? 'text-[#D4D4D4] cursor-not-allowed'
+            : 'text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717]'
+      }`}
+    >
+      <HugeiconsIcon icon={Icon} className="w-4 h-4" />
+    </button>
+  );
+}
+
+function ToolbarDivider() {
+  return <div className="mx-1 h-5 w-px bg-[#E5E5E5]" />;
+}
+
 export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorProps>(function AdvancedEditor({
   content,
   onChange,
-  placeholder = 'Start writing...',
+  placeholder,
   title,
 }, ref) {
+  const { isRTL, locale, t } = useLocale();
   const [isDragging, setIsDragging] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFindReplace, setShowFindReplace] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resolvedPlaceholder = placeholder ?? t('editor.startWriting');
+  const withShortcut = useCallback((label: string, shortcut: string) => `${label} (${shortcut})`, []);
 
   const editor = useEditor({
     extensions: [
@@ -78,7 +114,7 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
         openOnClick: false,
       }),
       Placeholder.configure({
-        placeholder,
+        placeholder: resolvedPlaceholder,
       }),
       Underline,
       TextAlign.configure({
@@ -106,14 +142,14 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
       Typography,
       TextDirection.configure({
         types: ['heading', 'paragraph', 'blockquote', 'listItem'],
-        defaultDirection: 'ltr',
+        defaultDirection: isRTL ? 'rtl' : 'ltr',
       }),
     ],
     content,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
-  });
+  }, [resolvedPlaceholder, isRTL, locale]);
 
   useImperativeHandle(ref, () => ({
     getHTML: () => editor?.getHTML() ?? content,
@@ -136,11 +172,11 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
     }
 
     if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
+      toast.error(t('editor.uploadImageFile'));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('File size must be less than 10MB');
+      toast.error(t('editor.fileTooLarge'));
       return;
     }
 
@@ -155,19 +191,19 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
           height: 'auto',
           textWrap: 'break',
         }).run();
-        toast.success('Image inserted successfully');
+        toast.success(t('editor.imageInserted'));
       }
     };
-    reader.onerror = () => toast.error('Failed to read image file');
+    reader.onerror = () => toast.error(t('editor.imageReadFailed'));
     reader.readAsDataURL(file);
-  }, [editor]);
+  }, [editor, t]);
 
   const addImageByUrl = useCallback(() => {
     if (!editor) {
       return;
     }
 
-    const url = window.prompt('Enter image URL');
+    const url = window.prompt(t('editor.enterImageUrl'));
     if (url) {
       editor.chain().focus().setResizableImage({
         src: url,
@@ -176,7 +212,7 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
         textWrap: 'break',
       }).run();
     }
-  }, [editor]);
+  }, [editor, t]);
 
   const addImageByFile = useCallback(() => {
     fileInputRef.current?.click();
@@ -225,9 +261,9 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
       return;
     }
 
-    const url = window.prompt('Enter URL');
+    const url = window.prompt(t('editor.enterLinkUrl'));
     if (url) editor.chain().focus().setLink({ href: url }).run();
-  }, [editor]);
+  }, [editor, t]);
 
   const clearFormatting = useCallback(() => {
     if (!editor) {
@@ -235,40 +271,8 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
     }
 
     editor.chain().focus().clearNodes().unsetAllMarks().run();
-    toast.success('Formatting cleared');
-  }, [editor]);
-
-  const ToolbarButton = ({ 
-    onClick, 
-    active = false, 
-    icon: Icon,
-    title,
-    disabled = false,
-  }: { 
-    onClick: () => void; 
-    active?: boolean; 
-    icon: IconSvgElement;
-    title: string;
-    disabled?: boolean;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={`p-1.5 rounded transition-colors ${
-        active 
-          ? 'bg-[#D93A3A] text-white' 
-          : disabled
-            ? 'text-[#D4D4D4] cursor-not-allowed'
-            : 'text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717]'
-      }`}
-    >
-      <HugeiconsIcon icon={Icon} className="w-4 h-4" />
-    </button>
-  );
-
-  const Divider = () => <div className="w-px h-5 bg-[#E5E5E5] mx-1" />;
+    toast.success(t('editor.formattingCleared'));
+  }, [editor, t]);
 
   const editorContainerClass = isFullscreen 
     ? 'fixed inset-0 z-50 bg-white flex flex-col' 
@@ -300,27 +304,27 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
         {/* Top Row - File Operations */}
         <div className="flex items-center gap-1 px-3 py-2 border-b border-[#E5E5E5]">
           <ExportMenu editor={editor} title={title} />
-          <Divider />
+          <ToolbarDivider />
           <ToolbarButton
             onClick={() => setShowFindReplace(true)}
             icon={Search01Icon}
-            title="Find and Replace (Ctrl+F)"
+            title={withShortcut(t('editor.findReplace'), 'Ctrl+F')}
           />
           <div className="flex-1" />
           <ToolbarButton
             onClick={clearFormatting}
             icon={TextClearIcon}
-            title="Clear formatting"
+            title={t('editor.clearFormatting')}
           />
         </div>
 
         {/* Second Row - Font & Size */}
         <div className="flex items-center gap-2 px-3 py-2 border-b border-[#E5E5E5] flex-wrap">
           <HeadingSelector editor={editor} />
-          <Divider />
+          <ToolbarDivider />
           <FontSelector editor={editor} />
           <FontSizeSelector editor={editor} />
-          <Divider />
+          <ToolbarDivider />
           <ColorPicker editor={editor} />
         </div>
 
@@ -330,44 +334,44 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
             onClick={() => editor.chain().focus().toggleBold().run()}
             active={editor.isActive('bold')}
             icon={TextBoldIcon}
-            title="Bold (Ctrl+B)"
+            title={withShortcut(t('editor.bold'), 'Ctrl+B')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleItalic().run()}
             active={editor.isActive('italic')}
             icon={TextItalicIcon}
-            title="Italic (Ctrl+I)"
+            title={withShortcut(t('editor.italic'), 'Ctrl+I')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             active={editor.isActive('underline')}
             icon={TextUnderlineIcon}
-            title="Underline (Ctrl+U)"
+            title={withShortcut(t('editor.underline'), 'Ctrl+U')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleStrike().run()}
             active={editor.isActive('strike')}
             icon={TextStrikethroughIcon}
-            title="Strikethrough"
+            title={t('editor.strikethrough')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleCode().run()}
             active={editor.isActive('code')}
             icon={CodeIcon}
-            title="Inline code"
+            title={t('editor.inlineCode')}
           />
           <Divider />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleSubscript().run()}
             active={editor.isActive('subscript')}
             icon={TextSubscriptIcon}
-            title="Subscript"
+            title={t('editor.subscript')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleSuperscript().run()}
             active={editor.isActive('superscript')}
             icon={TextSuperscriptIcon}
-            title="Superscript"
+            title={t('editor.superscript')}
           />
           <Divider />
           <AlignmentSelector editor={editor} />
@@ -381,25 +385,25 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
             onClick={() => editor.chain().focus().toggleBulletList().run()}
             active={editor.isActive('bulletList')}
             icon={List}
-            title="Bullet list"
+            title={t('editor.bulletList')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
             active={editor.isActive('orderedList')}
             icon={LeftToRightListNumberIcon}
-            title="Numbered list"
+            title={t('editor.numberedList')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleTaskList().run()}
             active={editor.isActive('taskList')}
             icon={CheckmarkSquare01Icon}
-            title="Task list"
+            title={t('editor.taskList')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
             active={editor.isActive('blockquote')}
             icon={QuoteUpIcon}
-            title="Quote"
+            title={t('editor.quote')}
           />
           <Divider />
           <TableMenu editor={editor} />
@@ -408,22 +412,22 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
             onClick={addLink}
             active={editor.isActive('link')}
             icon={Link01Icon}
-            title="Add link"
+            title={t('editor.addLink')}
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                title="Insert image"
+                title={t('editor.insertImage')}
                 className="flex items-center gap-1 rounded px-2 py-1.5 text-sm text-[#737373] transition-colors hover:bg-[#F3F4F6] hover:text-[#171717] data-[state=open]:bg-[#D93A3A]/10 data-[state=open]:text-[#D93A3A]"
               >
                 <HugeiconsIcon icon={Image01Icon} className="h-4 w-4" />
-                <span className="hidden sm:inline">Image</span>
+                <span className="hidden sm:inline">{t('editor.image')}</span>
                 <HugeiconsIcon icon={ArrowDown01Icon} className="h-3.5 w-3.5" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              align="start"
+              align={isRTL ? 'end' : 'start'}
               className="w-52 border-[#E5E5E5] bg-white p-1.5 shadow-lg"
             >
               <DropdownMenuItem
@@ -431,34 +435,34 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
                 className="gap-3 rounded-md px-3 py-2 text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
               >
                 <HugeiconsIcon icon={GlobeIcon} className="h-4 w-4 text-[#737373]" />
-                <span>Insert from URL</span>
+                <span>{t('editor.insertImageFromUrl')}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={addImageByFile}
                 className="gap-3 rounded-md px-3 py-2 text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
               >
                 <HugeiconsIcon icon={FolderOpenIcon} className="h-4 w-4 text-[#737373]" />
-                <span>Insert from local files</span>
+                <span>{t('editor.insertImageFromFiles')}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <ToolbarButton
             onClick={() => editor.chain().focus().setHorizontalRule().run()}
             icon={MinusSignIcon}
-            title="Horizontal rule"
+            title={t('editor.horizontalRule')}
           />
           <Divider />
           <ToolbarButton
             onClick={() => editor.chain().focus().undo().run()}
             disabled={!editor.can().undo()}
             icon={UndoIcon}
-            title="Undo (Ctrl+Z)"
+            title={withShortcut(t('editor.undo'), 'Ctrl+Z')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().redo().run()}
             disabled={!editor.can().redo()}
             icon={RedoIcon}
-            title="Redo (Ctrl+Y)"
+            title={withShortcut(t('editor.redo'), 'Ctrl+Y')}
           />
         </div>
       </div>
@@ -476,12 +480,12 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
           <div className="absolute inset-0 z-50 bg-[#D93A3A]/10 border-2 border-dashed border-[#D93A3A] m-4 rounded-lg flex items-center justify-center">
             <div className="text-center">
               <HugeiconsIcon icon={Upload01Icon} className="w-16 h-16 text-[#D93A3A] mx-auto mb-3" />
-              <p className="text-xl font-medium text-[#D93A3A]">Drop images here</p>
+              <p className="text-xl font-medium text-[#D93A3A]">{t('editor.dropImagesHere')}</p>
             </div>
           </div>
         )}
 
-        <div className="prose prose-sm max-w-none p-6 min-h-[400px]">
+        <div className="prose prose-sm max-w-none p-6 min-h-[400px]" dir={isRTL ? 'rtl' : 'ltr'}>
           <EditorContent editor={editor} />
         </div>
       </div>

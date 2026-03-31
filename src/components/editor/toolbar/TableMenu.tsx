@@ -2,12 +2,15 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Add01Icon, Delete02Icon, MinusSignIcon, TableIcon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
 import type { Editor } from '@tiptap/react';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 
 interface TableMenuProps {
   editor: Editor;
 }
 
 export function TableMenu({ editor }: TableMenuProps) {
+  const { formatNumber, isRTL, t } = useLocale();
   const [showGrid, setShowGrid] = useState(false);
   const [hoveredCell, setHoveredCell] = useState({ row: 0, col: 0 });
 
@@ -27,10 +30,10 @@ export function TableMenu({ editor }: TableMenuProps) {
         className={`flex items-center gap-1 px-2 py-1.5 text-sm rounded transition-colors ${
           isInTable || showGrid ? 'bg-[#D93A3A]/10 text-[#D93A3A]' : 'text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717]'
         }`}
-        title="Table"
+        title={t('editor.table')}
       >
         <HugeiconsIcon icon={TableIcon} className="w-4 h-4" />
-        <span className="hidden sm:inline">Table</span>
+        <span className="hidden sm:inline">{t('editor.table')}</span>
       </button>
 
       {/* Table Menu */}
@@ -40,11 +43,11 @@ export function TableMenu({ editor }: TableMenuProps) {
             className="fixed inset-0 z-40" 
             onClick={() => setShowGrid(false)}
           />
-          <div className="absolute top-full left-0 mt-2 p-4 bg-white border border-[#E5E5E5] rounded-lg shadow-lg z-50 min-w-[280px]">
+          <div className={cn('absolute top-full mt-2 p-4 bg-white border border-[#E5E5E5] rounded-lg shadow-lg z-50 min-w-[280px]', isRTL ? 'right-0' : 'left-0')}>
             {!isInTable ? (
               // Insert Table Grid
               <div>
-                <p className="text-sm text-[#737373] mb-3">Insert table</p>
+                <p className="text-sm text-[#737373] mb-3">{t('editor.insertTable')}</p>
                 <div className="grid grid-cols-8 gap-1 mb-3">
                   {Array.from({ length: 64 }, (_, i) => {
                     const row = Math.floor(i / 8) + 1;
@@ -65,13 +68,13 @@ export function TableMenu({ editor }: TableMenuProps) {
                   })}
                 </div>
                 <p className="text-sm text-[#171717]">
-                  {hoveredCell.row} × {hoveredCell.col}
+                  {formatNumber(hoveredCell.row)} × {formatNumber(hoveredCell.col)}
                 </p>
               </div>
             ) : (
               // Table Operations
               <div className="space-y-2">
-                <p className="text-sm font-medium text-[#171717] mb-3">Table Options</p>
+                <p className="text-sm font-medium text-[#171717] mb-3">{t('editor.tableOptions')}</p>
                 
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -80,7 +83,7 @@ export function TableMenu({ editor }: TableMenuProps) {
                     className="flex items-center gap-2 px-3 py-2 text-sm text-[#171717] hover:bg-[#F3F4F6] rounded transition-colors"
                   >
                     <HugeiconsIcon icon={Add01Icon} className="w-4 h-4" />
-                    Column Before
+                    {t('editor.columnBefore')}
                   </button>
                   <button
                     type="button"
@@ -88,7 +91,7 @@ export function TableMenu({ editor }: TableMenuProps) {
                     className="flex items-center gap-2 px-3 py-2 text-sm text-[#171717] hover:bg-[#F3F4F6] rounded transition-colors"
                   >
                     <HugeiconsIcon icon={Add01Icon} className="w-4 h-4" />
-                    Column After
+                    {t('editor.columnAfter')}
                   </button>
                   <button
                     type="button"
@@ -96,7 +99,7 @@ export function TableMenu({ editor }: TableMenuProps) {
                     className="flex items-center gap-2 px-3 py-2 text-sm text-[#171717] hover:bg-[#F3F4F6] rounded transition-colors"
                   >
                     <HugeiconsIcon icon={Add01Icon} className="w-4 h-4" />
-                    Row Before
+                    {t('editor.rowBefore')}
                   </button>
                   <button
                     type="button"
@@ -104,7 +107,7 @@ export function TableMenu({ editor }: TableMenuProps) {
                     className="flex items-center gap-2 px-3 py-2 text-sm text-[#171717] hover:bg-[#F3F4F6] rounded transition-colors"
                   >
                     <HugeiconsIcon icon={Add01Icon} className="w-4 h-4" />
-                    Row After
+                    {t('editor.rowAfter')}
                   </button>
                   <button
                     type="button"
@@ -112,7 +115,7 @@ export function TableMenu({ editor }: TableMenuProps) {
                     className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
                   >
                     <HugeiconsIcon icon={MinusSignIcon} className="w-4 h-4" />
-                    Delete Column
+                    {t('editor.deleteColumn')}
                   </button>
                   <button
                     type="button"
@@ -120,7 +123,7 @@ export function TableMenu({ editor }: TableMenuProps) {
                     className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
                   >
                     <HugeiconsIcon icon={MinusSignIcon} className="w-4 h-4" />
-                    Delete Row
+                    {t('editor.deleteRow')}
                   </button>
                 </div>
                 
@@ -134,7 +137,7 @@ export function TableMenu({ editor }: TableMenuProps) {
                     className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
                   >
                     <HugeiconsIcon icon={Delete02Icon} className="w-4 h-4" />
-                    Delete Table
+                    {t('editor.deleteTable')}
                   </button>
                 </div>
               </div>

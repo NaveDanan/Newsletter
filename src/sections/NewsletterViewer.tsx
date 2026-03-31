@@ -2,8 +2,11 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon, Bookmark01Icon, Heart, Link01Icon, Message01Icon, PlayIcon } from "@hugeicons/core-free-icons";
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { CommentReply } from '@/components/ui/comment-reply';
+import { useLocale } from '@/contexts/LocaleContext';
 import { stripCommentFormatting } from '@/lib/comment-formatting';
+import { cn } from '@/lib/utils';
 import type { PocketBaseUser } from '@/lib/pocketbase/client';
 import type { Newsletter, NewsletterComment } from '../types/newsletter';
 import '../components/editor/EditorStyles.css';
@@ -27,32 +30,6 @@ function getInitials(name: string): string {
     .join('');
 }
 
-function formatCommentDate(value: string): string {
-  const date = new Date(value);
-  const diffMs = Date.now() - date.getTime();
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-
-  if (diffHours < 1) {
-    const diffMinutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
-    return `${diffMinutes}m ago`;
-  }
-
-  if (diffHours < 24) {
-    return `${diffHours}h ago`;
-  }
-
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) {
-    return `${diffDays}d ago`;
-  }
-
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
 export function NewsletterViewer({
   newsletter,
   onBack,
@@ -62,6 +39,7 @@ export function NewsletterViewer({
   onAddComment,
   onToggleCommentLike,
 }: NewsletterViewerProps) {
+  const { formatDate, formatNumber, formatRelativeTime, isRTL, t } = useLocale();
   const articleRef = useRef<HTMLDivElement>(null);
   const discussionRef = useRef<HTMLDivElement>(null);
   const [commentDraft, setCommentDraft] = useState('');
@@ -78,7 +56,7 @@ export function NewsletterViewer({
 
   const handleShare = (platform: string) => {
     const url = window.location.href;
-    const text = `Check out this article: ${newsletter.title}`;
+    const text = t('viewer.shareText', { title: newsletter.title });
 
     switch (platform) {
       case 'twitter':
@@ -89,7 +67,7 @@ export function NewsletterViewer({
         break;
       case 'copy':
         navigator.clipboard.writeText(url);
-        toast.success('Link copied to clipboard');
+        toast.success(t('viewer.shareCopied'));
         break;
     }
   };
@@ -110,7 +88,7 @@ export function NewsletterViewer({
     }
 
     if (!stripCommentFormatting(commentDraft)) {
-      toast.error('Write a comment before posting.');
+      toast.error(t('viewer.emptyComment'));
       return;
     }
 
@@ -120,7 +98,7 @@ export function NewsletterViewer({
     }
 
     setCommentDraft('');
-    toast.success('Comment posted');
+    toast.success(t('viewer.commentPosted'));
   };
 
   const handleCommentLike = (commentId: string) => {
@@ -140,10 +118,11 @@ export function NewsletterViewer({
             onClick={onBack}
             className="flex items-center gap-2 text-[#737373] transition-colors hover:text-[#171717]"
           >
-            <HugeiconsIcon icon={ArrowLeft01Icon} className="h-5 w-5" />
-            <span className="text-sm font-medium">Back</span>
+            <HugeiconsIcon icon={ArrowLeft01Icon} className={cn('h-5 w-5', isRTL && 'rtl-rotate-180')} />
+            <span className="text-sm font-medium">{t('common.back')}</span>
           </button>
           <div className="flex items-center gap-2">
+            <LanguageToggleButton compact />
             <button
               onClick={() => handleShare('copy')}
               className="p-2 text-[#737373] transition-colors hover:text-[#171717]"
@@ -179,12 +158,12 @@ export function NewsletterViewer({
           </div>
         )}
 
-        <h1 className="mb-4 text-3xl font-bold leading-tight text-[#171717] sm:text-4xl lg:text-5xl">
+        <h1 className="mb-4 text-3xl font-bold leading-tight text-[#171717] sm:text-4xl lg:text-5xl" dir="auto">
           {newsletter.title}
         </h1>
 
         {newsletter.subtitle && (
-          <p className="mb-6 text-xl text-[#737373]">
+          <p className="mb-6 text-xl text-[#737373]" dir="auto">
             {newsletter.subtitle}
           </p>
         )}
@@ -199,7 +178,7 @@ export function NewsletterViewer({
             <div>
               <p className="font-semibold text-[#171717]">{newsletter.author}</p>
               <p className="text-sm text-[#737373]">
-                {new Date(newsletter.publishedAt).toLocaleDateString('en-US', {
+                {formatDate(newsletter.publishedAt, {
                   month: 'long',
                   day: 'numeric',
                   year: 'numeric',
@@ -213,11 +192,11 @@ export function NewsletterViewer({
           <div className="hidden items-center gap-4 text-sm text-[#737373] sm:flex">
             <span className="flex items-center gap-1">
               <HugeiconsIcon icon={Heart} className="h-4 w-4" />
-              {newsletter.likes}
+              {formatNumber(newsletter.likes)}
             </span>
             <span className="flex items-center gap-1">
               <HugeiconsIcon icon={Message01Icon} className="h-4 w-4" />
-              {newsletter.comments}
+              {formatNumber(newsletter.comments)}
             </span>
           </div>
         </div>
@@ -229,7 +208,7 @@ export function NewsletterViewer({
                 <HugeiconsIcon icon={PlayIcon} className="ml-0.5 h-5 w-5 fill-white text-white" />
               </button>
               <div className="flex-1">
-                <p className="font-medium text-[#171717]">Listen to this article</p>
+                <p className="font-medium text-[#171717]">{t('viewer.listen')}</p>
                 <p className="text-sm text-[#737373]">{newsletter.audioDuration || '5:30'}</p>
               </div>
               <div className="hidden items-center gap-2 sm:flex">
@@ -243,6 +222,7 @@ export function NewsletterViewer({
 
         <div
           className="newsletter-article"
+          dir="auto"
           dangerouslySetInnerHTML={{ __html: newsletter.content }}
         />
 
@@ -297,7 +277,7 @@ export function NewsletterViewer({
           </div>
 
           <CommentReply
-            title="Community Threads"
+            title={t('viewer.communityThreads')}
             likeCount={newsletter.likes}
             commentCount={newsletter.comments}
             isLiked={hasLikedNewsletter}
@@ -309,7 +289,7 @@ export function NewsletterViewer({
             onToggleLike={handleToggleLike}
             onToggleCommentLike={handleCommentLike}
             onRequireAuth={onRequireAuth}
-            formatCommentDate={formatCommentDate}
+            formatCommentDate={formatRelativeTime}
           />
         </section>
       </article>

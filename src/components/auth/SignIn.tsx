@@ -2,13 +2,16 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { AlertCircleIcon, ArrowLeft01Icon, ChromeIcon, GithubIcon, Loading02Icon, LockIcon, Mail01Icon, ViewIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 interface SignInProps {
   onBack: () => void;
@@ -17,6 +20,7 @@ interface SignInProps {
 
 export function SignIn({ onBack, onSuccess }: SignInProps) {
   const { login, register, initiateSSO, requestPasswordReset } = useAuth();
+  const { isRTL, t } = useLocale();
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -41,7 +45,7 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
 
     if (showForgotPassword) {
       if (!resetEmail) {
-        toast.error('Please enter your email');
+        toast.error(t('auth.pleaseEnterEmail'));
         return;
       }
 
@@ -58,22 +62,22 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
 
     if (isSignUp) {
       if (!email || !password || !name) {
-        toast.error('Please fill in all fields');
+        toast.error(t('auth.fillAllFields'));
         return;
       }
 
       if (password !== confirmPassword) {
-        toast.error('Passwords do not match');
+        toast.error(t('auth.passwordsMismatch'));
         return;
       }
 
       if (password.length < 8) {
-        toast.error('Password must be at least 8 characters');
+        toast.error(t('auth.passwordTooShort'));
         return;
       }
 
       if (!agreeTerms) {
-        toast.error('Please agree to the terms and conditions');
+        toast.error(t('auth.acceptTerms'));
         return;
       }
 
@@ -87,7 +91,7 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
     }
 
     if (!email || !password) {
-      toast.error('Please enter email and password');
+      toast.error(t('auth.enterCredentials'));
       return;
     }
 
@@ -111,29 +115,34 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
   if (showForgotPassword) {
     return (
       <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+        <div className="w-full max-w-md space-y-4">
+          <div className="flex justify-end">
+            <LanguageToggleButton compact />
+          </div>
+          <Card className="w-full">
           <CardHeader className="space-y-1">
             <div className="flex items-center gap-2 mb-4">
               <button onClick={() => setShowForgotPassword(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                <HugeiconsIcon icon={ArrowLeft01Icon} className="w-4 h-4" />
+                <HugeiconsIcon icon={ArrowLeft01Icon} className={cn('w-4 h-4', isRTL && 'rtl-rotate-180')} />
               </button>
             </div>
-            <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
-            <CardDescription>Enter your email and we&apos;ll send you reset instructions.</CardDescription>
+            <CardTitle className="text-2xl font-bold">{t('auth.resetPassword')}</CardTitle>
+            <CardDescription>{t('auth.resetDescription')}</CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="reset-email">Email</Label>
+                <Label htmlFor="reset-email">{t('auth.email')}</Label>
                 <div className="relative">
-                  <HugeiconsIcon icon={Mail01Icon} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <HugeiconsIcon icon={Mail01Icon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400', isRTL ? 'right-3' : 'left-3')} />
                   <Input
                     id="reset-email"
                     type="email"
-                    placeholder="name@example.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     value={resetEmail}
                     onChange={(event) => setResetEmail(event.target.value)}
-                    className="pl-10"
+                    dir={isRTL ? 'rtl' : 'ltr'}
+                    className={isRTL ? 'pr-10' : 'pl-10'}
                     required
                   />
                 </div>
@@ -141,15 +150,16 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
             </CardContent>
             <CardFooter className="flex gap-3">
               <Button type="button" variant="outline" className="w-full" onClick={onBack}>
-                Cancel
+                {t('auth.cancel')}
               </Button>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <HugeiconsIcon icon={Loading02Icon} className="mr-2 h-4 w-4 animate-spin" />}
-                Send Reset
+                {t('auth.sendReset')}
               </Button>
             </CardFooter>
           </form>
-        </Card>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -157,10 +167,13 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        <div className="mb-4 flex justify-end">
+          <LanguageToggleButton compact />
+        </div>
         <div className="text-center mb-8">
           <button onClick={onBack} className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
             <img src="/logo.gif" alt="AI-Break" className="w-24 h-24 object-contain" />
-            <span className="font-bold text-2xl text-[#171717] mt-8">AI-Break</span>
+            <span className="font-bold text-2xl text-[#171717] mt-8">{t('auth.brandName')}</span>
           </button>
         </div>
 
@@ -178,7 +191,7 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
                   !isSignUp ? 'bg-white text-[#171717] shadow-sm' : 'text-[#737373] hover:text-[#171717]'
                 }`}
               >
-                Sign In
+                {t('auth.signIn')}
               </button>
               <button
                 type="button"
@@ -191,14 +204,14 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
                   isSignUp ? 'bg-white text-[#171717] shadow-sm' : 'text-[#737373] hover:text-[#171717]'
                 }`}
               >
-                Sign Up
+                {t('auth.signUp')}
               </button>
             </div>
             <CardTitle className="text-2xl font-bold">
-              {isSignUp ? 'Create an account' : 'Sign in to your account'}
+              {isSignUp ? t('auth.createAccount') : t('auth.signInTitle')}
             </CardTitle>
             <CardDescription>
-              {isSignUp ? 'Enter your details to create your account' : 'Enter your email and password to sign in'}
+              {isSignUp ? t('auth.createAccountDescription') : t('auth.signInDescription')}
             </CardDescription>
           </CardHeader>
 
@@ -219,18 +232,18 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
                 <Separator className="w-full" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500">Or continue with email</span>
+                <span className="bg-white px-2 text-gray-500">{t('auth.continueWithEmail')}</span>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {isSignUp && (
                 <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
+                  <Label htmlFor="name">{t('auth.fullName')}</Label>
                   <Input
                     id="name"
                     type="text"
-                    placeholder="John Doe"
+                    placeholder={t('auth.fullNamePlaceholder')}
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     required={isSignUp}
@@ -239,38 +252,40 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('auth.email')}</Label>
                 <div className="relative">
-                  <HugeiconsIcon icon={Mail01Icon} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <HugeiconsIcon icon={Mail01Icon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400', isRTL ? 'right-3' : 'left-3')} />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="name@example.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    className="pl-10"
+                    dir={isRTL ? 'rtl' : 'ltr'}
+                    className={isRTL ? 'pr-10' : 'pl-10'}
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t('auth.password')}</Label>
                 <div className="relative">
-                  <HugeiconsIcon icon={LockIcon} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <HugeiconsIcon icon={LockIcon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400', isRTL ? 'right-3' : 'left-3')} />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    className="pl-10 pr-10"
+                    dir={isRTL ? 'rtl' : 'ltr'}
+                    className={isRTL ? 'pr-10 pl-10' : 'pl-10 pr-10'}
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((current) => !current)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className={cn('absolute top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600', isRTL ? 'left-3' : 'right-3')}
                   >
                     {showPassword ? <HugeiconsIcon icon={ViewOffIcon} className="w-4 h-4" /> : <HugeiconsIcon icon={ViewIcon} className="w-4 h-4" />}
                   </button>
@@ -279,16 +294,17 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
 
               {isSignUp && (
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm Password</Label>
+                  <Label htmlFor="confirm-password">{t('auth.confirmPassword')}</Label>
                   <div className="relative">
-                    <HugeiconsIcon icon={LockIcon} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <HugeiconsIcon icon={LockIcon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400', isRTL ? 'right-3' : 'left-3')} />
                     <Input
                       id="confirm-password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
-                      className="pl-10"
+                      dir={isRTL ? 'rtl' : 'ltr'}
+                      className={isRTL ? 'pr-10' : 'pl-10'}
                       required={isSignUp}
                     />
                   </div>
@@ -296,21 +312,21 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
               )}
 
               {isSignUp && (
-                <div className="flex items-start space-x-2">
+                <div className={cn('flex items-start', isRTL ? 'space-x-reverse space-x-2' : 'space-x-2')}>
                   <Checkbox
                     id="terms"
                     checked={agreeTerms}
                     onCheckedChange={(checked) => setAgreeTerms(checked === true)}
                   />
                   <label htmlFor="terms" className="text-sm text-gray-600 leading-none">
-                    I agree to the Terms of Service and Privacy Policy
+                    {t('auth.agreeTerms')}
                   </label>
                 </div>
               )}
 
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <HugeiconsIcon icon={Loading02Icon} className="mr-2 h-4 w-4 animate-spin" />}
-                {isSignUp ? 'Create Account' : 'Sign In'}
+                {isSignUp ? t('auth.signUpButton') : t('auth.signInButton')}
               </Button>
             </form>
           </CardContent>
@@ -318,7 +334,7 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
           <CardFooter className="flex flex-col space-y-4">
             {!isSignUp && (
               <button onClick={() => setShowForgotPassword(true)} className="text-sm text-[#D93A3A] hover:underline">
-                Forgot your password?
+                {t('auth.forgotPassword')}
               </button>
             )}
           </CardFooter>
@@ -330,7 +346,7 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
               <HugeiconsIcon icon={AlertCircleIcon} className="w-5 h-5 text-blue-600 mt-0.5" />
               <div className="text-sm text-blue-800">
                 <p className="font-medium mb-1">PocketBase Setup Required</p>
-                <p>Add `VITE_POCKETBASE_URL` to your environment before using sign-in or SSO.</p>
+                <p>Add VITE_POCKETBASE_URL to your environment before using sign-in or SSO.</p>
               </div>
             </div>
           </div>

@@ -1,6 +1,8 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import type { Editor } from '@tiptap/react';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 
 interface FontSelectorProps {
   editor: Editor;
@@ -23,9 +25,10 @@ const fonts = [
 ];
 
 export function FontSelector({ editor }: FontSelectorProps) {
+  const { isRTL, t } = useLocale();
   const currentFont = editor.getAttributes('textStyle').fontFamily || '';
   
-  const currentFontName = fonts.find(f => f.value === currentFont)?.name || 'Default';
+  const currentFontName = fonts.find(f => f.value === currentFont)?.name || t('editor.defaultFont');
 
   return (
     <div className="relative group">
@@ -37,7 +40,7 @@ export function FontSelector({ editor }: FontSelectorProps) {
         <HugeiconsIcon icon={ArrowDown01Icon} className="w-3 h-3 text-[#737373]" />
       </button>
       
-      <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-[#E5E5E5] rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 max-h-64 overflow-y-auto">
+      <div className={cn('absolute top-full mt-1 w-48 bg-white border border-[#E5E5E5] rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 max-h-64 overflow-y-auto', isRTL ? 'right-0' : 'left-0')}>
         {fonts.map((font) => (
           <button
             key={font.name}
@@ -54,7 +57,7 @@ export function FontSelector({ editor }: FontSelectorProps) {
             }`}
             style={{ fontFamily: font.value || 'inherit' }}
           >
-            {font.name}
+            {font.value ? font.name : t('editor.defaultFont')}
           </button>
         ))}
       </div>

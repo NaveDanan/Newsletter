@@ -1,6 +1,7 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight } from "@hugeicons/core-free-icons";
 import type { Editor } from '@tiptap/react';
+import { useLocale } from '@/contexts/LocaleContext';
 
 interface AlignmentSelectorProps {
   editor: Editor;
@@ -14,6 +15,7 @@ const alignments = [
 ] as const;
 
 export function AlignmentSelector({ editor }: AlignmentSelectorProps) {
+  const { t } = useLocale();
   return (
     <div className="flex items-center gap-0.5">
       {alignments.map(({ name, icon: Icon, value }) => (
@@ -26,7 +28,7 @@ export function AlignmentSelector({ editor }: AlignmentSelectorProps) {
               ? 'bg-[#D93A3A] text-white'
               : 'text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717]'
           }`}
-          title={`Align ${name}`}
+          title={name === 'left' ? t('editor.alignLeft') : name === 'center' ? t('editor.alignCenter') : name === 'right' ? t('editor.alignRight') : t('editor.alignJustify')}
         >
           <HugeiconsIcon icon={Icon} className="w-4 h-4" />
         </button>

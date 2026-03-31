@@ -3,6 +3,8 @@ import { Download01Icon, FileAttachmentIcon, FileScriptIcon, PrinterIcon } from 
 import { useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { toast } from 'sonner';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 
 interface ExportMenuProps {
   editor: Editor;
@@ -10,16 +12,18 @@ interface ExportMenuProps {
 }
 
 export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
+  const { dir, isRTL, locale, t } = useLocale();
   const [showMenu, setShowMenu] = useState(false);
+  const resolvedTitle = title || t('editor.document');
 
   const exportHTML = () => {
     const html = editor.getHTML();
     const blob = new Blob([`
 <!DOCTYPE html>
-<html>
+<html lang="${locale}" dir="${dir}">
 <head>
   <meta charset="UTF-8">
-  <title>${title}</title>
+  <title>${resolvedTitle}</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -28,6 +32,7 @@ export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
       padding: 20px;
       line-height: 1.6;
       color: #333;
+      direction: ${dir};
     }
     img { max-width: 100%; height: auto; }
     table { border-collapse: collapse; width: 100%; }
@@ -63,13 +68,13 @@ export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${title.replace(/\s+/g, '_').toLowerCase()}.html`;
+    a.download = `${resolvedTitle.replace(/\s+/g, '_').toLowerCase()}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    toast.success('HTML exported successfully');
+    toast.success(t('editor.htmlExported'));
     setShowMenu(false);
   };
 
@@ -80,13 +85,13 @@ export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${title.replace(/\s+/g, '_').toLowerCase()}.txt`;
+    a.download = `${resolvedTitle.replace(/\s+/g, '_').toLowerCase()}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    toast.success('Text exported successfully');
+    toast.success(t('editor.textExported'));
     setShowMenu(false);
   };
 
@@ -97,13 +102,13 @@ export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${title.replace(/\s+/g, '_').toLowerCase()}.json`;
+    a.download = `${resolvedTitle.replace(/\s+/g, '_').toLowerCase()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    toast.success('JSON exported successfully');
+    toast.success(t('editor.jsonExported'));
     setShowMenu(false);
   };
 
@@ -112,10 +117,10 @@ export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
     if (printWindow) {
       printWindow.document.write(`
 <!DOCTYPE html>
-<html>
+<html lang="${locale}" dir="${dir}">
 <head>
   <meta charset="UTF-8">
-  <title>${title}</title>
+  <title>${resolvedTitle}</title>
   <style>
     @media print {
       body { 
@@ -135,6 +140,7 @@ export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
       margin: 40px auto; 
       padding: 20px;
       line-height: 1.6;
+      direction: ${dir};
     }
     img { max-width: 100%; height: auto; }
     table { border-collapse: collapse; width: 100%; margin: 1em 0; }
@@ -184,10 +190,10 @@ export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
         type="button"
         onClick={() => setShowMenu(!showMenu)}
         className="flex items-center gap-1 px-2 py-1.5 text-sm text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717] rounded transition-colors"
-        title="Export"
+        title={t('editor.export')}
       >
         <HugeiconsIcon icon={Download01Icon} className="w-4 h-4" />
-        <span className="hidden sm:inline">Export</span>
+        <span className="hidden sm:inline">{t('editor.export')}</span>
       </button>
 
       {showMenu && (
@@ -196,14 +202,14 @@ export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
             className="fixed inset-0 z-40" 
             onClick={() => setShowMenu(false)}
           />
-          <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-[#E5E5E5] rounded-lg shadow-lg z-50 py-1">
+          <div className={cn('absolute top-full mt-2 w-48 bg-white border border-[#E5E5E5] rounded-lg shadow-lg z-50 py-1', isRTL ? 'left-0' : 'right-0')} dir={dir}>
             <button
               type="button"
               onClick={exportHTML}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#171717] hover:bg-[#F3F4F6] transition-colors"
             >
               <HugeiconsIcon icon={FileScriptIcon} className="w-4 h-4 text-[#737373]" />
-              Export as HTML
+              {t('editor.exportHtml')}
             </button>
             <button
               type="button"
@@ -211,7 +217,7 @@ export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#171717] hover:bg-[#F3F4F6] transition-colors"
             >
               <HugeiconsIcon icon={FileAttachmentIcon} className="w-4 h-4 text-[#737373]" />
-              Export as Text
+              {t('editor.exportText')}
             </button>
             <button
               type="button"
@@ -219,7 +225,7 @@ export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#171717] hover:bg-[#F3F4F6] transition-colors"
             >
               <HugeiconsIcon icon={FileScriptIcon} className="w-4 h-4 text-[#737373]" />
-              Export as JSON
+              {t('editor.exportJson')}
             </button>
             <div className="border-t border-[#E5E5E5] my-1" />
             <button
@@ -228,7 +234,7 @@ export function ExportMenu({ editor, title = 'document' }: ExportMenuProps) {
               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#171717] hover:bg-[#F3F4F6] transition-colors"
             >
               <HugeiconsIcon icon={PrinterIcon} className="w-4 h-4 text-[#737373]" />
-              Print
+              {t('editor.print')}
             </button>
           </div>
         </>

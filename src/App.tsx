@@ -11,6 +11,7 @@ import { SignIn } from './components/auth/SignIn';
 import { SSOCallback } from './components/auth/SSOCallback';
 import { MigratePage } from './sections/MigratePage';
 import { useAuth } from './contexts/AuthContext';
+import { useLocale } from './contexts/LocaleContext';
 import { useNewsletters } from './hooks/useNewsletters';
 import { hasManagerAccess } from './lib/auth/permissions';
 import { Toaster } from 'sonner';
@@ -165,6 +166,7 @@ function getCurrentPathnameSnapshot() {
 }
 
 function App() {
+  const { isRTL, t } = useLocale();
   const {
     isAuthenticated: isUserAuthenticated,
     isLoading: isAuthLoading,
@@ -194,6 +196,7 @@ function App() {
   const currentRoute = useMemo(() => resolveRoute(currentPathname), [currentPathname]);
   const [searchQuery, setSearchQuery] = useState('');
   const managerToastRouteRef = useRef<string | null>(null);
+  const toasterPosition = isRTL ? 'top-left' : 'top-right';
   const publishedNewsletters = newsletters
     .filter((newsletter) => newsletter.status === 'published')
     .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
@@ -252,7 +255,7 @@ function App() {
 
     if (!hasManagerAccess(userRole)) {
       if (managerToastRouteRef.current !== currentRoute.pathname) {
-        toast.error('This account is not allowed to access the manager dashboard.');
+        toast.error(t('app.managerAccessDenied'));
         managerToastRouteRef.current = currentRoute.pathname;
       }
       navigateTo('/', { replace: true });
@@ -260,7 +263,7 @@ function App() {
     }
 
     managerToastRouteRef.current = null;
-  }, [currentRoute.pathname, currentRoute.view, isAuthLoading, isUserAuthenticated, navigateTo, userRole]);
+  }, [currentRoute.pathname, currentRoute.view, isAuthLoading, isUserAuthenticated, navigateTo, t, userRole]);
 
   const handleManagerClick = () => {
     navigateTo('/manager');
@@ -293,7 +296,7 @@ function App() {
   };
 
   const handleRequireAuth = () => {
-    toast.error('Sign in to join the discussion.');
+    toast.error(t('app.authRequiredDiscussion'));
     navigateTo('/sign-in');
   };
 
@@ -337,7 +340,7 @@ function App() {
   if (currentRoute.view === 'article' && selectedArticle) {
     return (
       <div className="min-h-screen bg-white">
-        <Toaster position="top-right" richColors />
+        <Toaster position={toasterPosition} richColors />
         <NewsletterViewer
           newsletter={selectedArticle}
           currentUser={user}
@@ -354,9 +357,9 @@ function App() {
   if (currentRoute.view === 'article') {
     return (
       <div className="min-h-screen bg-white">
-        <Toaster position="top-right" richColors />
+        <Toaster position={toasterPosition} richColors />
         <div className="flex min-h-screen items-center justify-center text-sm font-medium text-[#737373]">
-          Loading article...
+          {t('app.loadingArticle')}
         </div>
       </div>
     );
@@ -367,9 +370,9 @@ function App() {
     if (isAuthLoading) {
       return (
         <div className="min-h-screen bg-white">
-          <Toaster position="top-right" richColors />
+          <Toaster position={toasterPosition} richColors />
           <div className="flex min-h-screen items-center justify-center text-sm font-medium text-[#737373]">
-            Loading manager dashboard...
+            {t('app.loadingManager')}
           </div>
         </div>
       );
@@ -382,7 +385,7 @@ function App() {
     if (currentRoute.view === 'gantt-editor' && currentRoute.projectId) {
       return (
         <div className="min-h-screen bg-white">
-          <Toaster position="top-right" richColors />
+          <Toaster position={toasterPosition} richColors />
           <GanttEditorPage
             key={currentRoute.projectId}
             projectId={currentRoute.projectId}
@@ -394,7 +397,7 @@ function App() {
 
     return (
       <div className="min-h-screen bg-white">
-        <Toaster position="top-right" richColors />
+        <Toaster position={toasterPosition} richColors />
         <ManagerDashboard
           activeTab={currentRoute.managerSection ?? 'newsletters'}
           onTabChange={handleManagerTabChange}
@@ -419,7 +422,7 @@ function App() {
   if (currentRoute.view === 'migrate') {
     return (
       <div className="min-h-screen bg-white">
-        <Toaster position="top-right" richColors />
+        <Toaster position={toasterPosition} richColors />
         <MigratePage onBack={handleHomeClick} />
       </div>
     );
@@ -428,7 +431,7 @@ function App() {
   if (currentRoute.view === 'signin') {
     return (
       <div className="min-h-screen bg-white">
-        <Toaster position="top-right" richColors />
+        <Toaster position={toasterPosition} richColors />
         <SignIn onBack={handleHomeClick} onSuccess={handleAuthSuccess} />
       </div>
     );
@@ -437,7 +440,7 @@ function App() {
   if (currentRoute.view === 'sso-callback') {
     return (
       <div className="min-h-screen bg-white">
-        <Toaster position="top-right" richColors />
+        <Toaster position={toasterPosition} richColors />
         <SSOCallback
           onFinish={handleAuthSuccess}
           onRetry={() => navigateTo('/sign-in', { replace: true })}
@@ -449,7 +452,7 @@ function App() {
   // Render home page
   return (
     <div className="min-h-screen bg-white">
-      <Toaster position="top-right" richColors />
+      <Toaster position={toasterPosition} richColors />
       <Navigation
         onManagerClick={handleManagerClick}
         onHomeClick={handleHomeClick}
@@ -473,16 +476,14 @@ function App() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#D93A3A]">
-                    Newsletter Search
+                    {t('app.search.label')}
                   </p>
                   <h2 className="mt-1 text-2xl font-bold text-[#171717]">
-                    {filteredNewsletters.length === 1
-                      ? '1 result found'
-                      : `${filteredNewsletters.length} results found`}
+                    {t('app.search.results', { count: filteredNewsletters.length })}
                   </h2>
                 </div>
                 <p className="text-sm text-[#737373]">
-                  Showing matches for <span className="font-semibold text-[#171717]">&quot;{trimmedSearchQuery}&quot;</span>
+                  {t('app.search.matches', { query: trimmedSearchQuery })}
                 </p>
               </div>
             </section>
@@ -503,13 +504,13 @@ function App() {
               ) : (
                 <section className="rounded-2xl border border-dashed border-[#D4D4D8] bg-[#FAFAFA] px-6 py-10 text-center">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#D93A3A]">
-                    No Matches
+                    {t('app.search.noMatchesLabel')}
                   </p>
                   <h2 className="mt-3 text-2xl font-bold text-[#171717]">
-                    No newsletters matched your search
+                    {t('app.search.noMatchesTitle')}
                   </h2>
                   <p className="mt-3 text-sm text-[#737373]">
-                    Try a title, tag, author name, or a broader keyword from the article content.
+                    {t('app.search.noMatchesDescription')}
                   </p>
                 </section>
               )}

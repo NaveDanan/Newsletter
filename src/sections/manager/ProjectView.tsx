@@ -2,10 +2,12 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Add01Icon, Briefcase01Icon, Building02Icon, CheckmarkCircle02Icon, CircleIcon, Clock01Icon, Delete02Icon, Edit02Icon, FolderTreeIcon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useLocale } from '@/contexts/LocaleContext';
 import { useProjects } from '../../hooks/useProjects';
 import type { Project } from '../../types/project';
 
 export function ProjectView() {
+  const { formatNumber, t } = useLocale();
   const { projects, addProject, updateProject, deleteProject, updateProjectStatus } = useProjects();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newProject, setNewProject] = useState({ department: '', devision: '', field: '', title: '', description: '' });
@@ -37,19 +39,32 @@ export function ProjectView() {
     }
   };
 
+  const getStatusLabel = (status: Project['status']) => {
+    switch (status) {
+      case 'completed':
+        return t('manager.completed');
+      case 'in-progress':
+        return t('manager.inProgress');
+      case 'pending':
+        return t('manager.pending');
+      case 'delayed':
+        return t('manager.delayed');
+    }
+  };
+
   const handleAddProject = () => {
     if (!newProject.department || !newProject.devision || !newProject.field || !newProject.title) {
-      toast.error('Please fill in all required fields');
+      toast.error(t('manager.requiredFields'));
       return;
     }
 
     if (editingProjectId) {
       void updateProject(editingProjectId, newProject).then((result) => {
-        if (result) toast.success('Project updated successfully');
+        if (result) toast.success(t('manager.projectUpdated'));
       });
     } else {
       void addProject(newProject).then((result) => {
-        if (result) toast.success('Project added successfully');
+        if (result) toast.success(t('manager.projectAdded'));
       });
     }
 
@@ -60,7 +75,7 @@ export function ProjectView() {
 
   const handleDeleteProject = (id: string) => {
     void deleteProject(id).then((ok) => {
-      if (ok) toast.success('Project deleted');
+      if (ok) toast.success(t('manager.projectDeleted'));
     });
   };
 
@@ -109,18 +124,18 @@ export function ProjectView() {
 
       <div className="dashboard-card flex flex-col items-center justify-center mx-auto w-fit px-4 py-2 min-w-[340px]">
         <div className="grid grid-cols-5 gap-4 h-5 w-full">
-          <p className="text-xs text-[#737373] mb-1 text-center">Total</p>
-          <p className="text-xs text-[#737373] mb-1 text-center">Completed</p>
-          <p className="text-xs text-[#737373] mb-1 text-center">In Progress</p>
-          <p className="text-xs text-[#737373] mb-1 text-center">Pending</p>
-          <p className="text-xs text-[#737373] mb-1 text-center">Delayed</p>
+          <p className="text-xs text-[#737373] mb-1 text-center">{t('manager.total')}</p>
+          <p className="text-xs text-[#737373] mb-1 text-center">{t('manager.completed')}</p>
+          <p className="text-xs text-[#737373] mb-1 text-center">{t('manager.inProgress')}</p>
+          <p className="text-xs text-[#737373] mb-1 text-center">{t('manager.pending')}</p>
+          <p className="text-xs text-[#737373] mb-1 text-center">{t('manager.delayed')}</p>
         </div>
         <div className="grid grid-cols-5 gap-4 h-5 w-full">
-          <p className="text-lg font-bold text-[#171717] text-center">{stats.total}</p>
-          <p className="text-lg font-bold text-green-600 text-center">{stats.completed}</p>
-          <p className="text-lg font-bold text-[#D93A3A] text-center">{stats.inProgress}</p>
-          <p className="text-lg font-bold text-[#A3A3A3] text-center">{stats.pending}</p>
-          <p className="text-lg font-bold text-yellow-600 text-center">{stats.delayed}</p>
+          <p className="text-lg font-bold text-[#171717] text-center">{formatNumber(stats.total)}</p>
+          <p className="text-lg font-bold text-green-600 text-center">{formatNumber(stats.completed)}</p>
+          <p className="text-lg font-bold text-[#D93A3A] text-center">{formatNumber(stats.inProgress)}</p>
+          <p className="text-lg font-bold text-[#A3A3A3] text-center">{formatNumber(stats.pending)}</p>
+          <p className="text-lg font-bold text-yellow-600 text-center">{formatNumber(stats.delayed)}</p>
         </div>
       </div>
 
@@ -132,7 +147,7 @@ export function ProjectView() {
             className="btn-primary flex items-center gap-2"
           >
             <HugeiconsIcon icon={Add01Icon} className="w-4 h-4" />
-            Add Project
+            {t('manager.addProject')}
           </button>
         </div>
 
@@ -155,20 +170,20 @@ export function ProjectView() {
                     <h3 className={`font-medium ${project.status === 'completed' ? 'line-through text-[#A3A3A3]' : 'text-[#171717]'}`}>
                       {project.title}
                     </h3>
-                    <p className="text-sm text-[#737373] mt-1">{project.description}</p>
+                    <p className="text-sm text-[#737373] mt-1" dir="auto">{project.description || t('manager.noDescription')}</p>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => handleEditProject(project)}
                       className="p-2 text-[#A3A3A3] hover:text-[#171717]"
-                      title="Edit"
+                      title={t('manager.edit')}
                     >
                       <HugeiconsIcon icon={Edit02Icon} className="w-4 h-4" />
                     </button>
                     <button 
                       onClick={() => handleDeleteProject(project.id)}
                       className="p-2 text-[#A3A3A3] hover:text-red-600"
-                      title="Delete"
+                      title={t('manager.delete')}
                     >
                       <HugeiconsIcon icon={Delete02Icon} className="w-4 h-4" />
                     </button>
@@ -177,7 +192,7 @@ export function ProjectView() {
                 
                 <div className="flex items-center gap-4 mt-3">
                   <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadge(project.status)}`}>
-                    {project.status.replace('-', ' ')}
+                    {getStatusLabel(project.status)}
                   </span>
                   <span className="flex items-center gap-1 text-[#737373] text-xs">
                     <HugeiconsIcon icon={Building02Icon} className="w-3 h-3" />
@@ -203,54 +218,54 @@ export function ProjectView() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-md rounded-xl shadow-2xl p-6">
             <h3 className="text-lg font-bold text-[#171717] mb-4">
-              {editingProjectId ? 'Edit Project' : 'Add New Project'}
+              {editingProjectId ? t('manager.editProject') : t('manager.addNewProject')}
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="text-sm text-[#737373] mb-1 block">Title *</label>
+                <label className="text-sm text-[#737373] mb-1 block">{t('manager.projectTitle')}</label>
                 <input
                   type="text"
                   value={newProject.title}
                   onChange={(e) => setNewProject({ ...newProject, title: e.target.value })}
-                  placeholder="Enter project title"
+                  placeholder={t('manager.enterProjectTitle')}
                 />
               </div>
               <div>
-                <label className="text-sm text-[#737373] mb-1 block">Devision *</label>
+                <label className="text-sm text-[#737373] mb-1 block">{t('manager.division')}</label>
                 <input
                   type="text"
                   value={newProject.devision}
                   onChange={(e) => setNewProject({ ...newProject, devision: e.target.value })}
-                  placeholder="Enter devision"
+                  placeholder={t('manager.enterDivision')}
                 />
               </div>
               <div>
-                <label className="text-sm text-[#737373] mb-1 block">Field *</label>
+                <label className="text-sm text-[#737373] mb-1 block">{t('manager.field')}</label>
                 <input
                   type="text"
                   value={newProject.field}
                   onChange={(e) => setNewProject({ ...newProject, field: e.target.value })}
-                  placeholder="Enter field"
+                  placeholder={t('manager.enterField')}
                 />
               </div>
               <div>
-                <label className="text-sm text-[#737373] mb-1 block">Department *</label>
+                <label className="text-sm text-[#737373] mb-1 block">{t('manager.department')}</label>
                 <input
                   type="text"
                   value={newProject.department}
                   onChange={(e) => setNewProject({ ...newProject, department: e.target.value })}
-                  placeholder="Enter department"
+                  placeholder={t('manager.enterDepartment')}
                 />
               </div>
               
 
               
               <div>
-                <label className="text-sm text-[#737373] mb-1 block">Description</label>
+                <label className="text-sm text-[#737373] mb-1 block">{t('manager.description')}</label>
                 <textarea
                   value={newProject.description}
                   onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                  placeholder="Enter description"
+                  placeholder={t('manager.enterDescription')}
                   rows={3}
                   className="w-full"
                 />
@@ -260,13 +275,13 @@ export function ProjectView() {
                   onClick={handleCloseModal}
                   className="flex-1 btn-secondary"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button 
                   onClick={handleAddProject}
                   className="flex-1 btn-primary"
                 >
-                  {editingProjectId ? 'Save Changes' : 'Add Project'}
+                  {editingProjectId ? t('manager.saveProjectChanges') : t('manager.addProject')}
                 </button>
               </div>
             </div>

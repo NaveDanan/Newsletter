@@ -9,7 +9,9 @@ import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import ExcelJS, { type Worksheet } from 'exceljs';
 import { format, parseISO, eachDayOfInterval, differenceInCalendarDays, startOfDay, isToday } from 'date-fns';
+import { useLocale } from '@/contexts/LocaleContext';
 import { useProjects } from '@/hooks/useProjects';
+import { cn } from '@/lib/utils';
 import type { Project } from '@/types/project';
 import type { GanttTask, GanttRole, GanttResource, ProjectGantt, GanttTaskStatus, GanttRoleBillingPeriod, GanttCurrency } from '@/types/gantt';
 import { getTimelineRange, getTaskProgress, createTaskId, createResourceId, createRoleId, getNextResourceColor, normalizeTask } from '@/lib/gantt';
@@ -251,13 +253,14 @@ const DAY_W = 26;
 const NAME_W = 210;
 
 function MiniGanttViewer({ project }: { project: Project }) {
+  const { formatDate, formatNumber, t } = useLocale();
   const tasks = project.gantt?.tasks ?? [];
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-40 text-center gap-2 py-8">
         <HugeiconsIcon icon={FileSpreadsheetIcon} className="w-10 h-10 text-[#E5E5E5]" />
-        <p className="text-sm text-[#737373]">No Gantt tasks yet.</p>
-        <p className="text-xs text-[#A3A3A3]">Open the Gantt editor to add tasks.</p>
+        <p className="text-sm text-[#737373]">{t('manager.noTasksYet')}</p>
+        <p className="text-xs text-[#A3A3A3]">{t('manager.openGanttEditorToAddTasks')}</p>
       </div>
     );
   }
@@ -270,7 +273,7 @@ function MiniGanttViewer({ project }: { project: Project }) {
 
   const months: { label: string; count: number }[] = [];
   days.forEach(d => {
-    const lbl = format(d, 'MMM yyyy');
+    const lbl = formatDate(d, { month: 'short', year: 'numeric' });
     if (!months.length || months[months.length - 1].label !== lbl) months.push({ label: lbl, count: 1 });
     else months[months.length - 1].count++;
   });
@@ -281,7 +284,7 @@ function MiniGanttViewer({ project }: { project: Project }) {
 
         {/* Month header */}
         <div style={{ display: 'flex', position: 'sticky', top: 0, zIndex: 10, borderBottom: '2px solid #E5E5E5' }}>
-          <div style={{ width: NAME_W, flexShrink: 0, background: '#F9FAFB', borderRight: '1px solid #E5E5E5', padding: '6px 12px', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: '0.08em' }}>TASK</div>
+          <div style={{ width: NAME_W, flexShrink: 0, background: '#F9FAFB', borderRight: '1px solid #E5E5E5', padding: '6px 12px', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: '0.08em' }}>{t('manager.task')}</div>
           {months.map((m, i) => (
             <div key={i} style={{ width: m.count * DAY_W, flexShrink: 0, background: '#F9FAFB', borderLeft: i > 0 ? '1px solid #E5E5E5' : undefined, padding: '6px 4px', fontSize: 11, fontWeight: 700, color: '#D93A3A', textAlign: 'center' }}>{m.label}</div>
           ))}
@@ -293,7 +296,7 @@ function MiniGanttViewer({ project }: { project: Project }) {
           {days.map((d, i) => {
             const weekend = d.getDay() === 5 || d.getDay() === 6;
             const todayDay = isToday(d);
-            return <div key={i} style={{ width: DAY_W, flexShrink: 0, textAlign: 'center', padding: '3px 0', fontSize: 9, fontWeight: todayDay ? 700 : 400, color: todayDay ? '#D93A3A' : weekend ? '#D1D5DB' : '#9CA3AF', background: weekend ? '#F3F4F6' : '#FAFAFA', borderLeft: '1px solid #F3F4F6' }}>{d.getDate()}</div>;
+            return <div key={i} title={formatDate(d, { weekday: 'short', month: 'short', day: 'numeric' })} style={{ width: DAY_W, flexShrink: 0, textAlign: 'center', padding: '3px 0', fontSize: 9, fontWeight: todayDay ? 700 : 400, color: todayDay ? '#D93A3A' : weekend ? '#D1D5DB' : '#9CA3AF', background: weekend ? '#F3F4F6' : '#FAFAFA', borderLeft: '1px solid #F3F4F6' }}>{formatNumber(d.getDate())}</div>;
           })}
         </div>
 
@@ -321,7 +324,7 @@ function MiniGanttViewer({ project }: { project: Project }) {
                 {isMile ? (
                   <div title={task.name} style={{ position: 'absolute', top: '50%', left: startOff * DAY_W + DAY_W / 2 - 7, width: 14, height: 14, transform: 'translateY(-50%) rotate(45deg)', background: c.bg, borderRadius: 2, zIndex: 3 }} />
                 ) : (
-                  <div title={`${task.name} — ${prog}%`} style={{ position: 'absolute', top: 6, height: 22, left: startOff * DAY_W + 2, width: barW - 4, background: c.light, border: `1.5px solid ${c.bg}`, borderRadius: 5, overflow: 'hidden', zIndex: 3 }}>
+                  <div title={`${task.name} - ${formatNumber(prog)}%`} style={{ position: 'absolute', top: 6, height: 22, left: startOff * DAY_W + 2, width: barW - 4, background: c.light, border: `1.5px solid ${c.bg}`, borderRadius: 5, overflow: 'hidden', zIndex: 3 }}>
                     <div style={{ height: '100%', width: `${prog}%`, background: c.bg, opacity: 0.65 }} />
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', paddingLeft: 5, fontSize: 10, color: c.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden' }}>{task.name}</div>
                   </div>
@@ -338,16 +341,28 @@ function MiniGanttViewer({ project }: { project: Project }) {
 // ─── Raw Gantt Table (matches export format) ─────────────────────────────────
 
 function RawGanttTable({ project }: { project: Project }) {
+  const { formatNumber, t } = useLocale();
   const tasks = project.gantt?.tasks ?? [];
   const resources = project.gantt?.resources ?? [];
   const resourceById = new Map(resources.map(r => [r.id, r.name]));
   const taskNums = generateTaskNumbers(tasks);
 
   if (tasks.length === 0) {
-    return <div className="py-10 text-center text-sm text-[#737373]">No tasks.</div>;
+    return <div className="py-10 text-center text-sm text-[#737373]">{t('manager.noTasksYet')}</div>;
   }
 
-  const cols = ['Task ID', 'Task Name', 'Start Date', 'End Date', 'Duration', 'Progress %', 'Status', 'Milestone', 'Resource', 'PRED'];
+  const cols = [
+    t('manager.taskId'),
+    t('manager.taskName'),
+    t('manager.startDate'),
+    t('manager.endDate'),
+    t('manager.durationDays'),
+    t('manager.progressPercent'),
+    t('manager.status'),
+    t('manager.milestone'),
+    t('manager.resource'),
+    t('manager.pred'),
+  ];
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -357,24 +372,24 @@ function RawGanttTable({ project }: { project: Project }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-[#F3F4F6]">
-          {tasks.map(t => {
-            const num = taskNums.get(t.id) ?? '';
-            const predNums = t.predecessorIds.map(pid => taskNums.get(pid) ?? '').filter(Boolean).join(', ');
+          {tasks.map(task => {
+            const num = taskNums.get(task.id) ?? '';
+            const predNums = task.predecessorIds.map(pid => taskNums.get(pid) ?? '').filter(Boolean).join(', ');
             return (
-              <tr key={t.id} className="hover:bg-[#FAFAFA]">
+              <tr key={task.id} className="hover:bg-[#FAFAFA]">
                 <td className="py-2 px-3 font-mono text-xs text-[#A3A3A3]">{num}</td>
-                <td className="py-2 px-3 font-medium text-[#171717] whitespace-nowrap" style={{ paddingLeft: 12 + t.indentLevel * 12 }}>
-                  {t.milestone ? '◆ ' : ''}{t.name}
+                <td className="py-2 px-3 font-medium text-[#171717] whitespace-nowrap" style={{ paddingLeft: 12 + task.indentLevel * 12 }}>
+                  {task.milestone ? '◆ ' : ''}{task.name}
                 </td>
-                <td className="py-2 px-3 font-mono text-xs text-[#737373] whitespace-nowrap">{t.startDate}</td>
-                <td className="py-2 px-3 font-mono text-xs text-[#737373] whitespace-nowrap">{t.endDate}</td>
-                <td className="py-2 px-3 text-xs text-[#737373]">{t.durationDays}d</td>
-                <td className="py-2 px-3 text-xs text-[#737373]">{t.progress}%</td>
+                <td className="py-2 px-3 font-mono text-xs text-[#737373] whitespace-nowrap">{task.startDate}</td>
+                <td className="py-2 px-3 font-mono text-xs text-[#737373] whitespace-nowrap">{task.endDate}</td>
+                <td className="py-2 px-3 text-xs text-[#737373]">{formatNumber(task.durationDays)}d</td>
+                <td className="py-2 px-3 text-xs text-[#737373]">{formatNumber(task.progress)}%</td>
                 <td className="py-2 px-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadgeClass(t.status as Project['status'])}`}>{fmtStatus(t.status)}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadgeClass(task.status as Project['status'])}`}>{fmtStatus(task.status)}</span>
                 </td>
-                <td className="py-2 px-3 text-xs text-[#737373]">{t.milestone ? 'Yes' : 'No'}</td>
-                <td className="py-2 px-3 text-xs text-[#737373] whitespace-nowrap">{t.resourceId ? (resourceById.get(t.resourceId) ?? '—') : '—'}</td>
+                <td className="py-2 px-3 text-xs text-[#737373]">{task.milestone ? t('manager.yes') : t('manager.no')}</td>
+                <td className="py-2 px-3 text-xs text-[#737373] whitespace-nowrap">{task.resourceId ? (resourceById.get(task.resourceId) ?? '—') : '—'}</td>
                 <td className="py-2 px-3 font-mono text-xs text-[#737373]">{predNums || '—'}</td>
               </tr>
             );
@@ -401,6 +416,7 @@ const SHEET_TABS: { id: SheetTab; label: string }[] = [
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function SpreadsheetView() {
+  const { formatDate, formatNumber, isRTL, t } = useLocale();
   const { projects, addProject } = useProjects();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -572,8 +588,11 @@ export function SpreadsheetView() {
       : `All_Projects_${new Date().toISOString().split('T')[0]}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${toExport.length} project${toExport.length !== 1 ? 's' : ''} (6 sheets)`);
-  }, [selectedProject, projects, allGoals]);
+    toast.success(t('manager.exportedProjects', {
+      count: formatNumber(toExport.length),
+      suffix: toExport.length !== 1 ? 's' : '',
+    }));
+  }, [selectedProject, projects, allGoals, formatNumber, t]);
 
   // ── Full Multi-Sheet Import ───────────────────────────────────────
 
@@ -600,7 +619,7 @@ export function SpreadsheetView() {
 
       // Parse all sheets
       const sheetName = wb.SheetNames.includes('Projects') ? 'Projects' : wb.SheetNames[0];
-      if (!sheetName) { toast.error('No sheets found'); return; }
+      if (!sheetName) { toast.error(t('manager.noSheetsFound')); return; }
       const projRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName]);
 
       const rolesRows = wb.Sheets['Roles']
@@ -708,17 +727,21 @@ export function SpreadsheetView() {
       }
 
       if (imported > 0) {
-        toast.success(`Imported ${imported} project${imported !== 1 ? 's' : ''} with full Gantt data${skipped ? ` (${skipped} skipped)` : ''}`);
+        toast.success(t('manager.importedProjects', {
+          count: formatNumber(imported),
+          suffix: imported !== 1 ? 's' : '',
+          skipped: skipped ? t('manager.importSkipped', { count: formatNumber(skipped) }) : '',
+        }));
       } else {
-        toast.warning('No projects imported. Ensure a "Projects" sheet with "Title" and "Department" columns exists.');
+        toast.warning(t('manager.noProjectsImported'));
       }
     } catch (err) {
       console.error(err);
-      toast.error('Failed to parse file.');
+      toast.error(t('manager.failedToParseFile'));
     } finally {
       if (importRef.current) importRef.current.value = '';
     }
-  }, [addProject]);
+  }, [addProject, formatNumber, t]);
 
   // ── Goal UI helpers ───────────────────────────────────────────────────────
 
@@ -729,6 +752,30 @@ export function SpreadsheetView() {
       ? <HugeiconsIcon icon={AnalyticsDownIcon} className="w-3.5 h-3.5 text-red-600" />
       : <HugeiconsIcon icon={MinusSignIcon} className="w-3.5 h-3.5 text-[#D93A3A]" />;
 
+  const getProjectStatusLabel = (status: Project['status']) => {
+    switch (status) {
+      case 'completed':
+        return t('manager.completed');
+      case 'in-progress':
+        return t('manager.inProgress');
+      case 'pending':
+        return t('manager.pending');
+      case 'delayed':
+        return t('manager.delayed');
+    }
+  };
+
+  const getGoalStatusLabel = (status: GoalStatus) => {
+    switch (status) {
+      case 'ahead':
+        return t('manager.ahead');
+      case 'on-track':
+        return t('manager.onTrack');
+      case 'behind':
+        return t('manager.behind');
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -737,8 +784,8 @@ export function SpreadsheetView() {
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-[#171717]">Projects Spreadsheet</h2>
-          <p className="text-sm text-[#737373]">{projects.length} project{projects.length !== 1 ? 's' : ''} · Click a row to preview</p>
+          <h2 className="text-lg font-bold text-[#171717]">{t('manager.spreadsheetTitle')}</h2>
+          <p className="text-sm text-[#737373]">{t('manager.spreadsheetSummary', { count: formatNumber(projects.length), suffix: projects.length !== 1 ? 's' : '' })}</p>
         </div>
         <div className="flex items-center gap-2">
           <input ref={importRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
@@ -746,11 +793,11 @@ export function SpreadsheetView() {
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            Import
+            {t('manager.import')}
           </button>
           <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
             <HugeiconsIcon icon={Download01Icon} className="w-4 h-4" />
-            {selectedProject ? 'Export Selected' : 'Export All'}
+            {selectedProject ? t('manager.exportSelected') : t('manager.exportAll')}
           </button>
         </div>
       </div>
@@ -758,8 +805,8 @@ export function SpreadsheetView() {
       {/* Search */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-md">
-          <HugeiconsIcon icon={Search01Icon} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]" />
-          <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search projects or departments..." className="w-full pl-10 pr-4 py-2" />
+          <HugeiconsIcon icon={Search01Icon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]', isRTL ? 'right-3' : 'left-3')} />
+          <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder={t('manager.searchProjectsPlaceholder')} dir={isRTL ? 'rtl' : 'ltr'} className={cn('w-full py-2', isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4')} />
         </div>
         <button className="p-2 text-[#737373] hover:text-[#171717] hover:bg-[#F3F4F6] rounded-lg transition-colors">
           <HugeiconsIcon icon={FilterIcon} className="w-5 h-5" />
@@ -772,7 +819,7 @@ export function SpreadsheetView() {
           <table className="w-full">
             <thead>
               <tr className="bg-[#F9FAFB]">
-                {['Project', 'Department', 'Status', 'Due Date'].map(h => (
+                {[t('manager.project'), t('manager.department'), t('manager.status'), t('manager.dueDate')].map(h => (
                   <th key={h} className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -780,7 +827,7 @@ export function SpreadsheetView() {
             <tbody className="divide-y divide-[#E5E5E5]">
               {filteredProjects.length === 0 ? (
                 <tr><td colSpan={4} className="py-10 text-center text-sm text-[#737373]">
-                  {searchTerm ? `No results for "${searchTerm}"` : 'No projects yet. Add them in the Projects tab.'}
+                  {searchTerm ? t('manager.noSearchResults', { query: searchTerm }) : t('manager.noProjectsYet')}
                 </td></tr>
               ) : filteredProjects.map(project => {
                 const isSelected = project.id === selectedProjectId;
@@ -788,16 +835,16 @@ export function SpreadsheetView() {
                   <tr key={project.id} onClick={() => { setSelectedProjectId(isSelected ? null : project.id); setActiveSheet('gantt'); setViewMode('visual'); }}
                     className={`cursor-pointer transition-all ${isSelected ? 'bg-[#D93A3A]/5 border-l-2 border-l-[#D93A3A]' : 'hover:bg-[#F9FAFB]'}`}>
                     <td className="py-3 px-4">
-                      <span className={`font-medium ${isSelected ? 'text-[#D93A3A]' : 'text-[#171717]'}`}>{project.title || '(Untitled)'}</span>
-                      {project.devision && <div className="text-xs text-[#A3A3A3] mt-0.5">{project.devision}</div>}
+                      <span className={`font-medium ${isSelected ? 'text-[#D93A3A]' : 'text-[#171717]'}`} dir="auto">{project.title || t('manager.untitledProject')}</span>
+                      {project.devision && <div className="text-xs text-[#A3A3A3] mt-0.5" dir="auto">{project.devision}</div>}
                     </td>
                     <td className="py-3 px-4 text-[#737373] text-sm">
                       <span className="flex items-center gap-1.5"><HugeiconsIcon icon={Building02Icon} className="w-3.5 h-3.5 flex-shrink-0" />{project.department}</span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${getStatusBadgeClass(project.status)}`}>{fmtStatus(project.status)}</span>
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${getStatusBadgeClass(project.status)}`}>{getProjectStatusLabel(project.status)}</span>
                     </td>
-                    <td className="py-3 px-4 text-sm text-[#737373] font-mono">{getProjectDueDate(project)}</td>
+                    <td className="py-3 px-4 text-sm text-[#737373] font-mono">{getProjectDueDate(project) === '—' ? '—' : formatDate(getProjectDueDate(project), { year: 'numeric', month: 'short', day: 'numeric' })}</td>
                   </tr>
                 );
               })}
@@ -825,7 +872,7 @@ export function SpreadsheetView() {
               {(['visual', 'raw'] as ViewMode[]).map(mode => (
                 <button key={mode} onClick={() => setViewMode(mode)}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === mode ? 'bg-white text-[#171717] shadow-sm' : 'text-[#737373] hover:text-[#171717]'}`}>
-                  {mode === 'visual' ? '📊 Visual' : '📄 Raw'}
+                  {mode === 'visual' ? `📊 ${t('manager.visual')}` : `📄 ${t('manager.raw')}`}
                 </button>
               ))}
             </div>
@@ -835,7 +882,7 @@ export function SpreadsheetView() {
               {SHEET_TABS.map(tab => (
                 <button key={tab.id} onClick={() => setActiveSheet(tab.id)}
                   className={`px-3 py-2 text-xs font-medium rounded-t-lg border transition-colors whitespace-nowrap ${activeSheet === tab.id ? 'bg-white border-[#E5E5E5] border-b-white text-[#171717] -mb-px relative z-10' : 'bg-[#F3F4F6] border-transparent text-[#737373] hover:text-[#171717] hover:bg-white'}`}>
-                  {tab.label}
+                  {tab.id === 'gantt' ? `📊 ${t('manager.gantt')}` : tab.id === 'projects' ? `📋 ${t('manager.projects')}` : tab.id === 'goals' ? `🎯 ${t('manager.goals')}` : tab.id === 'resources' ? `👤 ${t('manager.resources')}` : `🎭 ${t('manager.roles')}`}
                 </button>
               ))}
             </div>
@@ -855,24 +902,24 @@ export function SpreadsheetView() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="bg-[#F9FAFB] border-b border-[#E5E5E5]">
-                    {['Title', 'Department', 'Division', 'Field', 'Status', 'Due Date', 'Description'].map(c => (
+                    {[t('manager.title'), t('manager.department'), t('manager.division'), t('manager.field'), t('manager.status'), t('manager.dueDate'), t('manager.description')].map(c => (
                       <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>
                     ))}
                   </tr></thead>
                   <tbody className="divide-y divide-[#F3F4F6]">
                     {projects.map(p => (
                       <tr key={p.id} className={p.id === selectedProjectId ? 'bg-[#D93A3A]/5' : 'hover:bg-[#FAFAFA]'}>
-                        <td className="py-2 px-4 font-medium text-[#171717] whitespace-nowrap">{p.title}</td>
+                        <td className="py-2 px-4 font-medium text-[#171717] whitespace-nowrap" dir="auto">{p.title}</td>
                         <td className="py-2 px-4 text-[#737373] whitespace-nowrap">{p.department}</td>
                         <td className="py-2 px-4 text-[#737373] whitespace-nowrap">{p.devision}</td>
                         <td className="py-2 px-4 text-[#737373] whitespace-nowrap">{p.field}</td>
                         <td className="py-2 px-4 whitespace-nowrap">
                           {viewMode === 'visual'
-                            ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadgeClass(p.status)}`}>{fmtStatus(p.status)}</span>
-                            : <span className="text-xs text-[#737373]">{fmtStatus(p.status)}</span>}
+                            ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadgeClass(p.status)}`}>{getProjectStatusLabel(p.status)}</span>
+                            : <span className="text-xs text-[#737373]">{getProjectStatusLabel(p.status)}</span>}
                         </td>
-                        <td className="py-2 px-4 text-[#737373] font-mono text-xs whitespace-nowrap">{getProjectDueDate(p)}</td>
-                        <td className="py-2 px-4 text-[#737373] max-w-xs truncate">{p.description}</td>
+                        <td className="py-2 px-4 text-[#737373] font-mono text-xs whitespace-nowrap">{getProjectDueDate(p) === '—' ? '—' : formatDate(getProjectDueDate(p), { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                        <td className="py-2 px-4 text-[#737373] max-w-xs truncate" dir="auto">{p.description}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -885,13 +932,13 @@ export function SpreadsheetView() {
               displayedGoals.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-center gap-2 py-8">
                   <HugeiconsIcon icon={Target01Icon} className="w-10 h-10 text-[#E5E5E5]" />
-                  <p className="text-sm text-[#737373]">No milestones. Add milestone tasks in the Gantt editor.</p>
+                  <p className="text-sm text-[#737373]">{t('manager.noMilestonesSpreadsheet')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead><tr className="bg-[#F9FAFB] border-b border-[#E5E5E5]">
-                      {['Project', 'Milestone', 'Date', 'Progress (%)', 'Status'].map(c => (
+                      {[t('manager.project'), t('manager.milestone'), t('manager.date'), t('manager.progressPercent'), t('manager.status')].map(c => (
                         <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>
                       ))}
                     </tr></thead>
@@ -904,23 +951,23 @@ export function SpreadsheetView() {
                               ? <span className="flex items-center gap-1.5"><HugeiconsIcon icon={Target01Icon} className="w-3.5 h-3.5 text-[#D93A3A] flex-shrink-0" />{g.milestoneName}</span>
                               : <span className="text-[#737373]">{g.milestoneName}</span>}
                           </td>
-                          <td className="py-2.5 px-4 text-[#737373] font-mono text-xs whitespace-nowrap">{g.milestoneDate}</td>
+                          <td className="py-2.5 px-4 text-[#737373] font-mono text-xs whitespace-nowrap">{formatDate(g.milestoneDate, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
                           <td className="py-2.5 px-4 whitespace-nowrap">
                             {viewMode === 'visual'
                               ? <div className="flex items-center gap-2">
                                   <div className="w-20 h-1.5 bg-[#E5E5E5] rounded-full overflow-hidden">
                                     <div className="h-full bg-[#D93A3A] rounded-full" style={{ width: `${g.progress}%` }} />
                                   </div>
-                                  <span className="text-xs text-[#737373]">{g.progress}%</span>
+                                  <span className="text-xs text-[#737373]">{formatNumber(g.progress)}%</span>
                                 </div>
-                              : <span className="text-xs text-[#737373]">{g.progress}%</span>}
+                              : <span className="text-xs text-[#737373]">{formatNumber(g.progress)}%</span>}
                           </td>
                           <td className="py-2.5 px-4">
                             {viewMode === 'visual'
                               ? <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${goalBadge(g.status)}`}>
-                                  {goalIcon(g.status)}{g.status.replace('-', ' ')}
+                                  {goalIcon(g.status)}{getGoalStatusLabel(g.status)}
                                 </span>
-                              : <span className="text-xs text-[#737373]">{g.status.replace('-', ' ')}</span>}
+                              : <span className="text-xs text-[#737373]">{getGoalStatusLabel(g.status)}</span>}
                           </td>
                         </tr>
                       ))}
@@ -938,13 +985,13 @@ export function SpreadsheetView() {
               return resources.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-center gap-2 py-8">
                   <span className="text-4xl">👤</span>
-                  <p className="text-sm text-[#737373]">No resources. Add them in the Gantt editor.</p>
+                  <p className="text-sm text-[#737373]">{t('manager.noResourcesSpreadsheet')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead><tr className="bg-[#F9FAFB] border-b border-[#E5E5E5]">
-                      {['Name', 'Role', 'Color', 'Capacity (%)'].map(c => <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>)}
+                      {[t('manager.name'), t('manager.role'), t('manager.color'), t('manager.capacity')].map(c => <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>)}
                     </tr></thead>
                     <tbody className="divide-y divide-[#F3F4F6]">
                       {resources.map(r => {
@@ -966,9 +1013,9 @@ export function SpreadsheetView() {
                               {viewMode === 'visual'
                                 ? <div className="flex items-center gap-2">
                                     <div className="w-16 h-1.5 bg-[#E5E5E5] rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${r.capacityPercent}%`, background: r.color }} /></div>
-                                    <span className="text-xs text-[#737373]">{r.capacityPercent}%</span>
+                                    <span className="text-xs text-[#737373]">{formatNumber(r.capacityPercent)}%</span>
                                   </div>
-                                : <span className="text-xs text-[#737373]">{r.capacityPercent}%</span>}
+                                : <span className="text-xs text-[#737373]">{formatNumber(r.capacityPercent)}%</span>}
                             </td>
                           </tr>
                         );
@@ -985,19 +1032,19 @@ export function SpreadsheetView() {
               return roles.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-center gap-2 py-8">
                   <span className="text-4xl">🎭</span>
-                  <p className="text-sm text-[#737373]">No roles. Add them in the Gantt editor.</p>
+                  <p className="text-sm text-[#737373]">{t('manager.noRolesSpreadsheet')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead><tr className="bg-[#F9FAFB] border-b border-[#E5E5E5]">
-                      {['Name', 'Budget', 'Paid By', 'Currency'].map(c => <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>)}
+                      {[t('manager.name'), t('manager.budget'), t('manager.paidBy'), t('manager.currency')].map(c => <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>)}
                     </tr></thead>
                     <tbody className="divide-y divide-[#F3F4F6]">
                       {roles.map(rl => (
                         <tr key={rl.id} className="hover:bg-[#FAFAFA]">
                           <td className="py-2.5 px-4 font-medium text-[#171717] whitespace-nowrap">{rl.name}</td>
-                          <td className="py-2.5 px-4 text-[#737373] whitespace-nowrap font-mono">{rl.budget.toLocaleString()} {rl.currency}</td>
+                          <td className="py-2.5 px-4 text-[#737373] whitespace-nowrap font-mono">{formatNumber(rl.budget)} {rl.currency}</td>
                           <td className="py-2.5 px-4 whitespace-nowrap">
                             {viewMode === 'visual'
                               ? <span className="text-xs px-2 py-0.5 rounded-full bg-[#F3F4F6] text-[#737373] font-medium capitalize">{rl.paidBy}</span>

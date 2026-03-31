@@ -1,6 +1,8 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, FloppyDiskIcon, Tag01Icon, UserIcon, ViewIcon } from "@hugeicons/core-free-icons";
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, startTransition, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 import { AdvancedEditor, type AdvancedEditorHandle } from '../../components/editor/AdvancedEditor';
 import { FileUploadZone } from '../../components/upload/FileUploadZone';
 import { toast } from 'sonner';
@@ -52,6 +54,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
   onCancel,
   isEditing = false 
 }, ref) {
+  const { formatDate, isRTL, t } = useLocale();
   const [showPreview, setShowPreview] = useState(false);
   const [formData, setFormData] = useState<NewsletterFormData>({
     title: '',
@@ -73,7 +76,6 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
     ...formData,
     content: contentEditorRef.current?.getHTML() ?? formData.content,
   }), [formData]);
-  const liveFormData = getCurrentFormData();
   const publishedSnapshot = newsletter?.status === 'published'
     ? JSON.stringify(normalizeFormData({
         title: newsletter.title,
@@ -85,7 +87,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
         status: newsletter.status,
       }))
     : null;
-  const currentSnapshot = JSON.stringify(normalizeFormData(liveFormData));
+  const currentSnapshot = JSON.stringify(normalizeFormData(formData));
   const hasUnsavedPublishedChanges = Boolean(
     newsletter?.status === 'published' &&
     publishedSnapshot &&
@@ -95,16 +97,18 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
   useEffect(() => {
     if (newsletter) {
       isHydratingFromNewsletter.current = true;
-      setFormData({
-        title: newsletter.title,
-        subtitle: newsletter.subtitle,
-        content: newsletter.content,
-        author: newsletter.author,
-        coverImage: newsletter.coverImage,
-        tags: newsletter.tags,
-        status: newsletter.status,
+      startTransition(() => {
+        setFormData({
+          title: newsletter.title,
+          subtitle: newsletter.subtitle,
+          content: newsletter.content,
+          author: newsletter.author,
+          coverImage: newsletter.coverImage,
+          tags: newsletter.tags,
+          status: newsletter.status,
+        });
+        setAutoSaveDraftId(newsletter.id);
       });
-      setAutoSaveDraftId(newsletter.id);
     }
   }, [newsletter]);
 
@@ -149,7 +153,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
       return;
     }
 
-    if (!hasMeaningfulContent(liveFormData)) {
+    if (!hasMeaningfulContent(formData)) {
       return;
     }
 
@@ -163,7 +167,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
         autoSaveTimeoutRef.current = null;
       }
     };
-  }, [flushDraftAutoSave, isAutoSaveEnabled, liveFormData]);
+  }, [flushDraftAutoSave, formData, isAutoSaveEnabled]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -183,15 +187,15 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [flushDraftAutoSave, hasUnsavedPublishedChanges, isAutoSaveEnabled]);
 
-  function handleSave(status: 'draft' | 'published', shouldToast = true): boolean {
+  const handleSave = useCallback((status: 'draft' | 'published', shouldToast = true): boolean => {
     const nextFormData = getCurrentFormData();
 
     if (!nextFormData.title.trim()) {
-      toast.error('Please enter a title');
+      toast.error(t('manager.enterTitleError'));
       return false;
     }
     if (!nextFormData.content.replace(/<[^>]*>/g, '').trim()) {
-      toast.error('Please add some content');
+      toast.error(t('manager.enterContentError'));
       return false;
     }
 
@@ -204,11 +208,11 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
     }
 
     if (shouldToast) {
-      toast.success(status === 'published' ? 'Newsletter published!' : 'Draft saved!');
+      toast.success(status === 'published' ? t('manager.newsletterPublished') : t('manager.draftSaved'));
     }
 
     return true;
-  }
+  }, [getCurrentFormData, isEditing, newsletter, onSave, onUpdate, t]);
 
   useImperativeHandle(ref, () => ({
     prepareToLeave: () => {
@@ -226,7 +230,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
 
       return handleSave('published', false);
     },
-  }), [flushDraftAutoSave, hasUnsavedPublishedChanges, isAutoSaveEnabled, newsletter]);
+  }), [flushDraftAutoSave, handleSave, hasUnsavedPublishedChanges, isAutoSaveEnabled, newsletter]);
 
   const addTag = () => {
     if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
@@ -250,13 +254,13 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-[#171717]">Preview</h2>
+          <h2 className="text-xl font-bold text-[#171717]">{t('manager.preview')}</h2>
           <button
             onClick={() => setShowPreview(false)}
             className="btn-secondary flex items-center gap-2"
           >
             <HugeiconsIcon icon={Cancel01Icon} className="w-4 h-4" />
-            Back to Editor
+            {t('manager.backToEditor')}
           </button>
         </div>
 
@@ -277,13 +281,13 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
           {/* Content */}
           <div className="max-w-3xl mx-auto px-6 py-12">
             {/* Title */}
-            <h1 className="text-3xl lg:text-4xl font-bold text-[#171717] mb-4">
+            <h1 className="text-3xl lg:text-4xl font-bold text-[#171717] mb-4" dir="auto">
               {formData.title}
             </h1>
 
             {/* Subtitle */}
             {formData.subtitle && (
-              <p className="text-xl text-[#737373] mb-6">
+              <p className="text-xl text-[#737373] mb-6" dir="auto">
                 {formData.subtitle}
               </p>
             )}
@@ -294,9 +298,9 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
                 <HugeiconsIcon icon={UserIcon} className="w-5 h-5 text-[#D93A3A]" />
               </div>
               <div>
-                <p className="font-medium text-[#171717]">{formData.author || 'Anonymous'}</p>
+                <p className="font-medium text-[#171717]">{formData.author || t('manager.anonymous')}</p>
                 <p className="text-sm text-[#737373]">
-                  {new Date().toLocaleDateString('en-US', { 
+                  {formatDate(new Date(), { 
                     month: 'long', 
                     day: 'numeric', 
                     year: 'numeric' 
@@ -319,6 +323,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
             {/* Article Body */}
             <div 
               className="newsletter-article"
+              dir="auto"
               dangerouslySetInnerHTML={{ __html: formData.content }}
             />
           </div>
@@ -332,7 +337,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-[#171717]">
-          {isEditing ? 'Edit Newsletter' : 'Create Newsletter'}
+          {isEditing ? t('manager.editNewsletter') : t('manager.createNewsletter')}
         </h2>
         <div className="flex items-center gap-2">
           <button
@@ -340,21 +345,21 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
             className="btn-secondary flex items-center gap-2"
           >
             <HugeiconsIcon icon={ViewIcon} className="w-4 h-4" />
-            Preview
+            {t('manager.preview')}
           </button>
           <button
             onClick={onCancel}
             className="btn-secondary"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
       </div>
 
       {isAutoSaveEnabled && (
         <div className="flex items-center justify-between rounded-lg border border-[#E5E5E5] bg-white px-4 py-3 text-sm text-[#737373]">
-          <span>Changes are saved automatically as a draft.</span>
-          <span>{lastAutoSavedAt ? `Last saved ${lastAutoSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Waiting for changes'}</span>
+          <span>{t('manager.autoSaveDraft')}</span>
+          <span>{lastAutoSavedAt ? t('manager.lastSaved', { time: formatDate(lastAutoSavedAt, { hour: '2-digit', minute: '2-digit' }) }) : t('manager.waitingForChanges')}</span>
         </div>
       )}
 
@@ -363,13 +368,14 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
         {/* Title */}
         <div>
           <label className="block text-sm font-medium text-[#171717] mb-2">
-            Title *
+            {t('manager.titleRequired')}
           </label>
           <input
             type="text"
             value={formData.title}
             onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-            placeholder="Enter newsletter title..."
+            dir={isRTL ? 'rtl' : 'ltr'}
+            placeholder={t('manager.enterNewsletterTitle')}
             className="w-full text-lg font-semibold"
           />
         </div>
@@ -377,13 +383,14 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
         {/* Subtitle */}
         <div>
           <label className="block text-sm font-medium text-[#171717] mb-2">
-            Subtitle
+            {t('manager.subtitle')}
           </label>
           <input
             type="text"
             value={formData.subtitle}
             onChange={(e) => setFormData(prev => ({ ...prev, subtitle: e.target.value }))}
-            placeholder="A brief description of what this newsletter is about..."
+            dir={isRTL ? 'rtl' : 'ltr'}
+            placeholder={t('manager.enterNewsletterSubtitle')}
             className="w-full"
           />
         </div>
@@ -391,12 +398,12 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
         {/* Cover Image with Drag & Drop */}
         <div>
           <label className="block text-sm font-medium text-[#171717] mb-2">
-            Cover Image
+            {t('manager.coverImage')}
           </label>
           <FileUploadZone
             value={formData.coverImage}
             onChange={(url) => setFormData(prev => ({ ...prev, coverImage: url }))}
-            label="Upload cover image"
+            label={t('manager.uploadCoverImage')}
             maxSize={5}
           />
         </div>
@@ -404,16 +411,17 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
         {/* Author */}
         <div>
           <label className="block text-sm font-medium text-[#171717] mb-2">
-            Author
+            {t('manager.author')}
           </label>
           <div className="relative">
-            <HugeiconsIcon icon={UserIcon} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]" />
+            <HugeiconsIcon icon={UserIcon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]', isRTL ? 'right-3' : 'left-3')} />
             <input
               type="text"
               value={formData.author}
               onChange={(e) => setFormData(prev => ({ ...prev, author: e.target.value }))}
-              placeholder="Author name"
-              className="w-full pl-10"
+              dir={isRTL ? 'rtl' : 'ltr'}
+              placeholder={t('manager.authorPlaceholder')}
+              className={cn('w-full', isRTL ? 'pr-10' : 'pl-10')}
             />
           </div>
         </div>
@@ -421,18 +429,19 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
         {/* Tags */}
         <div>
           <label className="block text-sm font-medium text-[#171717] mb-2">
-            Tags
+            {t('manager.tags')}
           </label>
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <HugeiconsIcon icon={Tag01Icon} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]" />
+              <HugeiconsIcon icon={Tag01Icon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]', isRTL ? 'right-3' : 'left-3')} />
               <input
                 type="text"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Add a tag and press Enter"
-                className="w-full pl-10"
+                dir={isRTL ? 'rtl' : 'ltr'}
+                placeholder={t('manager.addTagPlaceholder')}
+                className={cn('w-full', isRTL ? 'pr-10' : 'pl-10')}
               />
             </div>
             <button
@@ -440,7 +449,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
               onClick={addTag}
               className="btn-secondary"
             >
-              Add
+              {t('manager.add')}
             </button>
           </div>
           {formData.tags.length > 0 && (
@@ -463,14 +472,14 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
         {/* Content Editor */}
         <div>
           <label className="block text-sm font-medium text-[#171717] mb-2">
-            Content *
+            {t('manager.content')} *
           </label>
           <AdvancedEditor
             ref={contentEditorRef}
             content={formData.content}
             onChange={(content) => setFormData(prev => ({ ...prev, content }))}
-            placeholder="Write your newsletter content here..."
-            title={formData.title || 'Newsletter'}
+            placeholder={t('manager.editorPlaceholder')}
+            title={formData.title || t('manager.editorTitleFallback')}
           />
         </div>
 
@@ -481,14 +490,14 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
             className="btn-secondary flex items-center gap-2"
           >
             <HugeiconsIcon icon={FloppyDiskIcon} className="w-4 h-4" />
-            Save as Draft
+            {t('manager.saveAsDraft')}
           </button>
           <button
             onClick={() => handleSave('published')}
             className="btn-primary flex items-center gap-2"
           >
             <HugeiconsIcon icon={FloppyDiskIcon} className="w-4 h-4" />
-            Publish Newsletter
+            {t('manager.publishNewsletter')}
           </button>
         </div>
       </div>

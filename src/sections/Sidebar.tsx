@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useLocale } from '@/contexts/LocaleContext';
 
 export function Sidebar() {
+  const { t } = useLocale();
   const [email, setEmail] = useState('');
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
-      toast.error('Please enter your email');
+      toast.error(t('sidebar.emptyEmail'));
       return;
     }
-    toast.success('Welcome to AI-BREAK! Check your inbox.');
+    toast.success(t('sidebar.subscribeSuccess'));
     setEmail('');
   };
 
@@ -26,40 +28,40 @@ export function Sidebar() {
           />
           <div>
             <h3 className="font-bold text-[#171717]">AI-BREAK</h3>
-            <p className="text-xs text-[#737373]">Weekly AI insights</p>
+            <p className="text-xs text-[#737373]">{t('sidebar.tagline')}</p>
           </div>
         </div>
         <p className="text-sm text-[#737373] mb-4">
-          Become the AI expert at your company. Get practical workflows and templates that save time, cut costs, and prove your value.
+          {t('sidebar.description')}
         </p>
         <form onSubmit={handleSubscribe} className="space-y-3">
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Type your email..."
+            placeholder={t('sidebar.emailPlaceholder')}
             className="w-full"
           />
           <button type="submit" className="btn-primary w-full">
-            Subscribe
+            {t('sidebar.subscribe')}
           </button>
         </form>
       </div>
 
       {/* Stats Card */}
       <div className="border border-[#E5E5E5] rounded-xl p-6">
-        <h3 className="font-bold text-[#171717] mb-4">Community</h3>
+        <h3 className="font-bold text-[#171717] mb-4">{t('sidebar.community')}</h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[#737373]">Subscribers</span>
+            <span className="text-sm text-[#737373]">{t('sidebar.subscribers')}</span>
             <span className="font-semibold text-[#171717]">12,450</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[#737373]">Open Rate</span>
+            <span className="text-sm text-[#737373]">{t('sidebar.openRate')}</span>
             <span className="font-semibold text-[#D93A3A]">38.5%</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[#737373]">Weekly Growth</span>
+            <span className="text-sm text-[#737373]">{t('sidebar.weeklyGrowth')}</span>
             <span className="font-semibold text-green-600">+15%</span>
           </div>
         </div>
@@ -67,9 +69,15 @@ export function Sidebar() {
 
       {/* Topics */}
       <div className="border border-[#E5E5E5] rounded-xl p-6">
-        <h3 className="font-bold text-[#171717] mb-4">Topics</h3>
+        <h3 className="font-bold text-[#171717] mb-4">{t('sidebar.topics')}</h3>
         <div className="flex flex-wrap gap-2">
-          {['Research', 'Products', 'Policy', 'Design', 'Infrastructure'].map((topic) => (
+          {[
+            t('sidebar.topic.research'),
+            t('sidebar.topic.products'),
+            t('sidebar.topic.policy'),
+            t('sidebar.topic.design'),
+            t('sidebar.topic.infrastructure'),
+          ].map((topic) => (
             <span
               key={topic}
               className="px-3 py-1.5 bg-[#F3F4F6] text-[#737373] text-sm rounded-lg hover:bg-[#E5E5E5] cursor-pointer transition-colors"

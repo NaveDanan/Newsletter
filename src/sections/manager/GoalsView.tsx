@@ -1,6 +1,7 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AnalyticsDownIcon, AnalyticsUpIcon, MinusSignIcon, Target01Icon } from "@hugeicons/core-free-icons";
 import { useMemo } from 'react';
+import { useLocale } from '@/contexts/LocaleContext';
 import { useProjects } from '@/hooks/useProjects';
 import { getTaskProgress, getTaskSpanDays } from '@/lib/gantt';
 import { parseISO } from 'date-fns';
@@ -81,6 +82,7 @@ function computeGoalStatus(tasks: GanttTask[], milestone: GanttTask): GoalStatus
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function GoalsView() {
+  const { formatDate, formatNumber, t } = useLocale();
   const { projects } = useProjects();
 
   // ── Build computed goals from every project's milestone tasks ──
@@ -149,15 +151,26 @@ export function GoalsView() {
     return 'bg-[#D93A3A]';
   };
 
+  const getStatusLabel = (status: GoalStatus) => {
+    switch (status) {
+      case 'ahead':
+        return t('manager.ahead');
+      case 'on-track':
+        return t('manager.onTrack');
+      case 'behind':
+        return t('manager.behind');
+    }
+  };
+
   // ── Empty state ──
   if (goals.length === 0) {
     return (
       <div className="space-y-6">
         <div className="dashboard-card flex flex-col items-center justify-center py-16 text-center">
           <HugeiconsIcon icon={Target01Icon} className="w-12 h-12 text-[#D93A3A]/40 mb-4" />
-          <h2 className="text-lg font-bold text-[#171717] mb-1">No Milestones Found</h2>
+          <h2 className="text-lg font-bold text-[#171717] mb-1">{t('manager.noMilestonesFound')}</h2>
           <p className="text-sm text-[#737373] max-w-xs">
-            Add milestone tasks to your projects in the Gantt editor to track goals here.
+            {t('manager.noMilestonesDescription')}
           </p>
         </div>
       </div>
@@ -170,15 +183,17 @@ export function GoalsView() {
       <div className="dashboard-card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-bold text-[#171717]">Overall Progress</h2>
+            <h2 className="text-lg font-bold text-[#171717]">{t('manager.overallProgress')}</h2>
             <p className="text-sm text-[#737373]">
-              {goals.filter((g) => g.status === 'ahead' && g.progress === 100).length} of{' '}
-              {goals.length} milestones completed
+              {t('manager.milestonesCompleted', {
+                completed: formatNumber(goals.filter((g) => g.status === 'ahead' && g.progress === 100).length),
+                total: formatNumber(goals.length),
+              })}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-[#D93A3A]">{overallProgress}%</p>
-            <p className="text-sm text-[#737373]">of milestones achieved</p>
+            <p className="text-3xl font-bold text-[#D93A3A]">{formatNumber(overallProgress)}%</p>
+            <p className="text-sm text-[#737373]">{t('manager.milestonesAchieved')}</p>
           </div>
         </div>
         <div className="h-3 bg-[#E5E5E5] rounded-full overflow-hidden">
@@ -203,7 +218,7 @@ export function GoalsView() {
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadgeClass(goal.status)}`}
                   >
-                    {goal.status.replace('-', ' ')}
+                    {getStatusLabel(goal.status)}
                   </span>
                 </div>
               </div>
@@ -212,22 +227,22 @@ export function GoalsView() {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#737373]">Project</span>
+                <span className="text-sm text-[#737373]">{t('manager.project')}</span>
                 <span className="font-medium text-[#171717] text-sm truncate max-w-[60%] text-right">
                   {goal.projectTitle}
                 </span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#737373]">Target Date</span>
-                <span className="text-sm text-[#171717]">{goal.milestoneDate}</span>
+                <span className="text-sm text-[#737373]">{t('manager.targetDate')}</span>
+                <span className="text-sm text-[#171717]">{formatDate(goal.milestoneDate, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
               </div>
 
               {/* Progress bar */}
               <div className="pt-2">
                 <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-[#737373]">Progress</span>
-                  <span className="text-[#171717]">{goal.progress}%</span>
+                  <span className="text-[#737373]">{t('manager.progress')}</span>
+                  <span className="text-[#171717]">{formatNumber(goal.progress)}%</span>
                 </div>
                 <div className="h-2 bg-[#E5E5E5] rounded-full overflow-hidden">
                   <div

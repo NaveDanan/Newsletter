@@ -2,6 +2,8 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { Calendar01Icon, Edit02Icon, ViewIcon, ViewOffIcon, Calendar03Icon, ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { addWeeks, differenceInCalendarDays, differenceInCalendarWeeks, endOfWeek, format, isAfter, parseISO, startOfWeek } from 'date-fns';
 import { useMemo, useState } from 'react';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 import { useProjects } from '../../hooks/useProjects';
 import { getTaskCalendarSpanDays, getTaskEnd, getTaskOffsetDays, getTimelineDays } from '../../lib/gantt';
 import type { GanttTask } from '../../types/gantt';
@@ -64,21 +66,6 @@ function getTimelineBarColor(status: GanttTask['status']) {
   }
 }
 
-function formatTimelineRangeLabel(startDate: Date, endDate: Date) {
-  const sameYear = startDate.getFullYear() === endDate.getFullYear();
-  const sameMonth = sameYear && startDate.getMonth() === endDate.getMonth();
-
-  if (sameMonth) {
-    return `${format(startDate, 'MMM d')} - ${format(endDate, 'd, yyyy')}`;
-  }
-
-  if (sameYear) {
-    return `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
-  }
-
-  return `${format(startDate, 'MMM d, yyyy')} - ${format(endDate, 'MMM d, yyyy')}`;
-}
-
 interface ContentTimelineBar {
   id: string;
   name: string;
@@ -97,7 +84,13 @@ interface ContentTimelineRow {
   rowMinHeight: number;
 }
 
-function buildContentTimelineRow(project: Project, windowStart: Date, windowEnd: Date): ContentTimelineRow {
+function buildContentTimelineRow(
+  project: Project,
+  windowStart: Date,
+  windowEnd: Date,
+  formatLabel: (date: Date) => string,
+  unassignedLabel: string,
+): ContentTimelineRow {
   const resourceNameById = new Map(project.gantt.resources.map((resource) => [resource.id, resource.name]));
   const laneEndDates: Date[] = [];
   const totalWindowDays = differenceInCalendarDays(windowEnd, windowStart) + 1;
@@ -128,10 +121,10 @@ function buildContentTimelineRow(project: Project, windowStart: Date, windowEnd:
       result.push({
         id: task.id,
         name: task.name,
-        owner: task.resourceId ? resourceNameById.get(task.resourceId) ?? 'Unassigned' : 'Unassigned',
+        owner: task.resourceId ? resourceNameById.get(task.resourceId) ?? unassignedLabel : unassignedLabel,
         status: task.status,
-        startLabel: format(taskStart, 'MMM d'),
-        endLabel: format(taskEnd, 'MMM d'),
+        startLabel: formatLabel(taskStart),
+        endLabel: formatLabel(taskEnd),
         left: `${(differenceInCalendarDays(clampedStart, windowStart) / totalWindowDays) * 100}%`,
         width: `${Math.max(((differenceInCalendarDays(clampedEnd, clampedStart) + 1) / totalWindowDays) * 100, 2)}%`,
         top: contentTimelineRowPadding + (resolvedLaneIndex * (contentTimelineBarHeight + contentTimelineBarGap)),
@@ -157,6 +150,7 @@ function buildContentTimelineRow(project: Project, windowStart: Date, windowEnd:
 }
 
 export function GanttView({ onEditProjectGantt }: GanttViewProps) {
+  const { formatDate, formatNumber, isRTL, t } = useLocale();
   const [activeStatuses, setActiveStatuses] = useState<GanttTask['status'][]>([]);
   const [showManageModal, setShowManageModal] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -205,8 +199,14 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
     return index >= 0 && index < contentTimelineWeekCount ? index : -1;
   }, [contentTimelineStart]);
   const contentTimelineRows = useMemo(
-    () => visibleProjects.map((project) => buildContentTimelineRow(project, contentTimelineStart, contentTimelineEnd)),
-    [contentTimelineEnd, contentTimelineStart, visibleProjects],
+    () => visibleProjects.map((project) => buildContentTimelineRow(
+      project,
+      contentTimelineStart,
+      contentTimelineEnd,
+      (date) => formatDate(date, { month: 'short', day: 'numeric' }),
+      t('manager.unassigned'),
+    )),
+    [contentTimelineEnd, contentTimelineStart, formatDate, t, visibleProjects],
   );
   const timelineStart = previewTimelineDays[0] ?? new Date();
   const dayWidth = 30;
@@ -225,19 +225,47 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
     onEditProjectGantt(projectId);
   };
 
+  const getStatusLabel = (status: GanttTask['status']) => {
+    switch (status) {
+      case 'completed':
+        return t('manager.completed');
+      case 'in-progress':
+        return t('manager.inProgress');
+      case 'pending':
+        return t('manager.pending');
+      case 'delayed':
+        return t('manager.delayed');
+    }
+  };
+
+  const formatRangeLabel = (startDate: Date, endDate: Date) => {
+    const sameYear = startDate.getFullYear() === endDate.getFullYear();
+    const sameMonth = sameYear && startDate.getMonth() === endDate.getMonth();
+
+    if (sameMonth) {
+      return `${formatDate(startDate, { month: 'short', day: 'numeric' })} - ${formatDate(endDate, { day: 'numeric', year: 'numeric' })}`;
+    }
+
+    if (sameYear) {
+      return `${formatDate(startDate, { month: 'short', day: 'numeric' })} - ${formatDate(endDate, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    }
+
+    return `${formatDate(startDate, { month: 'short', day: 'numeric', year: 'numeric' })} - ${formatDate(endDate, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  };
+
   return (
     <div className="space-y-6">
       <Dialog open={showManageModal} onOpenChange={setShowManageModal}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Manage Gantts</DialogTitle>
+            <DialogTitle>{t('manager.manageGantts')}</DialogTitle>
             <DialogDescription>
-              Show or hide projects on the overview and jump into the dedicated schedule editor.
+              {t('manager.manageGanttsDescription')}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[480px] overflow-y-auto rounded-2xl border border-[#E5E5E5]">
             {projects.length === 0 ? (
-              <div className="p-8 text-center text-sm text-[#737373]">No projects available yet.</div>
+              <div className="p-8 text-center text-sm text-[#737373]">{t('manager.noProjectsAvailable')}</div>
             ) : (
               <div className="divide-y divide-[#E5E5E5]">
                 {projects.map((project) => (
@@ -252,11 +280,11 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                           {project.department}
                         </span>
                         <span className="rounded-full bg-[#FEF2F2] px-2 py-1 text-xs text-[#D93A3A]">
-                          {project.gantt.tasks.length} tasks
+                          {t('manager.tasksCount', { count: formatNumber(project.gantt.tasks.length) })}
                         </span>
                       </div>
-                      <p className="mt-1 line-clamp-2 text-sm text-[#737373]">
-                        {project.description || 'No description'}
+                      <p className="mt-1 line-clamp-2 text-sm text-[#737373]" dir="auto">
+                        {project.description || t('manager.noDescription')}
                       </p>
                     </div>
 
@@ -269,7 +297,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                             ? 'text-[#D93A3A] hover:bg-[#D93A3A]/10'
                             : 'text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717]'
                         }`}
-                        title={project.isVisibleInGantt ? 'Hide from Gantt overview' : 'Show on Gantt overview'}
+                        title={project.isVisibleInGantt ? t('manager.hideFromOverview') : t('manager.showOnOverview')}
                       >
                         <HugeiconsIcon icon={project.isVisibleInGantt ? ViewOffIcon : ViewIcon} className="h-4 w-4" />
                       </button>
@@ -277,7 +305,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                         type="button"
                         onClick={() => handleOpenEditor(project.id)}
                         className="rounded-lg p-2 text-[#737373] transition-colors hover:bg-[#F3F4F6] hover:text-[#171717]"
-                        title="Edit schedule"
+                        title={t('manager.editSchedule')}
                       >
                         <HugeiconsIcon icon={Edit02Icon} className="h-4 w-4" />
                       </button>
@@ -292,9 +320,9 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-[#171717]">Gantt Projects</h2>
+          <h2 className="text-lg font-bold text-[#171717]">{t('manager.ganttProjects')}</h2>
           <p className="text-sm text-[#737373]">
-            Pick a visible project to preview its saved schedule, or manage which projects appear here.
+            {t('manager.ganttProjectsDescription')}
           </p>
         </div>
         <button
@@ -302,7 +330,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
           onClick={() => setShowManageModal(true)}
           className="btn-secondary"
         >
-          Manage Gantts
+          {t('manager.manageGantts')}
         </button>
       </div>
 
@@ -311,9 +339,9 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
           <div className="mx-auto inline-flex rounded-full bg-[#FEF2F2] p-4 text-[#D93A3A]">
             <HugeiconsIcon icon={Calendar01Icon} className="h-7 w-7" />
           </div>
-          <h3 className="mt-5 text-xl font-semibold text-[#171717]">No visible Gantt projects</h3>
+          <h3 className="mt-5 text-xl font-semibold text-[#171717]">{t('manager.noVisibleGanttProjects')}</h3>
           <p className="mt-2 text-sm text-[#737373]">
-            Use Manage Gantts to make one or more projects visible on the overview.
+            {t('manager.noVisibleGanttProjectsDescription')}
           </p>
         </div>
       ) : (
@@ -329,6 +357,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                     ? 'border-[#D93A3A] bg-[#FEF2F2] text-[#D93A3A]'
                     : 'border-[#E5E5E5] bg-white text-[#525252] hover:border-[#D4D4D4] hover:bg-[#FAFAFA]'
                 }`}
+                dir="auto"
               >
                 {project.title}
               </button>
@@ -378,8 +407,8 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
               {/* Content Timeline */}
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-bold text-[#171717]">Content Timeline</h2>
-                  <p className="text-sm text-[#737373]">6-week publishing schedule</p>
+                  <h2 className="text-lg font-bold text-[#171717]">{t('manager.contentTimeline')}</h2>
+                  <p className="text-sm text-[#737373]">{t('manager.publishingSchedule')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button 
@@ -387,18 +416,18 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                     onClick={() => setTimelineOffsetWeeks((current) => current - 1)}
                     className="p-2 text-[#737373] hover:text-[#171717] hover:bg-[#F3F4F6] rounded-lg transition-colors"
                   >
-                    <HugeiconsIcon icon={ArrowLeft01Icon} className="h-5 w-5 5" />
+                    <HugeiconsIcon icon={isRTL ? ArrowRight01Icon : ArrowLeft01Icon} className="h-5 w-5" />
                   </button>
                   <div className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E5E5E5] rounded-lg">
                     <HugeiconsIcon icon={Calendar03Icon} className="h-4 w-4 text-[#D93A3A]" />
-                    <span className="text-sm text-[#171717]">{formatTimelineRangeLabel(contentTimelineStart, contentTimelineEnd)}</span>
+                    <span className="text-sm text-[#171717]">{formatRangeLabel(contentTimelineStart, contentTimelineEnd)}</span>
                   </div>
                   <button 
                     type="button"
                     onClick={() => setTimelineOffsetWeeks((current) => current + 1)}
                     className="p-2 text-[#737373] hover:text-[#171717] hover:bg-[#F3F4F6] rounded-lg transition-colors"
                   >
-                    <HugeiconsIcon icon={ArrowRight01Icon} className="h-5 w-5 5" />
+                    <HugeiconsIcon icon={isRTL ? ArrowLeft01Icon : ArrowRight01Icon} className="h-5 w-5" />
                   </button>
                 </div>
               </div>
@@ -408,7 +437,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                 {/* Timeline header */}
                 <div className="grid grid-cols-[180px_1fr] border-b border-[#E5E5E5]">
                   <div className="p-4 border-r border-[#E5E5E5]">
-                    <span className="text-xs font-medium text-[#737373] uppercase tracking-wider">Projects</span>
+                    <span className="text-xs font-medium text-[#737373] uppercase tracking-wider">{t('manager.projects')}</span>
                   </div>
                   <div className="grid grid-cols-6">
                     {contentTimelineWeeks.map((weekStart, i) => (
@@ -419,7 +448,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                         }`}
                       >
                         <span className={`text-sm ${i === currentTimelineWeekIndex ? 'text-[#D93A3A] font-medium' : 'text-[#737373]'}`}>
-                          {format(weekStart, 'MMM d')}
+                          {formatDate(weekStart, { month: 'short', day: 'numeric' })}
                         </span>
                       </div>
                     ))}
@@ -434,7 +463,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                       <div className="p-4 border-r border-[#E5E5E5] bg-[#F9FAFB]">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getStatusBarColor(project.status) }} />
-                          <span className="font-medium text-[#171717] truncate">{project.title}</span>
+                          <span className="font-medium text-[#171717] truncate" dir="auto">{project.title}</span>
                         </div>
                       </div>
 
@@ -465,18 +494,18 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                                   className={`h-full rounded ${getTimelineBarColor(task.status)} opacity-80 group-hover:opacity-100 transition-opacity`}
                                 />
                                 <div className="absolute inset-0 flex items-center px-2">
-                                  <span className="text-xs text-white font-medium truncate">
+                                  <span className="text-xs text-white font-medium truncate" dir="auto">
                                     {task.name}
                                   </span>
                                 </div>
 
                                 {/* Tooltip */}
-                                <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-10">
+                                <div className={cn('absolute bottom-full mb-2 hidden group-hover:block z-10', isRTL ? 'right-0' : 'left-0')}>
                                   <div className="bg-white border border-[#E5E5E5] rounded-lg shadow-lg p-3 min-w-[180px]">
-                                    <p className="font-medium text-[#171717] mb-1">{task.name}</p>
-                                    <p className="text-xs text-[#737373]">Owner: {task.owner}</p>
-                                    <p className="text-xs text-[#737373]">Status: {task.status}</p>
-                                    <p className="text-xs text-[#737373]">Dates: {task.startLabel} - {task.endLabel}</p>
+                                    <p className="font-medium text-[#171717] mb-1" dir="auto">{task.name}</p>
+                                    <p className="text-xs text-[#737373]">{t('manager.owner')}: {task.owner}</p>
+                                    <p className="text-xs text-[#737373]">{t('manager.status')}: {getStatusLabel(task.status)}</p>
+                                    <p className="text-xs text-[#737373]">{t('manager.dates')}: {task.startLabel} - {task.endLabel}</p>
                                   </div>
                                 </div>
                               </div>
@@ -492,26 +521,26 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
               <div className="flex flex-wrap items-center gap-6">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-green-600" />
-                  <span className="text-sm text-[#737373]">Completed</span>
+                  <span className="text-sm text-[#737373]">{t('manager.completed')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-[#D93A3A]" />
-                  <span className="text-sm text-[#737373]">In Progress</span>
+                  <span className="text-sm text-[#737373]">{t('manager.inProgress')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-[#D4D4D4]" />
-                  <span className="text-sm text-[#737373]">Pending</span>
+                  <span className="text-sm text-[#737373]">{t('manager.pending')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-yellow-500" />
-                  <span className="text-sm text-[#737373]">Delayed</span>
+                  <span className="text-sm text-[#737373]">{t('manager.delayed')}</span>
                 </div>
               </div>
               {selectedProject.gantt.tasks.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-[#D4D4D8] bg-white px-6 py-14 text-center">
-                  <h3 className="text-xl font-semibold text-[#171717]">This project has no schedule yet</h3>
+                  <h3 className="text-xl font-semibold text-[#171717]">{t('manager.thisProjectHasNoSchedule')}</h3>
                   <p className="mt-2 text-sm text-[#737373]">
-                    Open the editor to add tasks, dependencies, resources, and timeline bars.
+                    {t('manager.thisProjectHasNoScheduleDescription')}
                   </p>
                   <button
                     type="button"
@@ -519,7 +548,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                     className="btn-primary mt-6 inline-flex items-center gap-2"
                   >
                     <HugeiconsIcon icon={Edit02Icon} className="h-4 w-4" />
-                    Create Schedule
+                    {t('manager.createSchedule')}
                   </button>
                 </div>
               ) : (
@@ -538,7 +567,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                               : 'border-[#E5E5E5] bg-white text-[#525252] hover:border-[#D4D4D4]'
                           }`}
                         >
-                          {status.replace('-', ' ')}
+                          {getStatusLabel(status)}
                         </button>
                       );
                     })}
@@ -546,7 +575,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
 
                   {filteredTasks.length === 0 ? (
                     <div className="rounded-3xl border border-[#E5E5E5] bg-white px-6 py-10 text-center text-sm text-[#737373]">
-                      No tasks match the current status filters.
+                      {t('manager.noTasksMatchFilters')}
                     </div>
                   ) : (
                     <div className="overflow-hidden rounded-3xl border border-[#E5E5E5] bg-white">
@@ -554,8 +583,8 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                         <div className="border-r border-[#E5E5E5]">
                           <div className="grid h-14 grid-cols-[52px_minmax(0,1fr)_92px] border-b border-[#E5E5E5] bg-[#F8FAFC] text-xs font-semibold uppercase tracking-[0.18em] text-[#737373]">
                             <div className="flex items-center justify-center border-r border-[#E5E5E5]">#</div>
-                            <div className="flex items-center border-r border-[#E5E5E5] px-4">Task</div>
-                            <div className="flex items-center px-4">Status</div>
+                            <div className="flex items-center border-r border-[#E5E5E5] px-4">{t('manager.task')}</div>
+                            <div className="flex items-center px-4">{t('manager.status')}</div>
                           </div>
                           {filteredTasks.map((task) => {
                             const resource = selectedProject.gantt.resources.find((entry) => entry.id === task.resourceId);
@@ -563,15 +592,15 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                             return (
                               <div key={task.id} className="grid h-14 grid-cols-[52px_minmax(0,1fr)_92px] border-b border-[#E5E5E5] last:border-b-0">
                                 <div className="flex items-center justify-center border-r border-[#E5E5E5] text-xs font-semibold text-[#525252]">
-                                  {selectedProject.gantt.tasks.findIndex((entry) => entry.id === task.id) + 1}
+                                  {formatNumber(selectedProject.gantt.tasks.findIndex((entry) => entry.id === task.id) + 1)}
                                 </div>
                                 <div className="border-r border-[#E5E5E5] px-4 py-3">
-                                  <p className="truncate text-sm font-medium text-[#171717]">{task.name}</p>
-                                  <p className="truncate text-xs text-[#737373]">{resource?.name ?? 'Unassigned'}</p>
+                                  <p className="truncate text-sm font-medium text-[#171717]" dir="auto">{task.name}</p>
+                                  <p className="truncate text-xs text-[#737373]">{resource?.name ?? t('manager.unassigned')}</p>
                                 </div>
                                 <div className="flex items-center px-3">
                                   <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${getStatusBadge(task.status)}`}>
-                                    {task.status.replace('-', ' ')}
+                                    {getStatusLabel(task.status)}
                                   </span>
                                 </div>
                               </div>

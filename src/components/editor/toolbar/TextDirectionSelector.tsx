@@ -2,12 +2,15 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { GlobeIcon, TextAlignLeftIcon, TextAlignRightIcon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
 import type { Editor } from '@tiptap/react';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 
 interface TextDirectionSelectorProps {
   editor: Editor;
 }
 
 export function TextDirectionSelector({ editor }: TextDirectionSelectorProps) {
+  const { isRTL, t } = useLocale();
   const [showMenu, setShowMenu] = useState(false);
 
   const setDirection = (direction: 'ltr' | 'rtl') => {
@@ -41,7 +44,7 @@ export function TextDirectionSelector({ editor }: TextDirectionSelectorProps) {
       return parentNode.attrs.dir;
     }
     
-    return 'ltr';
+    return isRTL ? 'rtl' : 'ltr';
   };
 
   const currentDirection = getCurrentDirection();
@@ -54,7 +57,7 @@ export function TextDirectionSelector({ editor }: TextDirectionSelectorProps) {
         className={`flex items-center gap-1 px-2 py-1.5 text-sm rounded transition-colors ${
           showMenu ? 'bg-[#D93A3A]/10 text-[#D93A3A]' : 'text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717]'
         }`}
-        title="Text Direction"
+        title={t('editor.textDirection')}
       >
         <HugeiconsIcon icon={GlobeIcon} className="w-4 h-4" />
         <span className="hidden sm:inline uppercase text-xs font-medium">
@@ -68,9 +71,9 @@ export function TextDirectionSelector({ editor }: TextDirectionSelectorProps) {
             className="fixed inset-0 z-40" 
             onClick={() => setShowMenu(false)}
           />
-          <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-[#E5E5E5] rounded-lg shadow-lg z-50 py-1">
+          <div className={cn('absolute top-full mt-2 w-48 bg-white border border-[#E5E5E5] rounded-lg shadow-lg z-50 py-1', isRTL ? 'right-0' : 'left-0')}>
             <div className="px-3 py-2 text-xs text-[#737373] uppercase tracking-wider border-b border-[#E5E5E5]">
-              Text Direction
+              {t('editor.textDirection')}
             </div>
             
             <button
@@ -83,7 +86,7 @@ export function TextDirectionSelector({ editor }: TextDirectionSelectorProps) {
               }`}
             >
               <HugeiconsIcon icon={TextAlignLeftIcon} className="w-4 h-4" />
-              <span className="flex-1 text-left">Left to Right</span>
+              <span className="flex-1 text-left">{t('editor.leftToRight')}</span>
               {currentDirection === 'ltr' && (
                 <span className="text-xs bg-[#D93A3A] text-white px-1.5 py-0.5 rounded">LTR</span>
               )}
@@ -99,7 +102,7 @@ export function TextDirectionSelector({ editor }: TextDirectionSelectorProps) {
               }`}
             >
               <HugeiconsIcon icon={TextAlignRightIcon} className="w-4 h-4" />
-              <span className="flex-1 text-left">Right to Left</span>
+              <span className="flex-1 text-left">{t('editor.rightToLeft')}</span>
               {currentDirection === 'rtl' && (
                 <span className="text-xs bg-[#D93A3A] text-white px-1.5 py-0.5 rounded">RTL</span>
               )}
@@ -107,8 +110,8 @@ export function TextDirectionSelector({ editor }: TextDirectionSelectorProps) {
             
             <div className="px-4 py-2 text-xs text-[#A3A3A3] border-t border-[#E5E5E5]">
               {editor.state.selection.from !== editor.state.selection.to 
-                ? 'Applies to selected text' 
-                : 'Applies to entire document'}
+                ? t('editor.appliesSelection') 
+                : t('editor.appliesDocument')}
             </div>
           </div>
         </>

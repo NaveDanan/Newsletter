@@ -1,22 +1,24 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon, Heading01Icon, Heading02Icon, Heading03Icon, Heading04Icon, Heading05Icon, Heading06Icon, TextIcon } from "@hugeicons/core-free-icons";
 import type { Editor } from '@tiptap/react';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 
 interface HeadingSelectorProps {
   editor: Editor;
 }
 
-const headings = [
-  { name: 'Normal text', level: 0, icon: TextIcon },
-  { name: 'Heading 1', level: 1, icon: Heading01Icon },
-  { name: 'Heading 2', level: 2, icon: Heading02Icon },
-  { name: 'Heading 3', level: 3, icon: Heading03Icon },
-  { name: 'Heading 4', level: 4, icon: Heading04Icon },
-  { name: 'Heading 5', level: 5, icon: Heading05Icon },
-  { name: 'Heading 6', level: 6, icon: Heading06Icon },
-] as const;
-
 export function HeadingSelector({ editor }: HeadingSelectorProps) {
+  const { isRTL, t } = useLocale();
+  const headings = [
+    { name: t('editor.normalText'), level: 0, icon: TextIcon },
+    { name: t('editor.heading1'), level: 1, icon: Heading01Icon },
+    { name: t('editor.heading2'), level: 2, icon: Heading02Icon },
+    { name: t('editor.heading3'), level: 3, icon: Heading03Icon },
+    { name: t('editor.heading4'), level: 4, icon: Heading04Icon },
+    { name: t('editor.heading5'), level: 5, icon: Heading05Icon },
+    { name: t('editor.heading6'), level: 6, icon: Heading06Icon },
+  ] as const;
   const getCurrentHeading = () => {
     for (let i = 1; i <= 6; i++) {
       if (editor.isActive('heading', { level: i })) {
@@ -48,7 +50,7 @@ export function HeadingSelector({ editor }: HeadingSelectorProps) {
         <HugeiconsIcon icon={ArrowDown01Icon} className="w-3 h-3 text-[#737373]" />
       </button>
       
-      <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-[#E5E5E5] rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+      <div className={cn('absolute top-full mt-1 w-40 bg-white border border-[#E5E5E5] rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50', isRTL ? 'right-0' : 'left-0')}>
         {headings.map((heading) => {
           const HeadingIcon = heading.icon;
           const isActive = heading.level === 0 

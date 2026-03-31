@@ -2,6 +2,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Add01Icon, CheckmarkCircle02Icon, Clock01Icon, Delete02Icon, Edit02Icon, FileAttachmentIcon, Search01Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 import type { Newsletter } from '../../types/newsletter';
 
 interface NewsletterListProps {
@@ -25,6 +27,7 @@ export function NewsletterList({
   canEdit,
   canDelete,
 }: NewsletterListProps) {
+  const { formatNumber, isRTL, t } = useLocale();
   const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -41,7 +44,7 @@ export function NewsletterList({
     if (deleteConfirm === id) {
       onDelete(id);
       setDeleteConfirm(null);
-      toast.success('Newsletter deleted');
+      toast.success(t('manager.newsletterDeleted'));
     } else {
       setDeleteConfirm(id);
       setTimeout(() => setDeleteConfirm(null), 3000);
@@ -59,16 +62,16 @@ export function NewsletterList({
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="dashboard-card">
-          <p className="text-sm text-[#737373] mb-1">Total</p>
-          <p className="text-2xl font-bold text-[#171717]">{stats.total}</p>
+          <p className="text-sm text-[#737373] mb-1">{t('manager.total')}</p>
+          <p className="text-2xl font-bold text-[#171717]">{formatNumber(stats.total)}</p>
         </div>
         <div className="dashboard-card">
-          <p className="text-sm text-[#737373] mb-1">Published</p>
-          <p className="text-2xl font-bold text-green-600">{stats.published}</p>
+          <p className="text-sm text-[#737373] mb-1">{t('manager.published')}</p>
+          <p className="text-2xl font-bold text-green-600">{formatNumber(stats.published)}</p>
         </div>
         <div className="dashboard-card">
-          <p className="text-sm text-[#737373] mb-1">Drafts</p>
-          <p className="text-2xl font-bold text-[#A3A3A3]">{stats.drafts}</p>
+          <p className="text-sm text-[#737373] mb-1">{t('manager.drafts')}</p>
+          <p className="text-2xl font-bold text-[#A3A3A3]">{formatNumber(stats.drafts)}</p>
         </div>
       </div>
 
@@ -83,7 +86,7 @@ export function NewsletterList({
                 : 'bg-white text-[#737373] border border-[#E5E5E5] hover:text-[#171717]'
             }`}
           >
-            All
+            {t('manager.all')}
           </button>
           <button
             onClick={() => setFilter('published')}
@@ -93,7 +96,7 @@ export function NewsletterList({
                 : 'bg-white text-[#737373] border border-[#E5E5E5] hover:text-[#171717]'
             }`}
           >
-            Published
+            {t('manager.published')}
           </button>
           <button
             onClick={() => setFilter('draft')}
@@ -103,7 +106,7 @@ export function NewsletterList({
                 : 'bg-white text-[#737373] border border-[#E5E5E5] hover:text-[#171717]'
             }`}
           >
-            Drafts
+            {t('manager.drafts')}
           </button>
         </div>
         {canCreate && (
@@ -112,7 +115,7 @@ export function NewsletterList({
             className="btn-primary flex items-center gap-2"
           >
             <HugeiconsIcon icon={Add01Icon} className="w-4 h-4" />
-            Create Newsletter
+            {t('manager.createNewsletter')}
           </button>
         )}
       </div>
@@ -120,13 +123,14 @@ export function NewsletterList({
       {/* Search */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-md">
-          <HugeiconsIcon icon={Search01Icon} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]" />
+          <HugeiconsIcon icon={Search01Icon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]', isRTL ? 'right-3' : 'left-3')} />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search newsletters..."
-            className="w-full pl-10"
+            dir={isRTL ? 'rtl' : 'ltr'}
+            placeholder={t('manager.searchNewsletters')}
+            className={cn('w-full', isRTL ? 'pr-10' : 'pl-10')}
           />
         </div>
       </div>
@@ -137,7 +141,7 @@ export function NewsletterList({
           <div className="p-12 text-center">
             <HugeiconsIcon icon={FileAttachmentIcon} className="w-12 h-12 text-[#D4D4D4] mx-auto mb-4" />
             <p className="text-[#737373]">
-              {searchTerm ? 'No newsletters found' : 'No newsletters yet. Create your first one!'}
+              {searchTerm ? t('manager.noNewslettersFound') : t('manager.noNewslettersYet')}
             </p>
           </div>
         ) : (
@@ -162,7 +166,7 @@ export function NewsletterList({
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-xs font-medium text-[#A3A3A3]">
-                        Draft
+                        {t('manager.draft')}
                       </div>
                     )}
                   </div>
@@ -171,11 +175,11 @@ export function NewsletterList({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h3 className="font-semibold text-[#171717] line-clamp-1">
-                          {newsletter.title || 'Untitled Draft'}
+                        <h3 className="font-semibold text-[#171717] line-clamp-1" dir="auto">
+                          {newsletter.title || t('manager.untitledDraft')}
                         </h3>
-                        <p className="text-sm text-[#737373] mt-1 line-clamp-1">
-                          {newsletter.subtitle || 'No subtitle yet'}
+                        <p className="text-sm text-[#737373] mt-1 line-clamp-1" dir="auto">
+                          {newsletter.subtitle || t('manager.noSubtitleYet')}
                         </p>
                       </div>
                       <span className={`flex-shrink-0 text-xs px-2 py-1 rounded-full ${
@@ -186,12 +190,12 @@ export function NewsletterList({
                         {newsletter.status === 'published' ? (
                           <span className="flex items-center gap-1">
                             <HugeiconsIcon icon={CheckmarkCircle02Icon} className="w-3 h-3" />
-                            Published
+                            {t('manager.published')}
                           </span>
                         ) : (
                           <span className="flex items-center gap-1">
                             <HugeiconsIcon icon={Clock01Icon} className="w-3 h-3" />
-                            Draft
+                            {t('manager.draft')}
                           </span>
                         )}
                       </span>
@@ -199,7 +203,7 @@ export function NewsletterList({
 
                     {/* Meta */}
                     <div className="flex items-center gap-4 mt-2 text-sm text-[#737373]">
-                      <span>{newsletter.author || 'Unknown author'}</span>
+                      <span dir="auto">{newsletter.author || t('manager.unknownAuthor')}</span>
                       <span>·</span>
                       <span>{newsletter.publishedAt}</span>
                       <span>·</span>
@@ -214,7 +218,7 @@ export function NewsletterList({
                               </span>
                             ))}
                             {newsletter.tags.length > 2 && (
-                              <span className="text-[#A3A3A3]">+{newsletter.tags.length - 2}</span>
+                              <span className="text-[#A3A3A3]">+{formatNumber(newsletter.tags.length - 2)}</span>
                             )}
                           </span>
                         </>
@@ -223,9 +227,9 @@ export function NewsletterList({
 
                     {/* Engagement */}
                     <div className="flex items-center gap-4 mt-2 text-sm text-[#737373]">
-                      <span>{newsletter.likes} likes</span>
-                      <span>{newsletter.comments} comments</span>
-                      <span>{newsletter.shares} shares</span>
+                      <span>{formatNumber(newsletter.likes)} {t('manager.likes')}</span>
+                      <span>{formatNumber(newsletter.comments)} {t('manager.comments')}</span>
+                      <span>{formatNumber(newsletter.shares)} {t('manager.shares')}</span>
                     </div>
                   </div>
 
@@ -234,7 +238,7 @@ export function NewsletterList({
                     <button
                       onClick={() => onView(newsletter)}
                       className="p-2 text-[#737373] hover:text-[#171717] hover:bg-[#F3F4F6] rounded-lg transition-colors"
-                      title="View"
+                      title={t('manager.view')}
                     >
                       <HugeiconsIcon icon={ViewIcon} className="w-4 h-4" />
                     </button>
@@ -242,7 +246,7 @@ export function NewsletterList({
                       <button
                         onClick={() => onEdit(newsletter)}
                         className="p-2 text-[#737373] hover:text-[#171717] hover:bg-[#F3F4F6] rounded-lg transition-colors"
-                        title="Edit"
+                        title={t('manager.edit')}
                       >
                         <HugeiconsIcon icon={Edit02Icon} className="w-4 h-4" />
                       </button>
@@ -255,7 +259,7 @@ export function NewsletterList({
                             ? 'text-red-600 bg-red-100'
                             : 'text-[#737373] hover:text-red-600 hover:bg-red-50'
                         }`}
-                        title={deleteConfirm === newsletter.id ? 'Click again to confirm' : 'Delete'}
+                        title={deleteConfirm === newsletter.id ? t('manager.confirmDelete') : t('manager.delete')}
                       >
                         <HugeiconsIcon icon={Delete02Icon} className="w-4 h-4" />
                       </button>

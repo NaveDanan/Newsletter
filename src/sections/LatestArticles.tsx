@@ -1,9 +1,9 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Heart, Message01Icon, PlayIcon, Share02Icon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 import type { Newsletter } from '../types/newsletter';
-
-const tabs = ['Latest', 'Top', 'Discussions'];
 
 interface LatestArticlesProps {
   newsletters: Newsletter[];
@@ -11,6 +11,12 @@ interface LatestArticlesProps {
 }
 
 export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesProps) {
+  const { formatDate, formatNumber, isRTL, t } = useLocale();
+  const tabs = [
+    { key: 'Latest', label: t('latest.tab.latest') },
+    { key: 'Top', label: t('latest.tab.top') },
+    { key: 'Discussions', label: t('latest.tab.discussions') },
+  ];
   const [activeTab, setActiveTab] = useState('Latest');
 
   // Filter articles based on active tab
@@ -32,10 +38,10 @@ export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesPr
     return (
       <section>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-[#171717]">Latest Articles</h2>
+          <h2 className="text-xl font-bold text-[#171717]">{t('latest.title')}</h2>
         </div>
         <div className="text-center py-12 bg-[#F9FAFB] rounded-xl">
-          <p className="text-[#737373]">No articles published yet.</p>
+          <p className="text-[#737373]">{t('latest.empty')}</p>
         </div>
       </section>
     );
@@ -48,11 +54,11 @@ export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesPr
         <div className="flex items-center gap-1 bg-[#F3F4F6] rounded-lg p-1">
           {tabs.map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`tab-button ${activeTab === tab ? 'active' : ''}`}
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`tab-button ${activeTab === tab.key ? 'active' : ''}`}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -75,7 +81,7 @@ export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesPr
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 {article.hasAudio && (
-                  <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                  <div className={cn('absolute bottom-3 flex items-center gap-2 bg-black/70 text-white text-xs px-2 py-1 rounded', isRTL ? 'right-3' : 'left-3')}>
                     <HugeiconsIcon icon={PlayIcon} className="w-3 h-3 fill-white" />
                     {article.audioDuration}
                   </div>
@@ -84,15 +90,15 @@ export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesPr
 
               {/* Content */}
               <div className="sm:col-span-2 p-5">
-                <h3 className="font-semibold text-lg text-[#171717] mb-2 group-hover:text-[#D93A3A] transition-colors">
+                <h3 className="font-semibold text-lg text-[#171717] mb-2 group-hover:text-[#D93A3A] transition-colors" dir="auto">
                   {article.title}
                 </h3>
-                <p className="text-[#737373] text-sm mb-4 line-clamp-2">
+                <p className="text-[#737373] text-sm mb-4 line-clamp-2" dir="auto">
                   {article.subtitle}
                 </p>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm text-[#737373]">
-                    <span>{new Date(article.publishedAt).toLocaleDateString('en-US', {
+                    <span>{formatDate(article.publishedAt, {
                       month: 'short',
                       day: 'numeric',
                     })}</span>
@@ -102,15 +108,15 @@ export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesPr
                   <div className="flex items-center gap-4">
                     <span className="engagement-stat">
                       <HugeiconsIcon icon={Message01Icon} className="w-4 h-4" />
-                      {article.comments.toLocaleString()}
+                      {formatNumber(article.comments)}
                     </span>
                     <span className="engagement-stat">
                       <HugeiconsIcon icon={Heart} className="w-4 h-4" />
-                      {article.likes}
+                      {formatNumber(article.likes)}
                     </span>
                     <span className="engagement-stat">
                       <HugeiconsIcon icon={Share02Icon} className="w-4 h-4" />
-                      {article.shares}
+                      {formatNumber(article.shares)}
                     </span>
                   </div>
                 </div>

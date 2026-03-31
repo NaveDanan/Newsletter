@@ -6,6 +6,7 @@ import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { COMMENT_EMOJIS, formatCommentBodyToHtml, stripCommentFormatting } from '@/lib/comment-formatting';
+import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -86,6 +87,7 @@ export function CommentReply({
   onRequireAuth,
   formatCommentDate,
 }: CommentReplyProps) {
+  const { isRTL, t } = useLocale();
   const [isRippling, setIsRippling] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const isAuthenticated = Boolean(currentUser?.id);
@@ -103,7 +105,7 @@ export function CommentReply({
         horizontalRule: false,
       }),
       Placeholder.configure({
-        placeholder: isAuthenticated ? 'Reply' : 'Sign in to reply',
+        placeholder: isAuthenticated ? t('comment.replyPlaceholder') : t('comment.signInToReply'),
       }),
       UnderlineExtension,
     ],
@@ -114,6 +116,7 @@ export function CommentReply({
     editorProps: {
       attributes: {
         class: 'ProseMirror min-h-28 rounded-[14px] px-2 py-2 text-[15px] leading-6 text-[#262A33]',
+        dir: isRTL ? 'rtl' : 'ltr',
       },
     },
   });
@@ -145,7 +148,15 @@ export function CommentReply({
     }
 
     editor.setEditable(isAuthenticated);
-  }, [editor, isAuthenticated]);
+    editor.setOptions({
+      editorProps: {
+        attributes: {
+          class: 'ProseMirror min-h-28 rounded-[14px] px-2 py-2 text-[15px] leading-6 text-[#262A33]',
+          dir: isRTL ? 'rtl' : 'ltr',
+        },
+      },
+    });
+  }, [editor, isAuthenticated, isRTL]);
 
   useEffect(() => {
     if (!editor) {
@@ -203,7 +214,7 @@ export function CommentReply({
                     ? 'border-[#D93A3A]/20 bg-[#D93A3A] text-white shadow-[0_18px_35px_-20px_rgba(217,58,58,0.9)]'
                     : 'border-[#E1E4EA] bg-[#F5F7FA] text-[#707277] hover:border-[#D93A3A]/35 hover:text-[#D93A3A]',
                 )}
-                aria-label="Like newsletter"
+                aria-label={t('comment.likeNewsletter')}
               >
                 <HugeiconsIcon icon={Heart} className={cn('h-4 w-4', isLiked ? 'fill-current' : '')} />
                 {isRippling ? (
@@ -272,6 +283,7 @@ export function CommentReply({
 
                       <div
                         className="text-[15px] leading-7 text-[#50535B] [&_em]:italic [&_s]:line-through [&_strong]:font-semibold [&_u]:underline"
+                        dir="auto"
                         dangerouslySetInnerHTML={{ __html: formatCommentBodyToHtml(comment.body) }}
                       />
                     </div>
@@ -281,9 +293,9 @@ export function CommentReply({
             })
           ) : (
             <div className="rounded-[14px] border border-dashed border-[#D8DCE5] bg-white px-6 py-8 text-center">
-              <p className="text-base font-semibold text-[#262A33]">No comments yet</p>
+              <p className="text-base font-semibold text-[#262A33]">{t('comment.noComments')}</p>
               <p className="mt-2 text-sm text-[#7D8088]">
-                Start the conversation with a useful reaction, question, or example.
+                {t('comment.startConversation')}
               </p>
             </div>
           )}
@@ -306,7 +318,7 @@ export function CommentReply({
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <ToolbarButton
-                    label="Bold"
+                    label={t('comment.bold')}
                     onClick={() => focusEditor() && editor?.chain().focus().toggleBold().run()}
                     isActive={isBoldActive}
                     disabled={!isAuthenticated}
@@ -314,7 +326,7 @@ export function CommentReply({
                     <HugeiconsIcon icon={TextBoldIcon} className="h-4 w-4" />
                   </ToolbarButton>
                   <ToolbarButton
-                    label="Italic"
+                    label={t('comment.italic')}
                     onClick={() => focusEditor() && editor?.chain().focus().toggleItalic().run()}
                     isActive={isItalicActive}
                     disabled={!isAuthenticated}
@@ -322,7 +334,7 @@ export function CommentReply({
                     <HugeiconsIcon icon={TextItalicIcon} className="h-4 w-4" />
                   </ToolbarButton>
                   <ToolbarButton
-                    label="Underline"
+                    label={t('comment.underline')}
                     onClick={() => focusEditor() && editor?.chain().focus().toggleUnderline().run()}
                     isActive={isUnderlineActive}
                     disabled={!isAuthenticated}
@@ -330,7 +342,7 @@ export function CommentReply({
                     <HugeiconsIcon icon={TextUnderlineIcon} className="h-4 w-4" />
                   </ToolbarButton>
                   <ToolbarButton
-                    label="Strikethrough"
+                    label={t('comment.strikethrough')}
                     onClick={() => focusEditor() && editor?.chain().focus().toggleStrike().run()}
                     isActive={isStrikethroughActive}
                     disabled={!isAuthenticated}
@@ -339,7 +351,7 @@ export function CommentReply({
                   </ToolbarButton>
                   <div className="relative">
                     <ToolbarButton
-                      label="Emoji"
+                      label={t('comment.emoji')}
                       onClick={() => {
                         if (!isAuthenticated) {
                           onRequireAuth?.();
@@ -356,14 +368,14 @@ export function CommentReply({
                     </ToolbarButton>
 
                     {isEmojiPickerOpen ? (
-                      <div className="absolute left-0 top-11 z-10 grid w-48 grid-cols-5 gap-2 rounded-[14px] border border-[#E2E4E9] bg-white p-3 shadow-[0_18px_50px_-30px_rgba(17,24,39,0.45)]">
+                      <div className={cn('absolute top-11 z-10 grid w-48 grid-cols-5 gap-2 rounded-[14px] border border-[#E2E4E9] bg-white p-3 shadow-[0_18px_50px_-30px_rgba(17,24,39,0.45)]', isRTL ? 'right-0' : 'left-0')}>
                         {COMMENT_EMOJIS.map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
                             onClick={() => insertEmoji(emoji)}
                             className="flex h-8 w-8 items-center justify-center rounded-full text-lg transition-colors hover:bg-[#FFF1F1]"
-                            aria-label={`Insert ${emoji}`}
+                            aria-label={t('comment.insertEmoji', { emoji })}
                           >
                             {emoji}
                           </button>
@@ -380,7 +392,7 @@ export function CommentReply({
                     disabled={!hasMeaningfulComment}
                     size="icon"
                     className="h-11 w-11 rounded-full bg-[#D93A3A] text-white hover:bg-[#BF3131] disabled:bg-[#F2C9C9] disabled:text-white"
-                    title="Send"
+                    title={t('comment.send')}
                   >
                     <HugeiconsIcon icon={SentIcon} className="h-4 w-4" />
                   </Button>
@@ -391,7 +403,7 @@ export function CommentReply({
                     onClick={onRequireAuth}
                     className="rounded-full border-[#E2E4E9] bg-white px-4 text-[#454851] hover:border-[#D93A3A]/30 hover:bg-[#FFF6F6] hover:text-[#D93A3A]"
                   >
-                    Sign In
+                    {t('comment.signIn')}
                   </Button>
                 )}
               </div>
@@ -399,7 +411,7 @@ export function CommentReply({
 
             {isAuthenticated ? (
               <p className="px-2 pt-3 text-xs text-[#8B8E96]">
-                Replying as {currentUser?.name}. Keep it specific and useful.
+                {t('comment.replyingAs', { name: currentUser?.name ?? '' })}
               </p>
             ) : null}
           </div>

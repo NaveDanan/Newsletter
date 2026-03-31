@@ -1,6 +1,9 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AnalyticsUpIcon, BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Logout01Icon, Mail01Icon, Menu01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
 import { useRef, useState } from 'react';
+import { LanguageToggleButton } from '@/components/LanguageToggleButton';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 import { ProjectView } from './manager/ProjectView';
 import { GoalsView } from './manager/GoalsView';
 import { GanttView } from './manager/GanttView';
@@ -65,6 +68,7 @@ export function ManagerDashboard({
   onAddNewsletterComment,
   onToggleCommentLike,
 }: ManagerDashboardProps) {
+  const { formatNumber, isRTL, t } = useLocale();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [editingNewsletter, setEditingNewsletter] = useState<Newsletter | null>(null);
   const [viewingNewsletter, setViewingNewsletter] = useState<Newsletter | null>(null);
@@ -77,11 +81,11 @@ export function ManagerDashboard({
     : null;
 
   const tabs = [
-    { id: 'newsletters' as Tab, label: 'Newsletters', icon: FileAttachmentIcon },
-    { id: 'projects' as Tab, label: 'Projects', icon: Calendar01Icon },
-    { id: 'goals' as Tab, label: 'Goals', icon: Target01Icon },
-    { id: 'gantt' as Tab, label: 'Gantt', icon: BarChartIcon },
-    { id: 'spreadsheet' as Tab, label: 'Spreadsheet', icon: FileSpreadsheetIcon },
+    { id: 'newsletters' as Tab, label: t('manager.newsletters'), icon: FileAttachmentIcon },
+    { id: 'projects' as Tab, label: t('manager.projects'), icon: Calendar01Icon },
+    { id: 'goals' as Tab, label: t('manager.goals'), icon: Target01Icon },
+    { id: 'gantt' as Tab, label: t('manager.gantt'), icon: BarChartIcon },
+    { id: 'spreadsheet' as Tab, label: t('manager.spreadsheet'), icon: FileSpreadsheetIcon },
   ].filter((tab) => canAccessManagerTab(currentUserRole, tab.id));
 
   const handleCreateNewsletter = () => {
@@ -274,9 +278,9 @@ export function ManagerDashboard({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Save published newsletter changes?</AlertDialogTitle>
+            <AlertDialogTitle>{t('manager.unsavedTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Your changes to this published newsletter are not saved yet. Save them before leaving, or discard them.
+              {t('manager.unsavedDescription')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -285,19 +289,19 @@ export function ManagerDashboard({
                 pendingLeaveActionRef.current = null;
               }}
             >
-              Keep Editing
+              {t('manager.keepEditing')}
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-[#737373] hover:bg-[#525252]"
               onClick={handleDiscardAndLeave}
             >
-              Discard Changes
+              {t('manager.discardChanges')}
             </AlertDialogAction>
             <AlertDialogAction
               className="bg-[#D93A3A] hover:bg-[#B91C1C]"
               onClick={handleConfirmSaveAndLeave}
             >
-              Save Changes
+              {t('manager.saveChanges')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -309,6 +313,7 @@ export function ManagerDashboard({
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowMobileMenu(!showMobileMenu)}
+              aria-label={showMobileMenu ? t('nav.closeMenu') : t('nav.openMenu')}
               className="lg:hidden p-2 text-[#737373]"
             >
               {showMobileMenu ? <HugeiconsIcon icon={Cancel01Icon} className="w-5 h-5" /> : <HugeiconsIcon icon={Menu01Icon} className="w-5 h-5" />}
@@ -325,15 +330,16 @@ export function ManagerDashboard({
               <span className="font-bold text-[#171717]">AI-BREAK</span>
             </button>
             <span className="text-[#D4D4D4] hidden sm:inline">|</span>
-            <span className="text-xs text-[#737373] uppercase tracking-wider hidden sm:inline">Manager Dashboard</span>
+            <span className="text-xs text-[#737373] uppercase tracking-wider hidden sm:inline">{t('manager.dashboard')}</span>
           </div>
           <div className="flex items-center gap-4">
+            <LanguageToggleButton compact />
             <button
               onClick={() => requestLeaveEditor(onLogout)}
               className="flex items-center gap-2 text-sm text-[#737373] hover:text-red-600 transition-colors"
             >
               <HugeiconsIcon icon={Logout01Icon} className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
+              <span className="hidden sm:inline">{t('manager.logout')}</span>
             </button>
           </div>
         </div>
@@ -341,7 +347,11 @@ export function ManagerDashboard({
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className={`${showMobileMenu ? 'block' : 'hidden'} lg:block w-64 fixed lg:sticky top-14 left-0 h-[calc(100vh-3.5rem)] bg-white border-r border-[#E5E5E5] z-40 overflow-y-auto`}>
+        <aside className={cn(
+          showMobileMenu ? 'block' : 'hidden',
+          'w-64 fixed lg:sticky top-14 h-[calc(100vh-3.5rem)] bg-white z-40 overflow-y-auto lg:block',
+          isRTL ? 'right-0 border-l border-[#E5E5E5]' : 'left-0 border-r border-[#E5E5E5]',
+        )}>
           <nav className="p-4 space-y-1">
             {tabs.map((tab) => (
               <button
@@ -369,33 +379,33 @@ export function ManagerDashboard({
 
           {/* Quick stats */}
           <div className="p-4 border-t border-[#E5E5E5]">
-            <p className="text-xs text-[#737373] uppercase tracking-wider mb-4">Quick Stats</p>
+            <p className="text-xs text-[#737373] uppercase tracking-wider mb-4">{t('manager.quickStats')}</p>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[#737373]">
                   <HugeiconsIcon icon={FileAttachmentIcon} className="w-4 h-4" />
-                  <span className="text-sm">Newsletters</span>
+                  <span className="text-sm">{t('manager.newsletters')}</span>
                 </div>
-                <span className="font-semibold text-[#171717]">{newsletters.length}</span>
+                <span className="font-semibold text-[#171717]">{formatNumber(newsletters.length)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[#737373]">
                   <HugeiconsIcon icon={UserGroupIcon} className="w-4 h-4" />
-                  <span className="text-sm">Subscribers</span>
+                  <span className="text-sm">{t('manager.subscribers')}</span>
                 </div>
                 <span className="font-semibold text-[#171717]">12,450</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[#737373]">
                   <HugeiconsIcon icon={Mail01Icon} className="w-4 h-4" />
-                  <span className="text-sm">Open Rate</span>
+                  <span className="text-sm">{t('manager.openRate')}</span>
                 </div>
                 <span className="font-semibold text-[#D93A3A]">38.5%</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[#737373]">
                   <HugeiconsIcon icon={AnalyticsUpIcon} className="w-4 h-4" />
-                  <span className="text-sm">Growth</span>
+                  <span className="text-sm">{t('manager.growth')}</span>
                 </div>
                 <span className="font-semibold text-green-600">+15%</span>
               </div>

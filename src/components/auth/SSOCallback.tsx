@@ -2,7 +2,9 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { CancelCircleIcon, CheckmarkCircle02Icon, Loading02Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import type { SSOProvider } from '@/lib/pocketbase/client';
 
 interface SSOCallbackProps {
@@ -12,6 +14,7 @@ interface SSOCallbackProps {
 
 export function SSOCallback({ onFinish, onRetry }: SSOCallbackProps) {
   const { handleSSOCallback } = useAuth();
+  const { t } = useLocale();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -26,14 +29,14 @@ export function SSOCallback({ onFinish, onRetry }: SSOCallbackProps) {
       if (error) {
         setStatus('error');
         setErrorMessage(errorDescription || error);
-        toast.error(`Authentication failed: ${errorDescription || error}`);
+        toast.error(t('sso.failed', { message: errorDescription || error }));
         return;
       }
 
       if (!code) {
         setStatus('error');
         setErrorMessage('Missing authorization code');
-        toast.error('Invalid authentication response');
+        toast.error(t('sso.invalidResponse'));
         return;
       }
 
@@ -43,14 +46,14 @@ export function SSOCallback({ onFinish, onRetry }: SSOCallbackProps) {
       if (state && state !== storedState) {
         setStatus('error');
         setErrorMessage('Invalid state parameter');
-        toast.error('Security validation failed');
+        toast.error(t('sso.securityFailed'));
         return;
       }
 
       if (!provider) {
         setStatus('error');
         setErrorMessage('No SSO provider found');
-        toast.error('Authentication session expired');
+        toast.error(t('sso.sessionExpired'));
         return;
       }
 
@@ -66,34 +69,37 @@ export function SSOCallback({ onFinish, onRetry }: SSOCallbackProps) {
     };
 
     void processCallback();
-  }, [handleSSOCallback, onFinish]);
+  }, [handleSSOCallback, onFinish, t]);
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
-      <div className="text-center">
+      <div className="space-y-4 text-center">
+        <div className="flex justify-end">
+          <LanguageToggleButton compact />
+        </div>
         {status === 'processing' && (
           <>
             <HugeiconsIcon icon={Loading02Icon} className="w-16 h-16 animate-spin text-[#D93A3A] mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-[#171717] mb-2">Completing Sign In</h2>
-            <p className="text-gray-600">Please wait while we verify your credentials.</p>
+            <h2 className="text-2xl font-bold text-[#171717] mb-2">{t('sso.processingTitle')}</h2>
+            <p className="text-gray-600">{t('sso.processingDescription')}</p>
           </>
         )}
 
         {status === 'success' && (
           <>
             <HugeiconsIcon icon={CheckmarkCircle02Icon} className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-[#171717] mb-2">Sign In Successful</h2>
-            <p className="text-gray-600">Redirecting you back to the homepage.</p>
+            <h2 className="text-2xl font-bold text-[#171717] mb-2">{t('sso.successTitle')}</h2>
+            <p className="text-gray-600">{t('sso.successDescription')}</p>
           </>
         )}
 
         {status === 'error' && (
           <>
             <HugeiconsIcon icon={CancelCircleIcon} className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-[#171717] mb-2">Authentication Failed</h2>
-            <p className="text-gray-600 mb-6">{errorMessage || 'Something went wrong during authentication.'}</p>
+            <h2 className="text-2xl font-bold text-[#171717] mb-2">{t('sso.errorTitle')}</h2>
+            <p className="text-gray-600 mb-6">{errorMessage || t('sso.errorFallback')}</p>
             <button onClick={onRetry} className="text-[#D93A3A] hover:underline font-medium">
-              Back to Sign In
+              {t('sso.backToSignIn')}
             </button>
           </>
         )}

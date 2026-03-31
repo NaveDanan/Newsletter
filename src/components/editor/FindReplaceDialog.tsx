@@ -1,7 +1,9 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon, ArrowUp01Icon, Cancel01Icon, ReplaceAllIcon, ReplaceIcon, Search01Icon } from "@hugeicons/core-free-icons";
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { Editor } from '@tiptap/react';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 
 interface FindReplaceDialogProps {
   editor: Editor;
@@ -10,30 +12,22 @@ interface FindReplaceDialogProps {
 }
 
 export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialogProps) {
+  const { formatNumber, isRTL, t } = useLocale();
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
   const [matchCase, setMatchCase] = useState(false);
   const [currentMatch, setCurrentMatch] = useState(0);
-  const [totalMatches, setTotalMatches] = useState(0);
-
-  // Count matches
-  const countMatches = useCallback(() => {
+  const editorText = editor.getText();
+  const totalMatches = useMemo(() => {
     if (!findText) {
-      setTotalMatches(0);
-      setCurrentMatch(0);
-      return;
+      return 0;
     }
 
-    const content = editor.getText();
     const flags = matchCase ? 'g' : 'gi';
     const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
-    const matches = content.match(regex);
-    setTotalMatches(matches ? matches.length : 0);
-  }, [editor, findText, matchCase]);
-
-  useEffect(() => {
-    countMatches();
-  }, [countMatches]);
+    const matches = editorText.match(regex);
+    return matches ? matches.length : 0;
+  }, [editorText, findText, matchCase]);
 
   // Find next
   const findNext = useCallback(() => {
@@ -117,11 +111,10 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
       
       if (shouldReplace) {
         editor.chain().focus().insertContent(replaceText).run();
-        countMatches();
       }
     }
     findNext();
-  }, [editor, findText, replaceText, matchCase, findNext, countMatches]);
+  }, [editor, findText, replaceText, matchCase, findNext]);
 
   // Replace all
   const replaceAll = useCallback(() => {
@@ -130,8 +123,8 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
     const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
     const newContent = content.replace(regex, replaceText);
     editor.chain().focus().setContent(newContent).run();
-    countMatches();
-  }, [editor, findText, replaceText, matchCase, countMatches]);
+    setCurrentMatch(0);
+  }, [editor, findText, replaceText, matchCase]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -157,13 +150,13 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/20">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/20" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="bg-white rounded-xl shadow-2xl border border-[#E5E5E5] w-full max-w-md mx-4">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E5]">
           <div className="flex items-center gap-2">
             <HugeiconsIcon icon={Search01Icon} className="w-5 h-5 text-[#D93A3A]" />
-            <h3 className="font-semibold text-[#171717]">Find and Replace</h3>
+            <h3 className="font-semibold text-[#171717]">{t('editor.findReplace')}</h3>
           </div>
           <button
             onClick={onClose}
@@ -178,16 +171,17 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
           {/* Find Input */}
           <div>
             <label className="block text-sm font-medium text-[#737373] mb-1.5">
-              Find
+              {t('editor.find')}
             </label>
             <div className="relative">
-              <HugeiconsIcon icon={Search01Icon} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]" />
+              <HugeiconsIcon icon={Search01Icon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]', isRTL ? 'right-3' : 'left-3')} />
               <input
                 type="text"
                 value={findText}
                 onChange={(e) => setFindText(e.target.value)}
-                placeholder="Search for..."
-                className="w-full pl-10 pr-4 py-2 border border-[#E5E5E5] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D93A3A]/20 focus:border-[#D93A3A]"
+                dir={isRTL ? 'rtl' : 'ltr'}
+                placeholder={t('editor.searchForPlaceholder')}
+                className={cn('w-full py-2 border border-[#E5E5E5] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D93A3A]/20 focus:border-[#D93A3A]', isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4')}
                 autoFocus
               />
             </div>
@@ -196,16 +190,17 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
           {/* Replace Input */}
           <div>
             <label className="block text-sm font-medium text-[#737373] mb-1.5">
-              Replace with
+              {t('editor.replaceWith')}
             </label>
             <div className="relative">
-              <HugeiconsIcon icon={ReplaceIcon} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]" />
+              <HugeiconsIcon icon={ReplaceIcon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]', isRTL ? 'right-3' : 'left-3')} />
               <input
                 type="text"
                 value={replaceText}
                 onChange={(e) => setReplaceText(e.target.value)}
-                placeholder="Replace with..."
-                className="w-full pl-10 pr-4 py-2 border border-[#E5E5E5] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D93A3A]/20 focus:border-[#D93A3A]"
+                dir={isRTL ? 'rtl' : 'ltr'}
+                placeholder={t('editor.replaceWithPlaceholder')}
+                className={cn('w-full py-2 border border-[#E5E5E5] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D93A3A]/20 focus:border-[#D93A3A]', isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4')}
               />
             </div>
           </div>
@@ -219,12 +214,12 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
                 onChange={(e) => setMatchCase(e.target.checked)}
                 className="w-4 h-4 rounded border-[#E5E5E5] text-[#D93A3A] focus:ring-[#D93A3A]"
               />
-              <span className="text-sm text-[#737373]">Match case</span>
+              <span className="text-sm text-[#737373]">{t('editor.matchCase')}</span>
             </label>
             
             {totalMatches > 0 && (
               <span className="text-sm text-[#737373] ml-auto">
-                {currentMatch} of {totalMatches} matches
+                {t('editor.matchesCount', { current: formatNumber(currentMatch), total: formatNumber(totalMatches) })}
               </span>
             )}
           </div>
@@ -237,7 +232,7 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
               className="flex items-center gap-1 px-3 py-2 text-sm bg-[#F3F4F6] text-[#171717] rounded-lg hover:bg-[#E5E5E5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <HugeiconsIcon icon={ArrowUp01Icon} className="w-4 h-4" />
-              Previous
+              {t('editor.previous')}
             </button>
             <button
               onClick={findNext}
@@ -245,7 +240,7 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
               className="flex items-center gap-1 px-3 py-2 text-sm bg-[#F3F4F6] text-[#171717] rounded-lg hover:bg-[#E5E5E5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <HugeiconsIcon icon={ArrowDown01Icon} className="w-4 h-4" />
-              Next
+              {t('editor.next')}
             </button>
             <div className="flex-1" />
             <button
@@ -254,7 +249,7 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
               className="flex items-center gap-1 px-3 py-2 text-sm bg-[#D93A3A] text-white rounded-lg hover:bg-[#B91C1C] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <HugeiconsIcon icon={ReplaceIcon} className="w-4 h-4" />
-              Replace
+              {t('editor.replace')}
             </button>
             <button
               onClick={replaceAll}
@@ -262,7 +257,7 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
               className="flex items-center gap-1 px-3 py-2 text-sm bg-[#171717] text-white rounded-lg hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <HugeiconsIcon icon={ReplaceAllIcon} className="w-4 h-4" />
-              Replace All
+              {t('editor.replaceAll')}
             </button>
           </div>
         </div>

@@ -19,9 +19,11 @@ import {
 } from '@hugeicons/core-free-icons';
 import { faDollarSign, faEuroSign, faPoundSign, faShekelSign } from '@fortawesome/free-solid-svg-icons';
 import { addDays, compareAsc, format, parseISO, startOfMonth } from 'date-fns';
+import { enUS, he as heLocale } from 'date-fns/locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useProjects } from '@/hooks/useProjects';
+import { useLocale } from '@/contexts/LocaleContext';
 import {
   alignTaskDates,
   applyDependencyScheduling,
@@ -36,7 +38,6 @@ import {
   getTaskOffsetDays,
   getTaskProgress,
   getTimelineDays,
-  getWeekLabel,
   hasDependencyCycle,
   isRestDay,
   normalizeProjectGantt,
@@ -271,10 +272,6 @@ const currencyIcons = {
   GBP: faPoundSign,
 } satisfies Record<GanttCurrency, typeof faDollarSign>;
 
-function formatBillingLabel(value: GanttRoleBillingPeriod) {
-  return value === 'one-time' ? 'One-time' : value[0].toUpperCase() + value.slice(1);
-}
-
 function CurrencyIcon({ currency }: { currency: GanttCurrency }) {
   const definition = currencyIcons[currency] as {
     icon: [number, number, unknown, unknown, string | string[]];
@@ -297,8 +294,45 @@ function CurrencyIcon({ currency }: { currency: GanttCurrency }) {
 }
 
 export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
+  const { formatDate, formatNumber, isRTL, locale, t } = useLocale();
   const { projects, updateProjectGantt } = useProjects();
   const project = projects.find((entry) => entry.id === projectId) ?? null;
+  const calendarLocale = locale === 'he' ? heLocale : enUS;
+  const backIcon = isRTL ? ArrowRight01Icon : ArrowLeft01Icon;
+  const formatBillingLabel = useCallback((value: GanttRoleBillingPeriod) => {
+    switch (value) {
+      case 'hourly':
+        return t('ganttEditor.billing.hourly');
+      case 'daily':
+        return t('ganttEditor.billing.daily');
+      case 'weekly':
+        return t('ganttEditor.billing.weekly');
+      case 'monthly':
+        return t('ganttEditor.billing.monthly');
+      case 'yearly':
+        return t('ganttEditor.billing.yearly');
+      default:
+        return t('ganttEditor.billing.oneTime');
+    }
+  }, [t]);
+  const formatStatusLabel = useCallback((value: GanttTask['status']) => {
+    switch (value) {
+      case 'pending':
+        return t('manager.pending');
+      case 'in-progress':
+        return t('manager.inProgress');
+      case 'completed':
+        return t('manager.completed');
+      case 'delayed':
+        return t('manager.delayed');
+      default:
+        return value;
+    }
+  }, [t]);
+  const formatWeekLabel = useCallback((value: Date) => {
+    const weekNumber = Number.parseInt(format(value, 'w'), 10);
+    return `${t('editor.weekShort')} ${formatNumber(Number.isFinite(weekNumber) ? weekNumber : 0)}`;
+  }, [formatNumber, t]);
   const initialGantt = normalizeProjectGantt(project?.gantt);
   const [draftGantt, setDraftGantt] = useState<ProjectGantt>(initialGantt);
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(initialGantt));
@@ -552,7 +586,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
     setDraftGantt(nextGantt);
   }, []);
 
-  const commitTasks = useCallback((nextTasks: GanttTask[], changedTaskId?: string, cycleMessage = 'Dependencies cannot form a circular chain.') => {
+  const commitTasks = useCallback((nextTasks: GanttTask[], changedTaskId?: string, cycleMessage = t('ganttEditor.circularDependency')) => {
     const alignedTasks = nextTasks.map((task) => alignTaskDates(task));
     if (hasDependencyCycle(alignedTasks)) {
       toast.error(cycleMessage);
@@ -565,10 +599,10 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
     };
     applyDraftGantt(nextGantt);
     return true;
-  }, [applyDraftGantt]);
+  }, [applyDraftGantt, t]);
 
   const handleBack = () => {
-    if (isDirty && !window.confirm('You have unsaved Gantt changes. Leave without saving?')) {
+    if (isDirty && !window.confirm(t('ganttEditor.unsavedLeave'))) {
       return;
     }
 
@@ -588,7 +622,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
     void updateProjectGantt(project.id, nextGantt);
     setSavedSnapshot(JSON.stringify(nextGantt));
     applyDraftGantt(nextGantt);
-    toast.success('Gantt schedule saved');
+    toast.success(t('ganttEditor.scheduleSaved'));
   };
 
   const createAppendedTask = useCallback((tasks: GanttTask[]) => {
@@ -669,7 +703,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
     const invalidRow = rowNumbers.find((rowNumber) => rowNumber < 1 || rowNumber > orderedTasks.length);
 
     if (invalidRow) {
-      toast.error('Predecessors must reference valid row numbers.');
+      toast.error(t('ganttEditor.invalidPredecessors'));
       setPredecessorDrafts((current) => ({
         ...current,
         [taskId]: orderedTasks
@@ -692,7 +726,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
     const didCommit = commitTasks(
       orderedTasks.map((task) => task.id === taskId ? { ...task, predecessorIds } : task),
       taskId,
-      'That predecessor selection creates a circular dependency.',
+      t('ganttEditor.circularPredecessor'),
     );
 
     if (didCommit) {
@@ -742,7 +776,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
     const pastedTask: GanttTask = {
       ...taskClipboard.task,
       id: createTaskId(),
-      name: taskClipboard.mode === 'copy' ? `${taskClipboard.task.name} copy` : taskClipboard.task.name,
+      name: taskClipboard.mode === 'copy' ? t('ganttEditor.taskCopySuffix', { name: taskClipboard.task.name }) : taskClipboard.task.name,
       predecessorIds: [],
     };
     const nextTasks = [...orderedTasks];
@@ -1269,12 +1303,12 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
             onClick={onBack}
             className="mb-6 inline-flex items-center gap-2 text-sm text-[#737373] hover:text-[#171717]"
           >
-            <HugeiconsIcon icon={ArrowLeft01Icon} className="h-4 w-4" />
-            Back to Gantt overview
+            <HugeiconsIcon icon={backIcon} className="h-4 w-4" />
+            {t('ganttEditor.backToOverview')}
           </button>
-          <h1 className="text-2xl font-bold text-[#171717]">Project not found</h1>
+          <h1 className="text-2xl font-bold text-[#171717]">{t('ganttEditor.projectNotFound')}</h1>
           <p className="mt-3 text-sm text-[#737373]">
-            The requested project could not be loaded from local storage.
+            {t('ganttEditor.projectLoadFailed')}
           </p>
         </div>
       </div>
@@ -1285,22 +1319,26 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
     <div
       className="flex min-h-screen flex-col bg-[linear-gradient(180deg,#F8FAFC_0%,#EEF2F7_100%)] text-[#171717]"
       onClick={() => setTimelineSelectedTaskId(null)}
+      dir={isRTL ? 'rtl' : 'ltr'}
     >
       <Dialog open={showResourcesDialog} onOpenChange={setShowResourcesDialog}>
         <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
-            <DialogTitle>Manage Resources</DialogTitle>
+            <DialogTitle>{t('ganttEditor.manageResources')}</DialogTitle>
             <DialogDescription>
-              Maintain the project resource list and keep assignments current for the task grid.
+              {t('ganttEditor.manageResourcesDescription')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 rounded-xl border border-[#EEF2F6] bg-[#F8FAFC] px-4 py-3">
               <div>
-                <p className="text-sm font-semibold text-[#171717]">Project resources</p>
+                <p className="text-sm font-semibold text-[#171717]">{t('ganttEditor.projectResources')}</p>
                 <p className="text-xs text-[#737373]">
-                  {draftGantt.resources.length} resources, {unassignedTasks} tasks currently unassigned.
+                  {t('ganttEditor.projectResourcesSummary', {
+                    resources: formatNumber(draftGantt.resources.length),
+                    tasks: formatNumber(unassignedTasks),
+                  })}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1310,7 +1348,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                   className="btn-secondary inline-flex items-center gap-2 !px-3 !py-2 text-xs"
                 >
                   <HugeiconsIcon icon={ResourcesAddIcon} className="h-4 w-4" />
-                  Add Roles
+                  {t('ganttEditor.addRoles')}
                 </button>
                 <button
                   type="button"
@@ -1318,14 +1356,14 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                   className="btn-secondary inline-flex items-center gap-2 !px-3 !py-2 text-xs"
                 >
                   <HugeiconsIcon icon={Add01Icon} className="h-4 w-4" />
-                  Add Resource
+                  {t('ganttEditor.addResource')}
                 </button>
               </div>
             </div>
 
             {draftGantt.resources.length === 0 ? (
               <div className="rounded-xl border border-dashed border-[#DADFE7] bg-[#F8FAFC] p-6 text-center text-sm text-[#737373]">
-                No resources yet. Add people here, then assign them in the task grid.
+                {t('ganttEditor.noResourcesYet')}
               </div>
             ) : (
               <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
@@ -1339,7 +1377,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                           <span className="h-3 w-3 rounded-full" style={{ backgroundColor: resource.color }} />
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-[#171717]">{resource.name}</p>
-                            <p className="truncate text-xs text-[#737373]">{resource.role || 'No role set'}</p>
+                            <p className="truncate text-xs text-[#737373]">{resource.role || t('ganttEditor.noRoleSet')}</p>
                           </div>
                         </div>
                         <button
@@ -1347,7 +1385,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                           onClick={() => handleDeleteResource(resource.id)}
                           className="text-xs font-medium text-[#A3A3A3] transition-colors hover:text-[#D93A3A]"
                         >
-                          Remove
+                          {t('ganttEditor.remove')}
                         </button>
                       </div>
 
@@ -1356,7 +1394,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                           type="text"
                           value={resource.name}
                           onChange={(event) => handleUpdateResource(resource.id, 'name', event.target.value)}
-                          placeholder="Name"
+                          placeholder={t('manager.name')}
                           className="h-10 w-full px-3 py-2 text-sm"
                         />
                         <select
@@ -1364,7 +1402,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                           onChange={(event) => handleUpdateResourceRole(resource.id, event.target.value)}
                           className="h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm"
                         >
-                          <option value="">No role</option>
+                          <option value="">{t('ganttEditor.noRole')}</option>
                           {draftGantt.roles.map((role) => (
                             <option key={role.id} value={role.id}>
                               {role.name}
@@ -1372,7 +1410,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                           ))}
                         </select>
                         <div className="rounded-lg bg-[#F8FAFC] px-3 py-2 text-center">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-[#A3A3A3]">Capacity</p>
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-[#A3A3A3]">{t('ganttEditor.capacity')}</p>
                           <input
                             type="number"
                             min={0}
@@ -1383,12 +1421,12 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                           />
                         </div>
                         <div className="rounded-lg bg-[#F8FAFC] px-3 py-2 text-center">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-[#A3A3A3]">Tasks</p>
-                          <p className="mt-1 text-sm font-semibold text-[#171717]">{summary?.assignedTasks ?? 0}</p>
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-[#A3A3A3]">{t('ganttEditor.tasks')}</p>
+                          <p className="mt-1 text-sm font-semibold text-[#171717]">{formatNumber(summary?.assignedTasks ?? 0)}</p>
                         </div>
                         <div className="rounded-lg bg-[#F8FAFC] px-3 py-2 text-center">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-[#A3A3A3]">Days</p>
-                          <p className="mt-1 text-sm font-semibold text-[#171717]">{summary?.scheduledDays ?? 0}</p>
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-[#A3A3A3]">{t('ganttEditor.days')}</p>
+                          <p className="mt-1 text-sm font-semibold text-[#171717]">{formatNumber(summary?.scheduledDays ?? 0)}</p>
                         </div>
                       </div>
                     </div>
@@ -1403,18 +1441,18 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
       <Dialog open={showRolesDialog} onOpenChange={setShowRolesDialog}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Manage Roles</DialogTitle>
+            <DialogTitle>{t('ganttEditor.manageRoles')}</DialogTitle>
             <DialogDescription>
-              Define role budgets, payment cadence, and billing currency for this project.
+              {t('ganttEditor.manageRolesDescription')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 rounded-xl border border-[#EEF2F6] bg-[#F8FAFC] px-4 py-3">
               <div>
-                <p className="text-sm font-semibold text-[#171717]">Project roles</p>
+                <p className="text-sm font-semibold text-[#171717]">{t('ganttEditor.projectRoles')}</p>
                 <p className="text-xs text-[#737373]">
-                  Create reusable paid roles and assign them to resources.
+                  {t('ganttEditor.projectRolesSummary')}
                 </p>
               </div>
               <button
@@ -1423,13 +1461,13 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                 className="btn-secondary inline-flex items-center gap-2 !px-3 !py-2 text-xs"
               >
                 <HugeiconsIcon icon={Add01Icon} className="h-4 w-4" />
-                Add Role
+                {t('ganttEditor.addRole')}
               </button>
             </div>
 
             {draftGantt.roles.length === 0 ? (
               <div className="rounded-xl border border-dashed border-[#DADFE7] bg-[#F8FAFC] p-6 text-center text-sm text-[#737373]">
-                No roles yet. Add roles here, then link them to resources in the Manage Resources dialog.
+                {t('ganttEditor.noRolesYet')}
               </div>
             ) : (
               <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
@@ -1443,7 +1481,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-[#171717]">{role.name}</p>
                           <p className="truncate text-xs text-[#737373]">
-                            {role.currency} {role.budget.toLocaleString(undefined, { maximumFractionDigits: 2 })} / {formatBillingLabel(role.paidBy)}
+                            {role.currency} {formatNumber(role.budget)} / {formatBillingLabel(role.paidBy)}
                           </p>
                         </div>
                       </div>
@@ -1452,7 +1490,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                         onClick={() => handleDeleteRole(role.id)}
                         className="text-xs font-medium text-[#A3A3A3] transition-colors hover:text-[#D93A3A]"
                       >
-                        Remove
+                        {t('ganttEditor.remove')}
                       </button>
                     </div>
 
@@ -1461,7 +1499,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                         type="text"
                         value={role.name}
                         onChange={(event) => handleUpdateRole(role.id, 'name', event.target.value)}
-                        placeholder="Role name"
+                        placeholder={t('ganttEditor.roleName')}
                         className="h-10 w-full px-3 py-2 text-sm"
                       />
                       <input
@@ -1470,7 +1508,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                         step="0.01"
                         value={role.budget}
                         onChange={(event) => handleUpdateRole(role.id, 'budget', event.target.value)}
-                        placeholder="Budget"
+                        placeholder={t('manager.budget')}
                         className="h-10 w-full px-3 py-2 text-sm"
                       />
                       <select
@@ -1512,8 +1550,8 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
               onClick={handleBack}
               className="mb-2 inline-flex items-center gap-2 text-sm text-[#737373] hover:text-[#171717]"
             >
-              <HugeiconsIcon icon={ArrowLeft01Icon} className="h-4 w-4" />
-              Back to Gantt overview
+              <HugeiconsIcon icon={backIcon} className="h-4 w-4" />
+              {t('ganttEditor.backToOverview')}
             </button>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold text-[#171717]">{project.title}</h1>
@@ -1521,18 +1559,18 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                 {project.department}
               </span>
               <span className="rounded-full bg-[#D93A3A]/10 px-3 py-1 text-xs font-medium text-[#D93A3A]">
-                {orderedTasks.length} tasks
+                {t('manager.tasksCount', { count: formatNumber(orderedTasks.length) })}
               </span>
             </div>
             <p className="mt-1 text-sm text-[#737373]">
-              Build and maintain this project&apos;s Gantt schedule with task dependencies and resource assignments.
+              {t('ganttEditor.buildScheduleDescription')}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <div className={`rounded-full px-3 py-1 text-xs font-medium ${isDirty ? 'bg-[#FEF2F2] text-[#D93A3A]' : 'bg-[#ECFDF3] text-[#027A48]'
               }`}>
-              {isDirty ? 'Unsaved changes' : 'All changes saved'}
+              {isDirty ? t('ganttEditor.unsavedChanges') : t('ganttEditor.allChangesSaved')}
             </div>
             <button
               type="button"
@@ -1540,7 +1578,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
               className="btn-primary inline-flex items-center gap-2"
             >
               <HugeiconsIcon icon={Tick01Icon} className="h-4 w-4" />
-              Save Schedule
+              {t('ganttEditor.saveSchedule')}
             </button>
           </div>
         </div>
@@ -1551,51 +1589,51 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
           {/* Stats card */}
           <div className="dashboard-card mx-auto flex w-fit min-w-[340px] flex-col items-center justify-center px-4 py-2">
               <div className="grid h-5 w-full grid-cols-4 gap-4">
-                <p className="text-sm text-[#737373] mb-1 text-center">Progress</p>
-                <p className="text-sm text-[#737373] mb-1 text-center">Dependencies</p>
+                <p className="text-sm text-[#737373] mb-1 text-center">{t('manager.progress')}</p>
+                <p className="text-sm text-[#737373] mb-1 text-center">{t('ganttEditor.dependencies')}</p>
                 <div className="group flex items-center justify-center gap-1">
-                  <p className="mb-1 text-center text-sm text-[#737373]">Resources</p>
+                  <p className="mb-1 text-center text-sm text-[#737373]">{t('manager.resources')}</p>
                   <div className="relative mb-1">
                     <button
                       type="button"
                       onClick={() => setShowResourcesDialog(true)}
                       className="peer rounded-full p-1 text-[#A3A3A3] opacity-0 transition-all hover:bg-[#F3F4F6] hover:text-[#171717] group-hover:opacity-100 focus-visible:opacity-100"
-                      aria-label="Manage resources"
-                      title="Mange resourses"
+                      aria-label={t('ganttEditor.manageResources')}
+                      title={t('ganttEditor.manageResources')}
                     >
                       <HugeiconsIcon icon={ResourcesAddIcon} className="h-3.5 w-3.5" />
                     </button>
                     <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded-md bg-[#171717] px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-sm transition-opacity peer-hover:opacity-100 peer-focus-visible:opacity-100">
-                      Mange resourses
+                      {t('ganttEditor.manageResources')}
                     </div>
                   </div>
                 </div>
-                <p className="text-sm text-[#737373] mb-1 text-center">Last saved</p>
+                <p className="text-sm text-[#737373] mb-1 text-center">{t('ganttEditor.lastSavedLabel')}</p>
               </div>
               <div className="grid h-5 w-full grid-cols-4 gap-4">
-                <p className="text-lg font-bold text-[#171717] text-center">{completion}%</p>
-                <p className="text-lg font-bold text-green-600 text-center">{orderedTasks.filter((task) => task.predecessorIds.length > 0).length}</p>
-                <p className="text-lg font-bold text-[#D93A3A] text-center">{draftGantt.resources.length}</p>
-                <p className="text-lg font-bold text-[#A3A3A3] text-center">{draftGantt.lastEditedAt ? format(parseISO(draftGantt.lastEditedAt), 'MMM d, yyyy HH:mm') : 'Not saved yet'}</p>
+                <p className="text-lg font-bold text-[#171717] text-center">{formatNumber(completion)}%</p>
+                <p className="text-lg font-bold text-green-600 text-center">{formatNumber(orderedTasks.filter((task) => task.predecessorIds.length > 0).length)}</p>
+                <p className="text-lg font-bold text-[#D93A3A] text-center">{formatNumber(draftGantt.resources.length)}</p>
+                <p className="text-lg font-bold text-[#A3A3A3] text-center">{draftGantt.lastEditedAt ? formatDate(parseISO(draftGantt.lastEditedAt), { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : t('ganttEditor.notSavedYet')}</p>
               </div>
               <div className="grid w-full grid-cols-4 gap-4">
-                <p className="text-xs text-[#737373] text-center py-2">Weighted by completed task time.</p>
-                <p className="text-xs text-[#737373] text-center py-2">Tasks chained to predecessors.</p>
-                <p className="text-xs text-[#737373] text-center py-2">{unassignedTasks} tasks unassigned.</p>
-                <p className="text-xs text-[#737373] text-center py-2">Stored locally in this browser.</p>
+                <p className="text-xs text-[#737373] text-center py-2">{t('ganttEditor.weightedProgress')}</p>
+                <p className="text-xs text-[#737373] text-center py-2">{t('ganttEditor.dependenciesDescription')}</p>
+                <p className="text-xs text-[#737373] text-center py-2">{t('ganttEditor.tasksUnassigned', { count: formatNumber(unassignedTasks) })}</p>
+                <p className="text-xs text-[#737373] text-center py-2">{t('ganttEditor.storedLocally')}</p>
               </div>
           </div>
           <div className="flex min-h-0 flex-1 flex-col border-y border-[#E5E7EB] bg-white/95">
             <div className="flex flex-col gap-4 border-b border-[#EEF2F6] px-4 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-6">
               <div>
-                <h2 className="text-lg font-semibold text-[#171717]">Task Grid and Timeline</h2>
+                <h2 className="text-lg font-semibold text-[#171717]">{t('ganttEditor.taskGridTimeline')}</h2>
                 <p className="text-sm text-[#737373]">
-                  Edit task details on the left and adjust bars directly on the right.
+                  {t('ganttEditor.taskGridTimelineDescription')}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#A3A3A3]">Timeline Window</p>
-                <p className="mt-1 text-lg font-semibold text-[#171717]">{format(activeVisibleTimelineDate, 'MMMM yyyy')}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#A3A3A3]">{t('ganttEditor.timelineWindow')}</p>
+                <p className="mt-1 text-lg font-semibold text-[#171717]">{formatDate(activeVisibleTimelineDate, { month: 'long', year: 'numeric' })}</p>
               </div>
               <Popover open={isTimelineCalendarOpen} onOpenChange={handleTimelineCalendarOpenChange}>
                 <PopoverTrigger asChild>
@@ -1604,15 +1642,15 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                     className="btn-secondary inline-flex items-center gap-2"
                   >
                     <HugeiconsIcon icon={Calendar01Icon} className="h-4 w-4 text-[#D93A3A]" />
-                    Calendar
+                    {t('ganttEditor.calendar')}
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-auto min-w-[23rem] p-0">
+                <PopoverContent align={isRTL ? 'start' : 'end'} className="w-auto min-w-[23rem] p-0">
                   <div className="border-b border-[#EEF2F6] px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-[#171717]">Calendar Viewer</p>
-                        <p className="text-xs text-[#737373]">Jump directly to a month in the current timeline range.</p>
+                        <p className="text-sm font-semibold text-[#171717]">{t('ganttEditor.calendarViewer')}</p>
+                        <p className="text-xs text-[#737373]">{t('ganttEditor.calendarViewerDescription')}</p>
                       </div>
                       <button
                         type="button"
@@ -1623,7 +1661,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                             : 'border-[#E5E7EB] bg-white text-[#525252] hover:border-[#D4D4D4] hover:bg-[#FAFAFA]'
                         }`}
                       >
-                        Year {timelineCalendarMonth.getFullYear()}
+                        {t('ganttEditor.year')} {timelineCalendarMonth.getFullYear()}
                       </button>
                     </div>
                     {showTimelineYears ? (
@@ -1651,6 +1689,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                   <div className="flex justify-center p-4">
                     <Calendar
                       mode="single"
+                      locale={calendarLocale}
                       month={timelineCalendarMonth}
                       onMonthChange={setTimelineCalendarMonth}
                       selected={activeVisibleTimelineDate}
@@ -1676,7 +1715,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                   className="btn-secondary inline-flex items-center gap-2"
                 >
                   <HugeiconsIcon icon={isTaskGridCollapsed ? ArrowRight01Icon : ArrowLeft01Icon} className="h-4 w-4" />
-                  {isTaskGridCollapsed ? 'Show Grid' : 'Hide Grid'}
+                  {isTaskGridCollapsed ? t('ganttEditor.showGrid') : t('ganttEditor.hideGrid')}
                 </button>
                 <div className="rounded-full border border-[#E5E7EB] bg-[#F8FAFC] p-1">
                   {(['day', 'week'] as const).map((zoom) => (
@@ -1687,7 +1726,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                       className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${draftGantt.zoom === zoom ? 'bg-[#171717] text-white' : 'text-[#525252] hover:bg-white'
                         }`}
                     >
-                      {zoom === 'day' ? 'Day Zoom' : 'Compact'}
+                      {zoom === 'day' ? t('ganttEditor.dayZoom') : t('ganttEditor.compact')}
                     </button>
                   ))}
                 </div>
@@ -1697,7 +1736,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                   className="btn-secondary inline-flex items-center gap-2"
                 >
                   <HugeiconsIcon icon={Add01Icon} className="h-4 w-4" />
-                  Add Task
+                  {t('ganttEditor.addTask')}
                 </button>
               </div>
             </div>
@@ -1708,14 +1747,14 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                   <HugeiconsIcon icon={TaskDone01Icon} className="h-8 w-8" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-[#171717]">Start your first schedule</h3>
+                  <h3 className="text-xl font-semibold text-[#171717]">{t('ganttEditor.startFirstSchedule')}</h3>
                   <p className="mt-2 text-sm text-[#737373]">
-                    Add a task to begin building this project&apos;s timeline.
+                    {t('ganttEditor.startFirstScheduleDescription')}
                   </p>
                 </div>
                 <button type="button" onClick={handleAddTask} className="btn-primary inline-flex items-center gap-2">
                   <HugeiconsIcon icon={PlusSignIcon} className="h-4 w-4" />
-                  Add First Task
+                  {t('ganttEditor.addFirstTask')}
                 </button>
               </div>
             ) : (
@@ -1740,7 +1779,13 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                         className="grid h-14 border-b border-[#EEF2F6] bg-[#F8FAFC] text-[11px] font-semibold uppercase tracking-[0.14em] text-[#737373]"
                         style={{ gridTemplateColumns: taskGridColumns }}
                       >
-                        {['#', 'Task', 'Start', 'Days', 'End'].map((label) => (
+                        {[
+                          '#',
+                          t('manager.task'),
+                          t('manager.startDate'),
+                          t('ganttEditor.days'),
+                          t('manager.endDate'),
+                        ].map((label) => (
                           <div key={label} className="flex items-center border-r border-[#EEF2F6] px-2 last:border-r-0">
                             {label}
                           </div>
@@ -1813,7 +1858,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                                   <div className="border-r border-[#EEF2F6] px-2 py-2">
                                     <div
                                       className="flex h-full items-center gap-2"
-                                      style={{ paddingLeft: `${8 + (task.indentLevel * 24)}px` }}
+                                      style={{ paddingInlineStart: `${8 + (task.indentLevel * 24)}px` }}
                                     >
                                       <div
                                         role="button"
@@ -1828,8 +1873,8 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                                             ? 'cursor-grabbing bg-white text-[#171717] opacity-100'
                                             : 'cursor-grab opacity-0 group-hover:opacity-100 hover:bg-white hover:text-[#171717]'
                                         }`}
-                                        aria-label="Drag task"
-                                        title="Drag task"
+                                        aria-label={t('ganttEditor.dragTask')}
+                                        title={t('ganttEditor.dragTask')}
                                       >
                                         <span className="grid grid-cols-2 gap-[2px]">
                                           {Array.from({ length: 6 }, (_, dot) => (
@@ -1845,7 +1890,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                                             handleToggleTaskCollapse(task.id);
                                           }}
                                           className="rounded-md p-1 text-[#5F6B7A] transition-colors hover:bg-white hover:text-[#171717]"
-                                          aria-label={isCollapsed ? 'Expand subtasks' : 'Collapse subtasks'}
+                                          aria-label={isCollapsed ? t('ganttEditor.expandSubtasks') : t('ganttEditor.collapseSubtasks')}
                                         >
                                           <HugeiconsIcon
                                             icon={ArrowDown01Icon}
@@ -1901,26 +1946,26 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                                       }}
                                     >
                                       <div className="border-r border-[#E8E0D2] px-3 py-2">
-                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8895C]">Status</p>
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8895C]">{t('manager.status')}</p>
                                         <select
                                           value={task.status}
                                           onChange={(event) => updateTask(task.id, { status: event.target.value as GanttTask['status'] })}
                                           className="mt-1 h-9 w-full rounded-md border border-[#E2D7C5] bg-white/90 px-2 py-1 text-sm"
                                         >
-                                          <option value="pending">Pending</option>
-                                          <option value="in-progress">In progress</option>
-                                          <option value="completed">Completed</option>
-                                          <option value="delayed">Delayed</option>
+                                          <option value="pending">{formatStatusLabel('pending')}</option>
+                                          <option value="in-progress">{formatStatusLabel('in-progress')}</option>
+                                          <option value="completed">{formatStatusLabel('completed')}</option>
+                                          <option value="delayed">{formatStatusLabel('delayed')}</option>
                                         </select>
                                       </div>
                                       <div className="border-r border-[#E8E0D2] px-3 py-2">
-                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8895C]">Resource</p>
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8895C]">{t('manager.resource')}</p>
                                         <select
                                           value={task.resourceId ?? ''}
                                           onChange={(event) => updateTask(task.id, { resourceId: event.target.value || null })}
                                           className="mt-1 h-9 w-full rounded-md border border-[#E2D7C5] bg-white/90 px-2 py-1 text-sm"
                                         >
-                                          <option value="">Unassigned</option>
+                                          <option value="">{t('manager.unassigned')}</option>
                                           {draftGantt.resources.map((resource) => (
                                             <option key={resource.id} value={resource.id}>
                                               {resource.name}
@@ -1929,7 +1974,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                                         </select>
                                       </div>
                                       <div className="border-r border-[#E8E0D2] px-3 py-2">
-                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8895C]">Flag</p>
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8895C]">{t('ganttEditor.flag')}</p>
                                         <label className="mt-2 inline-flex items-center gap-2 text-xs font-medium text-[#6B5A3C]">
                                           <input
                                             type="checkbox"
@@ -1944,7 +1989,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                                         </label>
                                       </div>
                                       <div className="border-r border-[#E8E0D2] px-3 py-2">
-                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8895C]">Pred</p>
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8895C]">{t('manager.pred')}</p>
                                         <input
                                           type="text"
                                           value={predecessorDrafts[task.id] ?? ''}
@@ -1955,8 +2000,8 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                                         />
                                       </div>
                                       <div className="px-3 py-2">
-                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8895C]">Level</p>
-                                        <p className="mt-2 text-xs font-medium text-[#6B5A3C]">{task.indentLevel + 1}</p>
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8895C]">{t('ganttEditor.level')}</p>
+                                        <p className="mt-2 text-xs font-medium text-[#6B5A3C]">{formatNumber(task.indentLevel + 1)}</p>
                                       </div>
                                     </div>
                                   </div>
@@ -1966,31 +2011,31 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                             <ContextMenuContent className="min-w-[10rem] rounded-xl border-[#E5E7EB] p-1.5">
                               <ContextMenuItem onSelect={() => handleCopyTask(task.id)}>
                                 <HugeiconsIcon icon={Copy01Icon} className="h-4 w-4" />
-                                Copy
+                                {t('ganttEditor.copy')}
                               </ContextMenuItem>
                               <ContextMenuItem onSelect={() => handleCopyTask(task.id, 'cut')}>
                                 <HugeiconsIcon icon={ScissorIcon} className="h-4 w-4" />
-                                Cut
+                                {t('ganttEditor.cut')}
                               </ContextMenuItem>
                               <ContextMenuItem onSelect={() => handleDeleteTask(task.id)} className="text-[#D93A3A] focus:text-[#D93A3A]">
                                 <HugeiconsIcon icon={Delete02Icon} className="h-4 w-4" />
-                                Delete
+                                {t('ganttEditor.delete')}
                               </ContextMenuItem>
                               <ContextMenuItem onSelect={() => handlePasteTask(task.id)} disabled={!taskClipboard}>
                                 <HugeiconsIcon icon={ClipboardPasteIcon} className="h-4 w-4" />
-                                Paste
+                                {t('ganttEditor.paste')}
                               </ContextMenuItem>
                               <ContextMenuSub>
                                 <ContextMenuSubTrigger>
                                   <HugeiconsIcon icon={Add01Icon} className="h-4 w-4" />
-                                  Insert
+                                  {t('ganttEditor.insert')}
                                 </ContextMenuSubTrigger>
                                 <ContextMenuSubContent className="min-w-[9rem] rounded-xl border-[#E5E7EB] p-1.5">
                                   <ContextMenuItem onSelect={() => handleInsertTask(task.id, 'subtask')}>
-                                    Sub-Task
+                                    {t('ganttEditor.subTask')}
                                   </ContextMenuItem>
                                   <ContextMenuItem onSelect={() => handleInsertTask(task.id, 'task')}>
-                                    Task
+                                    {t('manager.task')}
                                   </ContextMenuItem>
                                 </ContextMenuSubContent>
                               </ContextMenuSub>
@@ -1999,19 +2044,19 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                                 disabled={orderedTasks.findIndex((entry) => entry.id === task.id) === 0}
                               >
                                 <HugeiconsIcon icon={ListIndentIncreaseIcon} className="h-4 w-4" />
-                                Indent task
+                                {t('ganttEditor.indentTask')}
                               </ContextMenuItem>
                               <ContextMenuItem
                                 onSelect={() => handleShiftTaskHierarchy(task.id, 'outdent')}
                                 disabled={task.indentLevel === 0}
                               >
                                 <HugeiconsIcon icon={ListIndentDecreaseIcon} className="h-4 w-4" />
-                                Outdent task
+                                {t('ganttEditor.outdentTask')}
                               </ContextMenuItem>
                               <ContextMenuSeparator />
                               <ContextMenuItem onSelect={() => handleManageTask(task.id)}>
                                 <HugeiconsIcon icon={Settings02Icon} className="h-4 w-4" />
-                                Manage
+                                {t('ganttEditor.manage')}
                               </ContextMenuItem>
                             </ContextMenuContent>
                           </ContextMenu>
@@ -2054,8 +2099,8 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                       type="button"
                       onClick={handleToggleTaskGrid}
                       className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full border border-[#E5E7EB] bg-white p-1 text-[#737373] shadow-sm transition-colors hover:border-[#D4D4D4] hover:text-[#171717]"
-                      aria-label={isTaskGridCollapsed ? 'Expand task grid' : 'Collapse task grid'}
-                      title={isTaskGridCollapsed ? 'Expand task grid' : 'Collapse task grid'}
+                      aria-label={isTaskGridCollapsed ? t('ganttEditor.expandTaskGrid') : t('ganttEditor.collapseTaskGrid')}
+                      title={isTaskGridCollapsed ? t('ganttEditor.expandTaskGrid') : t('ganttEditor.collapseTaskGrid')}
                     >
                       <HugeiconsIcon icon={isTaskGridCollapsed ? ArrowRight01Icon : ArrowLeft01Icon} className="h-3.5 w-3.5" />
                     </button>
@@ -2097,14 +2142,14 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                             }`}
                           >
                             <p className={`text-[10px] uppercase tracking-[0.18em] ${isRestDay(day) ? 'text-[#B45309]' : 'text-[#A3A3A3]'}`}>
-                              {draftGantt.zoom === 'day' ? format(day, 'EEE') : getWeekLabel(day)}
+                              {draftGantt.zoom === 'day' ? formatDate(day, { weekday: 'short' }) : formatWeekLabel(day)}
                             </p>
                             <p className={`mt-1 text-sm font-medium ${isRestDay(day) ? 'text-[#92400E]' : 'text-[#171717]'}`}>
-                              {draftGantt.zoom === 'day' ? format(day, 'd') : index % 7 === 0 ? format(day, 'MMM d') : ''}
+                              {draftGantt.zoom === 'day' ? formatNumber(day.getDate()) : index % 7 === 0 ? formatDate(day, { month: 'short', day: 'numeric' }) : ''}
                             </p>
                             {isRestDay(day) ? (
                               <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[#C2410C]">
-                                
+                                {t('ganttEditor.restDay')}
                               </p>
                             ) : null}
                           </div>
@@ -2264,11 +2309,11 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#D93A3A]">
-                                  Selected Task
+                                  {t('ganttEditor.selectedTask')}
                                 </p>
                                 <p className="mt-2 truncate text-sm font-semibold text-[#171717]">{selectedTask.name}</p>
                                 <p className="mt-1 text-xs text-[#737373]">
-                                  {selectedTask.startDate} to {selectedTask.endDate}
+                                  {formatDate(selectedTask.startDate, { month: 'short', day: 'numeric', year: 'numeric' })} - {formatDate(selectedTask.endDate, { month: 'short', day: 'numeric', year: 'numeric' })}
                                 </p>
                               </div>
                               <button
@@ -2279,28 +2324,28 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
                                 }}
                                 className="shrink-0 rounded-full border border-[#E5E7EB] px-2 py-1 text-[11px] font-medium text-[#737373] transition-colors hover:border-[#D4D4D4] hover:text-[#171717]"
                               >
-                                Close
+                                {t('ganttEditor.close')}
                               </button>
                             </div>
                             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                               <div className="rounded-xl bg-[#F8FAFC] p-3">
-                                <p className="text-[10px] uppercase tracking-[0.18em] text-[#A3A3A3]">Progress</p>
-                                <p className="mt-1 text-sm font-semibold text-[#171717]">{getTaskProgress(selectedTask)}%</p>
+                                <p className="text-[10px] uppercase tracking-[0.18em] text-[#A3A3A3]">{t('manager.progress')}</p>
+                                <p className="mt-1 text-sm font-semibold text-[#171717]">{formatNumber(getTaskProgress(selectedTask))}%</p>
                               </div>
                               <div className="rounded-xl bg-[#F8FAFC] p-3">
-                                <p className="text-[10px] uppercase tracking-[0.18em] text-[#A3A3A3]">Status</p>
+                                <p className="text-[10px] uppercase tracking-[0.18em] text-[#A3A3A3]">{t('manager.status')}</p>
                                 <p className="mt-1 text-sm font-semibold capitalize text-[#171717]">
-                                  {selectedTask.status.replace('-', ' ')}
+                                  {formatStatusLabel(selectedTask.status)}
                                 </p>
                               </div>
                             </div>
                             <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-[#EEF2F6] px-3 py-2 text-xs text-[#525252]">
-                              <span>{selectedTaskResource?.name ?? 'Unassigned'}</span>
+                              <span>{selectedTaskResource?.name ?? t('manager.unassigned')}</span>
                               <span
                                 className="rounded-full px-2 py-1 text-[11px] font-medium"
                                 style={{ backgroundColor: `${selectedTaskBubble.barColor}1A`, color: selectedTaskBubble.barColor }}
                               >
-                                {taskHierarchy.get(selectedTask.id)?.label ?? selectedTaskIndex + 1}
+                                {taskHierarchy.get(selectedTask.id)?.label ?? formatNumber(selectedTaskIndex + 1)}
                               </span>
                             </div>
                           </div>

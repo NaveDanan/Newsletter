@@ -1,7 +1,9 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, Menu01Icon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
+import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { ExpandingSearchDock } from '@/components/ui/expanding-search-dock-shadcnui';
+import { useLocale } from '@/contexts/LocaleContext';
 
 interface NavigationProps {
   onManagerClick: () => void;
@@ -24,13 +26,14 @@ export function Navigation({
   isAuthenticated,
   authName,
 }: NavigationProps) {
+  const { t } = useLocale();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { label: 'Home', href: '#', active: true },
-    { label: 'Topics', href: '#topics' },
-    { label: 'Features', href: '#features' },
-    { label: 'Community', href: '#community' },
+    { id: 'home', label: t('nav.home'), href: '#', active: true },
+    { id: 'topics', label: t('nav.topics'), href: '#topics' },
+    { id: 'features', label: t('nav.features'), href: '#features' },
+    { id: 'community', label: t('nav.community'), href: '#community' },
   ];
 
   return (
@@ -56,32 +59,34 @@ export function Navigation({
             <ExpandingSearchDock
               onSearch={onSearch}
               onQueryChange={onSearchChange}
-              placeholder="Search newsletters..."
+              placeholder={t('nav.searchPlaceholder')}
             />
+            <LanguageToggleButton className="hidden sm:inline-flex" compact />
             <button 
               onClick={onManagerClick}
               className="hidden sm:block text-sm font-medium text-[#737373] hover:text-[#171717] transition-colors"
             >
-              Manager
+              {t('nav.manager')}
             </button>
             {isAuthenticated ? (
               <button
                 onClick={onSignOut}
                 className="hidden sm:block text-sm font-medium text-[#171717] hover:text-[#D93A3A] transition-colors"
               >
-                {authName ? `Sign Out (${authName})` : 'Sign Out'}
+                {authName ? `${t('nav.signOut')} (${authName})` : t('nav.signOut')}
               </button>
             ) : (
               <button
                 onClick={onSignInClick}
                 className="hidden sm:block text-sm font-medium text-[#171717] hover:text-[#D93A3A] transition-colors"
               >
-                Sign In
+                {t('nav.signIn')}
               </button>
             )}
 
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label={isMobileMenuOpen ? t('nav.closeMenu') : t('nav.openMenu')}
               className="lg:hidden p-2 text-[#737373]"
             >
               {isMobileMenuOpen ? <HugeiconsIcon icon={Cancel01Icon} className="w-5 h-5" /> : <HugeiconsIcon icon={Menu01Icon} className="w-5 h-5" />}
@@ -97,10 +102,10 @@ export function Navigation({
             {navLinks.map((link) => (
               <a
                 key={link.label}
-                href={link.label === 'Home' ? '/' : link.href}
+                href={link.id === 'home' ? '/' : link.href}
                 className={`nav-link whitespace-nowrap ${link.active ? 'active' : ''}`}
                 onClick={(event) => {
-                  if (link.label === 'Home') {
+                  if (link.id === 'home') {
                     event.preventDefault();
                     onHomeClick();
                   }
@@ -111,15 +116,15 @@ export function Navigation({
             ))}
             <a href="#workflows" className="nav-link whitespace-nowrap flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#171717]"></span>
-              AI Workflows
+              {t('nav.aiWorkflows')}
             </a>
             <a href="#case-studies" className="nav-link whitespace-nowrap flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#D93A3A]"></span>
-              Case Studies
+              {t('nav.caseStudies')}
             </a>
             <a href="#resources" className="nav-link whitespace-nowrap flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#A3A3A3]"></span>
-              Resources
+              {t('nav.resources')}
             </a>
           </div>
         </div>
@@ -132,10 +137,10 @@ export function Navigation({
             {navLinks.map((link) => (
               <a
                 key={link.label}
-                href={link.label === 'Home' ? '/' : link.href}
+                href={link.id === 'home' ? '/' : link.href}
                 className="block py-2 text-[#171717] font-medium"
                 onClick={(event) => {
-                  if (link.label === 'Home') {
+                  if (link.id === 'home') {
                     event.preventDefault();
                     onHomeClick();
                   }
@@ -145,6 +150,9 @@ export function Navigation({
                 {link.label}
               </a>
             ))}
+            <div className="pt-2">
+              <LanguageToggleButton />
+            </div>
             <button 
               onClick={() => {
                 onManagerClick();
@@ -152,7 +160,7 @@ export function Navigation({
               }}
               className="block py-2 text-[#737373] font-medium"
             >
-              Manager
+              {t('nav.manager')}
             </button>
             {isAuthenticated ? (
               <button
@@ -162,7 +170,7 @@ export function Navigation({
                 }}
                 className="block py-2 text-[#171717] font-medium"
               >
-                Sign Out
+                {t('nav.signOut')}
               </button>
             ) : (
               <button
@@ -172,7 +180,7 @@ export function Navigation({
                 }}
                 className="block py-2 text-[#171717] font-medium"
               >
-                Sign In
+                {t('nav.signIn')}
               </button>
             )}
           </div>

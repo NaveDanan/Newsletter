@@ -2,6 +2,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { HighlighterIcon, TextIcon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
 import type { Editor } from '@tiptap/react';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 
 interface ColorPickerProps {
   editor: Editor;
@@ -20,6 +22,7 @@ const highlightColors = [
 ];
 
 export function ColorPicker({ editor }: ColorPickerProps) {
+  const { isRTL, t } = useLocale();
   const [activeTab, setActiveTab] = useState<'text' | 'highlight'>('text');
   const [showPicker, setShowPicker] = useState(false);
 
@@ -52,7 +55,7 @@ export function ColorPicker({ editor }: ColorPickerProps) {
           className={`flex items-center gap-1 px-2 py-1.5 text-sm hover:bg-[#F3F4F6] rounded-l transition-colors ${
             showPicker && activeTab === 'text' ? 'bg-[#F3F4F6]' : ''
           }`}
-          title="Text color"
+          title={t('editor.textColor')}
         >
           <HugeiconsIcon icon={TextIcon} className="w-4 h-4" style={{ color: currentTextColor }} />
           <div 
@@ -71,7 +74,7 @@ export function ColorPicker({ editor }: ColorPickerProps) {
           className={`flex items-center gap-1 px-2 py-1.5 text-sm hover:bg-[#F3F4F6] rounded-r transition-colors ${
             showPicker && activeTab === 'highlight' ? 'bg-[#F3F4F6]' : ''
           }`}
-          title="Highlight color"
+          title={t('editor.highlightColor')}
         >
           <HugeiconsIcon icon={HighlighterIcon} className="w-4 h-4" />
           <div 
@@ -88,7 +91,7 @@ export function ColorPicker({ editor }: ColorPickerProps) {
             className="fixed inset-0 z-40" 
             onClick={() => setShowPicker(false)}
           />
-          <div className="absolute top-full left-0 mt-2 p-3 bg-white border border-[#E5E5E5] rounded-lg shadow-lg z-50 w-64">
+          <div className={cn('absolute top-full mt-2 p-3 bg-white border border-[#E5E5E5] rounded-lg shadow-lg z-50 w-64', isRTL ? 'right-0' : 'left-0')}>
             {/* Tabs */}
             <div className="flex gap-2 mb-3">
               <button
@@ -100,7 +103,7 @@ export function ColorPicker({ editor }: ColorPickerProps) {
                     : 'bg-[#F3F4F6] text-[#737373] hover:bg-[#E5E5E5]'
                 }`}
               >
-                Text
+                {t('editor.text')}
               </button>
               <button
                 type="button"
@@ -111,7 +114,7 @@ export function ColorPicker({ editor }: ColorPickerProps) {
                     : 'bg-[#F3F4F6] text-[#737373] hover:bg-[#E5E5E5]'
                 }`}
               >
-                Highlight
+                {t('editor.highlight')}
               </button>
             </div>
 
@@ -136,13 +139,13 @@ export function ColorPicker({ editor }: ColorPickerProps) {
                 onClick={() => handleColorSelect('transparent')}
                 className="mt-3 w-full py-1.5 text-sm text-[#737373] hover:bg-[#F3F4F6] rounded transition-colors border border-dashed border-[#E5E5E5]"
               >
-                No highlight
+                {t('editor.noHighlight')}
               </button>
             )}
 
             {/* Custom Color Input */}
             <div className="mt-3 flex items-center gap-2">
-              <span className="text-sm text-[#737373]">Custom:</span>
+              <span className="text-sm text-[#737373]">{t('editor.customColor')}</span>
               <input
                 type="color"
                 onChange={(e) => handleColorSelect(e.target.value)}

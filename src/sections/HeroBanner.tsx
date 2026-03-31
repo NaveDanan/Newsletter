@@ -2,6 +2,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 import type { Newsletter } from '../types/newsletter';
 
 interface HeroBannerProps {
@@ -9,15 +11,8 @@ interface HeroBannerProps {
   onArticleClick?: (newsletter: Newsletter) => void;
 }
 
-function formatHeroDate(value: string): string {
-  return new Date(value).toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
 export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerProps) {
+  const { formatDate, isRTL, t } = useLocale();
   const bannerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
@@ -26,25 +21,25 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
     const ctx = gsap.context(() => {
       gsap.fromTo(
         contentRef.current,
-        { opacity: 0, x: -30 },
+        { opacity: 0, x: isRTL ? 30 : -30 },
         { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out', delay: 0.3 }
       );
 
       gsap.fromTo(
         imageRef.current,
-        { opacity: 0, x: 30 },
+        { opacity: 0, x: isRTL ? -30 : 30 },
         { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out', delay: 0.5 }
       );
     }, bannerRef);
 
     return () => ctx.revert();
-  }, []);
-  const heroTitle = featuredNewsletter?.title ?? 'The AI Developments You Need to Know This Week';
-  const heroSubtitle = featuredNewsletter?.subtitle ?? 'Stay ahead with curated insights on product launches, research breakthroughs, and industry trends that matter.';
+  }, [isRTL]);
+  const heroTitle = featuredNewsletter?.title ?? t('hero.defaultTitle');
+  const heroSubtitle = featuredNewsletter?.subtitle ?? t('hero.defaultSubtitle');
   const heroImage = featuredNewsletter?.coverImage || '/hero_city_bg.jpg';
   const heroMeta = featuredNewsletter
-    ? `${formatHeroDate(featuredNewsletter.publishedAt)} · ${featuredNewsletter.author} · ${featuredNewsletter.readTime}`
-    : 'Fresh AI coverage, curated weekly';
+    ? `${formatDate(featuredNewsletter.publishedAt, { month: 'long', day: 'numeric', year: 'numeric' })} · ${featuredNewsletter.author} · ${featuredNewsletter.readTime}`
+    : t('hero.defaultMeta');
 
   return (
     <section ref={bannerRef} className="relative overflow-hidden">
@@ -68,12 +63,12 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div ref={contentRef} className="relative z-10">
               <span className="inline-block px-3 py-1 bg-[#D93A3A] text-white text-xs font-semibold rounded mb-4">
-                {featuredNewsletter ? 'LATEST NEWSLETTER' : 'LATEST'}
+                {featuredNewsletter ? t('hero.latestNewsletter') : t('hero.latest')}
               </span>
-              <h1 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-white leading-tight mb-4">
+              <h1 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-white leading-tight mb-4" dir="auto">
                 {heroTitle}
               </h1>
-              <p className="text-white/80 text-lg mb-6 max-w-lg">
+              <p className="text-white/80 text-lg mb-6 max-w-lg" dir="auto">
                 {heroSubtitle}
               </p>
               <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
@@ -82,8 +77,8 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
                     onClick={() => onArticleClick?.(featuredNewsletter)}
                     className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#171717] transition-colors hover:bg-white/90"
                   >
-                    Read Newsletter
-                    <HugeiconsIcon icon={ArrowRight01Icon} className="h-4 w-4" />
+                    {t('hero.readNewsletter')}
+                    <HugeiconsIcon icon={ArrowRight01Icon} className={cn('h-4 w-4', isRTL && 'rtl-rotate-180')} />
                   </button>
                 ) : null}
                 <div className="text-white/70 text-sm">
@@ -96,7 +91,7 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
               <div className="relative rounded-xl overflow-hidden shadow-2xl">
                 <img
                   src={heroImage}
-                  alt={featuredNewsletter?.title ?? 'AI Newsletter Featured'}
+                  alt={featuredNewsletter?.title ?? t('hero.imageAlt')}
                   className="w-full h-[250px] lg:h-[320px] object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
@@ -110,9 +105,9 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
                         className="w-10 h-10 object-contain"
                       />
                       <div>
-                        <p className="text-sm font-medium text-[#171717]">AI-BREAK Newsletter</p>
+                        <p className="text-sm font-medium text-[#171717]">{t('hero.brandLabel')}</p>
                         <p className="text-xs text-[#737373]">
-                          {featuredNewsletter?.tags[0] ?? 'Weekly insights delivered'}
+                          {featuredNewsletter?.tags[0] ?? t('hero.brandTagline')}
                         </p>
                       </div>
                     </div>

@@ -1,6 +1,8 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import type { Editor } from '@tiptap/react';
+import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 
 interface FontSizeSelectorProps {
   editor: Editor;
@@ -26,6 +28,7 @@ const fontSizes = [
 ];
 
 export function FontSizeSelector({ editor }: FontSizeSelectorProps) {
+  const { isRTL } = useLocale();
   const getCurrentFontSize = () => {
     const attrs = editor.getAttributes('textStyle');
     if (attrs.fontSize) return attrs.fontSize;
@@ -54,7 +57,7 @@ export function FontSizeSelector({ editor }: FontSizeSelectorProps) {
         <HugeiconsIcon icon={ArrowDown01Icon} className="w-3 h-3 text-[#737373]" />
       </button>
       
-      <div className="absolute top-full left-0 mt-1 w-20 bg-white border border-[#E5E5E5] rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 max-h-64 overflow-y-auto">
+      <div className={cn('absolute top-full mt-1 w-20 bg-white border border-[#E5E5E5] rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 max-h-64 overflow-y-auto', isRTL ? 'right-0' : 'left-0')}>
         {fontSizes.map((size) => (
           <button
             key={size.value}

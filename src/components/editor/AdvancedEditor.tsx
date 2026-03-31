@@ -2,9 +2,7 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { ArrowDown01Icon, CheckmarkSquare01Icon, CodeIcon, FolderOpenIcon, GlobeIcon, Image01Icon, LeftToRightListNumberIcon, Link01Icon, List, MinusSignIcon, QuoteUpIcon, RedoIcon, Search01Icon, TextBoldIcon, TextClearIcon, TextItalicIcon, TextStrikethroughIcon, TextSubscriptIcon, TextSuperscriptIcon, TextUnderlineIcon, UndoIcon, Upload01Icon } from "@hugeicons/core-free-icons";
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
@@ -24,7 +22,6 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { toast } from 'sonner';
 import { useLocale } from '@/contexts/LocaleContext';
 import { ResizableImage } from './extensions/ResizableImage';
-import { TextDirection } from './extensions/TextDirection';
 import { FontSelector } from './toolbar/FontSelector';
 import { FontSizeSelector } from './toolbar/FontSizeSelector';
 import { ColorPicker } from './toolbar/ColorPicker';
@@ -105,18 +102,17 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
         heading: {
           levels: [1, 2, 3, 4, 5, 6],
         },
+        link: {
+          openOnClick: false,
+        },
       }),
       ResizableImage.configure({
         allowBase64: true,
         inline: false,
       }),
-      Link.configure({
-        openOnClick: false,
-      }),
       Placeholder.configure({
         placeholder: resolvedPlaceholder,
       }),
-      Underline,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
@@ -140,11 +136,8 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
       }),
       CharacterCount,
       Typography,
-      TextDirection.configure({
-        types: ['heading', 'paragraph', 'blockquote', 'listItem'],
-        defaultDirection: isRTL ? 'rtl' : 'ltr',
-      }),
     ],
+    textDirection: isRTL ? 'rtl' : 'ltr',
     content,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -360,7 +353,7 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
             icon={CodeIcon}
             title={t('editor.inlineCode')}
           />
-          <Divider />
+          <ToolbarDivider />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleSubscript().run()}
             active={editor.isActive('subscript')}
@@ -373,9 +366,9 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
             icon={TextSuperscriptIcon}
             title={t('editor.superscript')}
           />
-          <Divider />
+          <ToolbarDivider />
           <AlignmentSelector editor={editor} />
-          <Divider />
+          <ToolbarDivider />
           <TextDirectionSelector editor={editor} />
         </div>
 
@@ -405,9 +398,9 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
             icon={QuoteUpIcon}
             title={t('editor.quote')}
           />
-          <Divider />
+          <ToolbarDivider />
           <TableMenu editor={editor} />
-          <Divider />
+          <ToolbarDivider />
           <ToolbarButton
             onClick={addLink}
             active={editor.isActive('link')}
@@ -451,7 +444,7 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
             icon={MinusSignIcon}
             title={t('editor.horizontalRule')}
           />
-          <Divider />
+          <ToolbarDivider />
           <ToolbarButton
             onClick={() => editor.chain().focus().undo().run()}
             disabled={!editor.can().undo()}

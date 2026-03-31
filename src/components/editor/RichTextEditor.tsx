@@ -2,9 +2,7 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { CodeIcon, Heading01Icon, Heading02Icon, Image01Icon, LeftToRightListNumberIcon, Link01Icon, List, MinusSignIcon, QuoteUpIcon, RedoIcon, TextBoldIcon, TextItalicIcon, TextStrikethroughIcon, TextUnderlineIcon, UndoIcon, Upload01Icon } from "@hugeicons/core-free-icons";
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
 import { toast } from 'sonner';
 import { ResizableImage } from './extensions/ResizableImage';
 import { useCallback, useRef, useState } from 'react';
@@ -22,18 +20,18 @@ export function RichTextEditor({ content, onChange, placeholder = 'Start writing
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        link: {
+          openOnClick: false,
+        },
+      }),
       ResizableImage.configure({
         allowBase64: true,
         inline: false,
       }),
-      Link.configure({
-        openOnClick: false,
-      }),
       Placeholder.configure({
         placeholder,
       }),
-      Underline,
     ],
     content,
     onUpdate: ({ editor }) => {

@@ -17,7 +17,7 @@ export function ExpandingSearchDock({
   onSearch,
   onQueryChange,
   placeholder = 'Search...',
-  expandedWidth = 'min(20rem, calc(100vw - 7rem))',
+  expandedWidth = 'min(20rem, calc(100vw - 7rem))'
 }: ExpandingSearchDockProps) {
   const { isRTL, t } = useLocale();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -59,7 +59,7 @@ export function ExpandingSearchDock({
             exit={{ scale: 0.9, opacity: 0 }}
             onClick={handleExpand}
             aria-label={t('nav.openSearch')}
-            className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card transition-colors hover:bg-muted"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card transition-colors hover:bg-muted"
           >
             <HugeiconsIcon icon={Search01Icon} className="h-5 w-5" />
           </motion.button>
@@ -98,7 +98,7 @@ export function ExpandingSearchDock({
                 autoFocus
                 dir={isRTL ? 'rtl' : 'ltr'}
                 className={cn(
-                  'h-12 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:ring-0',
+                  'h-10 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:ring-0',
                   isRTL ? 'pl-4 text-right' : 'pr-4 text-left',
                 )}
               />

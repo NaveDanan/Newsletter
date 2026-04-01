@@ -10,6 +10,10 @@ export function canAccessManagerTab(role: UserRole | null | undefined, tab: stri
     return hasManagerAccess(role);
   }
 
+  if (tab === 'links') {
+    return role === 'admin';
+  }
+
   return role === 'manager' || role === 'admin';
 }
 

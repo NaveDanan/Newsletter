@@ -19,10 +19,10 @@ export function PopularArticles({ newsletters, onArticleClick }: PopularArticles
   }
 
   return (
-    <section>
+    <section id="case-studies">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-[#171717]">{t('popular.title')}</h2>
-        <a href="#latest" className="text-sm font-medium text-[#D93A3A] hover:underline">
+        <a href="#workflows" className="text-sm font-medium text-[#D93A3A] hover:underline">
           {t('popular.viewAll')}
         </a>
       </div>

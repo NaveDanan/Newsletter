@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { AnalyticsUpIcon, BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Logout01Icon, Mail01Icon, Menu01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
+import { AnalyticsUpIcon, BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Logout01Icon, Mail01Icon, Menu01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
 import { useRef, useState } from 'react';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { ProjectView } from './manager/ProjectView';
 import { GoalsView } from './manager/GoalsView';
 import { GanttView } from './manager/GanttView';
+import { LinksView } from './manager/LinksView';
 import { SpreadsheetView } from './manager/SpreadsheetView';
 import { NewsletterList } from './manager/NewsletterList';
 import { NewsletterEditor, type NewsletterEditorHandle } from './manager/NewsletterEditor';
@@ -30,7 +31,7 @@ import {
 import type { PocketBaseUser, UserRole } from '@/lib/pocketbase/client';
 import type { Newsletter, NewsletterComment, NewsletterFormData } from '../types/newsletter';
 
-export type Tab = 'newsletters' | 'projects' | 'goals' | 'gantt' | 'spreadsheet';
+export type Tab = 'newsletters' | 'projects' | 'goals' | 'gantt' | 'spreadsheet' | 'links';
 type ViewMode = 'list' | 'editor' | 'viewer';
 
 interface ManagerDashboardProps {
@@ -86,6 +87,7 @@ export function ManagerDashboard({
     { id: 'goals' as Tab, label: t('manager.goals'), icon: Target01Icon },
     { id: 'gantt' as Tab, label: t('manager.gantt'), icon: BarChartIcon },
     { id: 'spreadsheet' as Tab, label: t('manager.spreadsheet'), icon: FileSpreadsheetIcon },
+    { id: 'links' as Tab, label: t('manager.links'), icon: Link01Icon },
   ].filter((tab) => canAccessManagerTab(currentUserRole, tab.id));
 
   const handleCreateNewsletter = () => {
@@ -260,6 +262,8 @@ export function ManagerDashboard({
         return <GanttView onEditProjectGantt={onOpenGanttEditor} />;
       case 'spreadsheet':
         return <SpreadsheetView />;
+      case 'links':
+        return <LinksView currentUserRole={currentUserRole} />;
       default:
         return null;
     }

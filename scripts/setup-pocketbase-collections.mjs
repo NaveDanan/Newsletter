@@ -71,6 +71,24 @@ const NEWSLETTERS_SCHEMA = {
   deleteRule: '@request.auth.id != ""',
 };
 
+const NAVIGATION_LINKS_SCHEMA = {
+  name: 'navigation_links',
+  type: 'base',
+  fields: [
+    autodate('created', true, false),
+    autodate('updated', true, true),
+    text('name', 1000),
+    text('description', 5000),
+    text('url', 200000),
+    text('iconUrl', 200000),
+  ],
+  listRule:   '',
+  viewRule:   '',
+  createRule: '@request.auth.role = "admin"',
+  updateRule: '@request.auth.role = "admin"',
+  deleteRule: '@request.auth.role = "admin"',
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -120,7 +138,10 @@ async function main() {
   console.log('📰  Recreating "newsletters" collection...');
   await recreateCollection(pb, NEWSLETTERS_SCHEMA);
 
-  console.log('\n✨  Done! Both collections are ready in PocketBase.');
+  console.log('🔗  Recreating "navigation_links" collection...');
+  await recreateCollection(pb, NAVIGATION_LINKS_SCHEMA);
+
+  console.log('\n✨  Done! All collections are ready in PocketBase.');
   console.log('    Refresh the app and sign in to start using them.\n');
 }
 

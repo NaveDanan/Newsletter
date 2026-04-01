@@ -36,7 +36,7 @@ export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesPr
 
   if (newsletters.length === 0) {
     return (
-      <section>
+      <section id="workflows">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-[#171717]">{t('latest.title')}</h2>
         </div>
@@ -48,7 +48,7 @@ export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesPr
   }
 
   return (
-    <section id="latest">
+    <section id="workflows">
       {/* Tabs */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-1 bg-[#F3F4F6] rounded-lg p-1">

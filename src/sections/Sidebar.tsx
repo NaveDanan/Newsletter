@@ -17,7 +17,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="space-y-8">
+    <aside id="resources" className="space-y-8">
       {/* Subscribe Card */}
       <div className="bg-[#F9FAFB] rounded-xl p-6">
         <div className="flex items-center gap-3 mb-4">
@@ -49,7 +49,7 @@ export function Sidebar() {
       </div>
 
       {/* Stats Card */}
-      <div className="border border-[#E5E5E5] rounded-xl p-6">
+      <div id="community" className="border border-[#E5E5E5] rounded-xl p-6">
         <h3 className="font-bold text-[#171717] mb-4">{t('sidebar.community')}</h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -68,7 +68,7 @@ export function Sidebar() {
       </div>
 
       {/* Topics */}
-      <div className="border border-[#E5E5E5] rounded-xl p-6">
+      <div id="topics" className="border border-[#E5E5E5] rounded-xl p-6">
         <h3 className="font-bold text-[#171717] mb-4">{t('sidebar.topics')}</h3>
         <div className="flex flex-wrap gap-2">
           {[

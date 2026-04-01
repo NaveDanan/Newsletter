@@ -42,7 +42,7 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
     : t('hero.defaultMeta');
 
   return (
-    <section ref={bannerRef} className="relative overflow-hidden">
+    <section id="features" ref={bannerRef} className="relative overflow-hidden">
       <div className="hero-gradient min-h-[400px] lg:min-h-[450px] relative">
         <div className="absolute inset-0 overflow-hidden">
           {[...Array(20)].map((_, i) => (

@@ -1,9 +1,22 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, Menu01Icon } from "@hugeicons/core-free-icons";
+import {
+  BarChart3,
+  BookOpen,
+  LayoutDashboard,
+  LayoutGrid,
+  LogIn,
+  LogOut,
+  Newspaper,
+  Sparkles,
+  Users,
+} from 'lucide-react';
 import { useState } from 'react';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
+import { DropdownNavigation, type DropdownNavigationItem } from '@/components/ui/dropdown-navigation';
 import { ExpandingSearchDock } from '@/components/ui/expanding-search-dock-shadcnui';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useNavigationLinks } from '@/hooks/useNavigationLinks';
 
 interface NavigationProps {
   onManagerClick: () => void;
@@ -28,12 +41,168 @@ export function Navigation({
 }: NavigationProps) {
   const { t } = useLocale();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { links: navigationLinks } = useNavigationLinks();
+  const accountMenuItem = isAuthenticated
+    ? {
+        label: authName ? `${t('nav.signOut')} (${authName})` : t('navDropdown.resources.accountLabelSignedIn'),
+        description: t('navDropdown.resources.accountDescriptionSignedIn'),
+        icon: LogOut,
+        onSelect: onSignOut,
+      }
+    : {
+        label: t('navDropdown.resources.accountLabelSignedOut'),
+        description: t('navDropdown.resources.accountDescriptionSignedOut'),
+        icon: LogIn,
+        onSelect: onSignInClick,
+      };
+  const managedResourceItems = navigationLinks.map((link) => ({
+    label: link.name,
+    description: link.description,
+    href: link.url,
+    imageSrc: link.iconUrl,
+    imageAlt: link.name,
+  }));
 
   const navLinks = [
     { id: 'home', label: t('nav.home'), href: '#', active: true },
     { id: 'topics', label: t('nav.topics'), href: '#topics' },
     { id: 'features', label: t('nav.features'), href: '#features' },
     { id: 'community', label: t('nav.community'), href: '#community' },
+  ];
+  const dropdownNavItems: DropdownNavigationItem[] = [
+    {
+      id: 1,
+      label: t('nav.aiWorkflows'),
+      link: '#workflows',
+      dotClassName: 'bg-[#171717]',
+      subMenus: [
+        {
+          title: t('navDropdown.aiWorkflows.groupCoverage'),
+          items: [
+            {
+              label: t('navDropdown.aiWorkflows.latestLabel'),
+              description: t('navDropdown.aiWorkflows.latestDescription'),
+              icon: Newspaper,
+              href: '#workflows',
+            },
+            {
+              label: t('navDropdown.aiWorkflows.featuredLabel'),
+              description: t('navDropdown.aiWorkflows.featuredDescription'),
+              icon: Sparkles,
+              href: '#features',
+            },
+            {
+              label: t('navDropdown.aiWorkflows.popularLabel'),
+              description: t('navDropdown.aiWorkflows.popularDescription'),
+              icon: BarChart3,
+              href: '#case-studies',
+            },
+          ],
+        },
+        {
+          title: t('navDropdown.aiWorkflows.groupExplore'),
+          items: [
+            {
+              label: t('navDropdown.aiWorkflows.topicsLabel'),
+              description: t('navDropdown.aiWorkflows.topicsDescription'),
+              icon: LayoutGrid,
+              href: '#topics',
+            },
+            {
+              label: t('navDropdown.aiWorkflows.communityLabel'),
+              description: t('navDropdown.aiWorkflows.communityDescription'),
+              icon: Users,
+              href: '#community',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 2,
+      label: t('nav.caseStudies'),
+      link: '#case-studies',
+      dotClassName: 'bg-[#D93A3A]',
+      subMenus: [
+        {
+          title: t('navDropdown.caseStudies.groupInsights'),
+          items: [
+            {
+              label: t('navDropdown.caseStudies.featuredLabel'),
+              description: t('navDropdown.caseStudies.featuredDescription'),
+              icon: Sparkles,
+              href: '#features',
+            },
+            {
+              label: t('navDropdown.caseStudies.popularLabel'),
+              description: t('navDropdown.caseStudies.popularDescription'),
+              icon: Newspaper,
+              href: '#case-studies',
+            },
+          ],
+        },
+        {
+          title: t('navDropdown.caseStudies.groupCommunity'),
+          items: [
+            {
+              label: t('navDropdown.caseStudies.communityLabel'),
+              description: t('navDropdown.caseStudies.communityDescription'),
+              icon: Users,
+              href: '#community',
+            },
+            {
+              label: t('navDropdown.caseStudies.signInLabel'),
+              description: t('navDropdown.caseStudies.signInDescription'),
+              icon: LogIn,
+              onSelect: onSignInClick,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 3,
+      label: t('nav.resources'),
+      link: '#resources',
+      dotClassName: 'bg-[#A3A3A3]',
+      subMenus: [
+        ...(managedResourceItems.length > 0 ? [
+          {
+            title: t('navDropdown.resources.groupLinks'),
+            items: managedResourceItems,
+          },
+        ] : []),
+        {
+          title: t('navDropdown.resources.groupReader'),
+          items: [
+            {
+              label: t('navDropdown.resources.topicsLabel'),
+              description: t('navDropdown.resources.topicsDescription'),
+              icon: LayoutGrid,
+              href: '#topics',
+            },
+            {
+              label: t('navDropdown.resources.subscribeLabel'),
+              description: t('navDropdown.resources.subscribeDescription'),
+              icon: BookOpen,
+              href: '#resources',
+            },
+          ],
+        },
+        {
+          title: t('navDropdown.resources.groupWorkspace'),
+          items: [
+            {
+              label: t('navDropdown.resources.managerLabel'),
+              description: t('navDropdown.resources.managerDescription'),
+              icon: LayoutDashboard,
+              onSelect: onManagerClick,
+            },
+            accountMenuItem,
+          ],
+        },
+      ],
+    },
   ];
 
   return (
@@ -114,18 +283,7 @@ export function Navigation({
                 {link.label}
               </a>
             ))}
-            <a href="#workflows" className="nav-link whitespace-nowrap flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#171717]"></span>
-              {t('nav.aiWorkflows')}
-            </a>
-            <a href="#case-studies" className="nav-link whitespace-nowrap flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#D93A3A]"></span>
-              {t('nav.caseStudies')}
-            </a>
-            <a href="#resources" className="nav-link whitespace-nowrap flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#A3A3A3]"></span>
-              {t('nav.resources')}
-            </a>
+            <DropdownNavigation navItems={dropdownNavItems} />
           </div>
         </div>
       </nav>
@@ -146,6 +304,16 @@ export function Navigation({
                   }
                   setIsMobileMenuOpen(false);
                 }}
+              >
+                {link.label}
+              </a>
+            ))}
+            {dropdownNavItems.map((link) => (
+              <a
+                key={link.id}
+                href={link.link}
+                className="block py-2 text-[#171717] font-medium"
+                onClick={() => setIsMobileMenuOpen(false)}
               >
                 {link.label}
               </a>

@@ -13,7 +13,7 @@ import { MigratePage } from './sections/MigratePage';
 import { useAuth } from './contexts/AuthContext';
 import { useLocale } from './contexts/LocaleContext';
 import { useNewsletters } from './hooks/useNewsletters';
-import { hasManagerAccess } from './lib/auth/permissions';
+import { canAccessManagerTab, hasManagerAccess } from './lib/auth/permissions';
 import { Toaster } from 'sonner';
 import { toast } from 'sonner';
 import type { Newsletter } from './types/newsletter';
@@ -21,7 +21,7 @@ import './App.css';
 
 export type View = 'home' | 'manager' | 'article' | 'signin' | 'sso-callback' | 'gantt-editor' | 'migrate';
 
-const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet'];
+const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet', 'links'];
 
 interface RouteState {
   view: View;
@@ -262,8 +262,17 @@ function App() {
       return;
     }
 
+    if (
+      currentRoute.view === 'manager'
+      && currentRoute.managerSection
+      && !canAccessManagerTab(userRole, currentRoute.managerSection)
+    ) {
+      navigateTo('/manager', { replace: true });
+      return;
+    }
+
     managerToastRouteRef.current = null;
-  }, [currentRoute.pathname, currentRoute.view, isAuthLoading, isUserAuthenticated, navigateTo, t, userRole]);
+  }, [currentRoute.managerSection, currentRoute.pathname, currentRoute.view, isAuthLoading, isUserAuthenticated, navigateTo, t, userRole]);
 
   const handleManagerClick = () => {
     navigateTo('/manager');

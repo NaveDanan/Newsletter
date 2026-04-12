@@ -82,6 +82,34 @@ Your app will be automatically served locally via Vite (default: `http://localho
 npm run build
 ```
 
+### Docker
+This repo includes a single-container setup that serves the React frontend on port `8080` and PocketBase, including its dashboard UI at `/_/`, on port `8090`.
+
+1. Copy `.env.docker.example` to `.env` or another env file consumed by Docker Compose.
+2. Set `POCKETBASE_DIST_DIR` to the extracted Linux PocketBase folder.
+3. Set the required superuser and optional app admin credentials.
+4. Build and run:
+
+```bash
+docker compose --env-file .env up --build
+```
+
+Frontend: `http://localhost:8080`
+PocketBase UI: `http://localhost:8090/_/`
+
+Notes:
+- The frontend reads PocketBase URL from a runtime `app-config.js`, so the container image is not locked to a single backend URL.
+- Destructive collection recreation is disabled by default. Set `POCKETBASE_RECREATE_COLLECTIONS=1` only if you intentionally want startup to drop and recreate the app collections.
+- The users schema sync and optional app-admin bootstrap run on every start.
+
+### Kubernetes
+Helm chart support is available in `helm/newsletter`.
+
+- Base values: `helm/newsletter/values.yaml`
+- Dev example: `helm/newsletter/values.dev.example.yaml`
+- Production example: `helm/newsletter/values.production.example.yaml`
+- Deployment guide: `docs/kubernetes.md`
+
 ---
 
 ## 🛠 Tech Stack Overview

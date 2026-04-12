@@ -1,0 +1,53 @@
+image:
+  repository: registry.example.com/newsletter
+  tag: 2026.04.12
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: regcred
+
+credentials:
+  existingSecret: newsletter-pocketbase-env
+
+env:
+  pocketbasePublicUrl: https://pb.example.com
+  pocketbaseRecreateCollections: false
+
+persistence:
+  enabled: true
+  storageClass: fast-ssd
+  size: 20Gi
+
+ingress:
+  frontend:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    host: newsletter.example.com
+    path: /
+    pathType: Prefix
+    tls:
+      - secretName: newsletter-tls
+        hosts:
+          - newsletter.example.com
+  pocketbase:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    host: pb.example.com
+    path: /
+    pathType: Prefix
+    tls:
+      - secretName: pocketbase-tls
+        hosts:
+          - pb.example.com
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi

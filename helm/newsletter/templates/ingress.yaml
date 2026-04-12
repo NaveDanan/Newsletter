@@ -1,0 +1,63 @@
+{{- if .Values.ingress.frontend.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "newsletter.fullname" . }}-frontend
+  labels:
+    {{- include "newsletter.labels" . | nindent 4 }}
+  {{- with .Values.ingress.frontend.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.frontend.className }}
+  ingressClassName: {{ .Values.ingress.frontend.className }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.frontend.host | quote }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.frontend.path }}
+            pathType: {{ .Values.ingress.frontend.pathType }}
+            backend:
+              service:
+                name: {{ include "newsletter.fullname" . }}
+                port:
+                  name: frontend
+  {{- with .Values.ingress.frontend.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+{{- end }}
+{{- if .Values.ingress.pocketbase.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "newsletter.fullname" . }}-pocketbase
+  labels:
+    {{- include "newsletter.labels" . | nindent 4 }}
+  {{- with .Values.ingress.pocketbase.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.pocketbase.className }}
+  ingressClassName: {{ .Values.ingress.pocketbase.className }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.pocketbase.host | quote }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.pocketbase.path }}
+            pathType: {{ .Values.ingress.pocketbase.pathType }}
+            backend:
+              service:
+                name: {{ include "newsletter.fullname" . }}
+                port:
+                  name: pocketbase
+  {{- with .Values.ingress.pocketbase.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

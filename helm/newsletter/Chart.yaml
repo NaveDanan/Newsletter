@@ -1,0 +1,6 @@
+apiVersion: v2
+name: newsletter
+description: Helm chart for the Newsletter frontend and PocketBase single-container deployment
+type: application
+version: 0.1.0
+appVersion: "0.36.9"

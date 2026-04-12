@@ -1,0 +1,72 @@
+replicaCount: 1
+
+image:
+  repository: your-registry/newsletter
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+deploymentStrategy:
+  type: Recreate
+
+podAnnotations: {}
+podLabels: {}
+
+service:
+  type: ClusterIP
+  annotations: {}
+  ports:
+    frontend: 80
+    pocketbase: 8090
+
+persistence:
+  enabled: true
+  existingClaim: ""
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  annotations: {}
+  mountPath: /pb_data
+
+credentials:
+  existingSecret: ""
+  superuserEmail: superuser@example.com
+  superuserPassword: change-this-password
+  adminEmail: admin@example.com
+  adminPassword: change-this-password
+
+env:
+  pocketbasePublicUrl: ""
+  pocketbaseRecreateCollections: false
+
+extraEnv: []
+# - name: NODE_ENV
+#   value: production
+
+ingress:
+  frontend:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: newsletter.local
+    path: /
+    pathType: Prefix
+    tls: []
+  pocketbase:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: pocketbase.local
+    path: /
+    pathType: Prefix
+    tls: []
+
+resources: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

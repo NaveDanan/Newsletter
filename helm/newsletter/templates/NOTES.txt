@@ -1,0 +1,6 @@
+1. Frontend service port: {{ .Values.service.ports.frontend }}
+2. PocketBase service port: {{ .Values.service.ports.pocketbase }}
+3. If ingress is disabled, use port-forward:
+   kubectl port-forward svc/{{ include "newsletter.fullname" . }} 8080:{{ .Values.service.ports.frontend }} 8090:{{ .Values.service.ports.pocketbase }}
+4. Frontend URL: {{- if .Values.ingress.frontend.enabled }} https://{{ .Values.ingress.frontend.host }} {{- else }} http://127.0.0.1:8080 {{- end }}
+5. PocketBase URL: {{- if .Values.ingress.pocketbase.enabled }} https://{{ .Values.ingress.pocketbase.host }}/_/ {{- else }} http://127.0.0.1:8090/_/ {{- end }}

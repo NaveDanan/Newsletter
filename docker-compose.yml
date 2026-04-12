@@ -1,0 +1,22 @@
+services:
+  newsletter:
+    image: newsletter:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      additional_contexts:
+        pocketbase-dist: ${POCKETBASE_DIST_DIR}
+    environment:
+      POCKETBASE_SUPERUSER_EMAIL: ${POCKETBASE_SUPERUSER_EMAIL}
+      POCKETBASE_SUPERUSER_PASSWORD: ${POCKETBASE_SUPERUSER_PASSWORD}
+      POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL:-}
+      POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-}
+      POCKETBASE_PUBLIC_URL: ${POCKETBASE_PUBLIC_URL:-}
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+      - "${POCKETBASE_PORT:-8090}:8090"
+    volumes:
+      - pocketbase_data:/pb_data
+
+volumes:
+  pocketbase_data:

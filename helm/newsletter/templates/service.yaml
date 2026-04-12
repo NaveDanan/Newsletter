@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "newsletter.fullname" . }}
+  labels:
+    {{- include "newsletter.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "newsletter.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: frontend
+      protocol: TCP
+      port: {{ .Values.service.ports.frontend }}
+      targetPort: frontend
+    - name: pocketbase
+      protocol: TCP
+      port: {{ .Values.service.ports.pocketbase }}
+      targetPort: pocketbase

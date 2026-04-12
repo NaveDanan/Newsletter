@@ -1,0 +1,43 @@
+image:
+  repository: ghcr.io/example/newsletter
+  tag: dev
+
+credentials:
+  superuserEmail: superuser@example.com
+  superuserPassword: change-this-password
+  adminEmail: admin@example.com
+  adminPassword: change-this-password
+
+env:
+  pocketbasePublicUrl: https://pocketbase.localtest.me
+  pocketbaseRecreateCollections: false
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  frontend:
+    enabled: true
+    className: nginx
+    annotations: {}
+    host: newsletter.localtest.me
+    path: /
+    pathType: Prefix
+    tls: []
+  pocketbase:
+    enabled: true
+    className: nginx
+    annotations: {}
+    host: pocketbase.localtest.me
+    path: /
+    pathType: Prefix
+    tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "newsletter.fullname" . }}
+  labels:
+    {{- include "newsletter.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: {{ .Values.deploymentStrategy.type }}
+  selector:
+    matchLabels:
+      {{- include "newsletter.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "newsletter.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: newsletter
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: frontend
+              containerPort: 8080
+              protocol: TCP
+            - name: pocketbase
+              containerPort: 8090
+              protocol: TCP
+          env:
+            - name: POCKETBASE_SUPERUSER_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "newsletter.secretName" . }}
+                  key: POCKETBASE_SUPERUSER_EMAIL
+            - name: POCKETBASE_SUPERUSER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "newsletter.secretName" . }}
+                  key: POCKETBASE_SUPERUSER_PASSWORD
+            - name: POCKETBASE_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "newsletter.secretName" . }}
+                  key: POCKETBASE_ADMIN_EMAIL
+                  optional: true
+            - name: POCKETBASE_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "newsletter.secretName" . }}
+                  key: POCKETBASE_ADMIN_PASSWORD
+                  optional: true
+            - name: POCKETBASE_PUBLIC_URL
+              value: {{ .Values.env.pocketbasePublicUrl | quote }}
+            - name: POCKETBASE_RECREATE_COLLECTIONS
+              value: {{ ternary "1" "0" .Values.env.pocketbaseRecreateCollections | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: pocketbase
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: pocketbase
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: pocketbase
+            periodSeconds: 10
+            failureThreshold: 6
+          volumeMounts:
+            - name: pb-data
+              mountPath: {{ .Values.persistence.mountPath }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: pb-data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "newsletter.pvcName" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

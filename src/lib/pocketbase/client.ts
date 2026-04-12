@@ -1,7 +1,8 @@
-import PocketBase, { BaseAuthStore, type RecordModel } from 'pocketbase';
+import PocketBase, { type RecordModel } from 'pocketbase';
 import { bootLogger } from '@/lib/bootLogger';
+import { getPocketBaseUrl } from '@/lib/runtime-config';
 
-export const POCKETBASE_URL = import.meta.env.VITE_POCKETBASE_URL || 'http://127.0.0.1:8090';
+export const POCKETBASE_URL = getPocketBaseUrl();
 const AUTH_STORAGE_KEY = 'pb_auth';
 
 let pb: PocketBase | null = null;
@@ -29,8 +30,6 @@ export interface PocketBaseUser {
 }
 
 export type SSOProvider = 'google' | 'github' | 'microsoft' | 'custom';
-
-export type AdminSyncResult = 'skipped' | 'verified' | 'created' | 'password_mismatch' | 'error';
 
 export function getPocketBase(): PocketBase {
   if (!pb) {
@@ -88,55 +87,6 @@ export function resetPocketBase(): void {
 
 export function getSSOCallbackUrl(): string {
   return `${window.location.origin}/sso-callback`;
-}
-
-export async function ensureConfiguredAdminUser(): Promise<AdminSyncResult> {
-  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim();
-  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD?.trim();
-
-  if (!adminEmail || !adminPassword) {
-    bootLogger.step('pocketbase', 'Admin sync skipped because credentials are not configured');
-    return 'skipped';
-  }
-
-  const syncClient = new PocketBase(POCKETBASE_URL, new BaseAuthStore());
-  bootLogger.step('pocketbase', 'Ensuring configured admin user exists', {
-    adminEmail,
-  });
-
-  try {
-    await syncClient.collection('users').authWithPassword(adminEmail, adminPassword);
-    bootLogger.success('pocketbase', 'Configured admin user verified');
-    return 'verified';
-  } catch {
-    try {
-      await syncClient.collection('users').create({
-        email: adminEmail,
-        password: adminPassword,
-        passwordConfirm: adminPassword,
-        name: 'Admin',
-        role: 'admin',
-      });
-
-      bootLogger.success('pocketbase', 'Configured admin user created');
-      return 'created';
-    } catch (createError) {
-      const message =
-        createError instanceof Error ? createError.message.toLowerCase() : '';
-
-      if (
-        message.includes('already exists') ||
-        message.includes('unique') ||
-        message.includes('duplicate')
-      ) {
-        bootLogger.warn('pocketbase', 'Configured admin email exists but password does not match');
-        return 'password_mismatch';
-      }
-
-      bootLogger.error('pocketbase', 'Failed to verify or create configured admin user', normalizeBootError(createError));
-      return 'error';
-    }
-  }
 }
 
 function normalizeBootError(error: unknown) {

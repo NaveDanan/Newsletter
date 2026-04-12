@@ -2,7 +2,6 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { toast } from 'sonner';
 import { bootLogger } from '@/lib/bootLogger';
 import {
-  ensureConfiguredAdminUser,
   getPocketBase,
   getSSOCallbackUrl,
   normalizeUserRole,
@@ -52,38 +51,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bootLogger.once('auth:provider-effect-start', () => {
       bootLogger.step('auth', 'Auth provider initialization started');
     });
-
-    void (async () => {
-      const syncResult = await ensureConfiguredAdminUser();
-      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase();
-
-      bootLogger.step('auth', 'Configured admin sync completed', {
-        result: syncResult,
-      });
-
-      if (syncResult === 'password_mismatch') {
-        toast.error('Configured admin email exists in PocketBase, but the configured password does not match it.');
-      }
-
-      if (syncResult === 'error') {
-        toast.error('Failed to sync the configured admin user with PocketBase.');
-      }
-
-      const authModel = pb.authStore.model as Record<string, unknown> | null;
-      const authEmail = typeof authModel?.email === 'string' ? authModel.email.toLowerCase() : '';
-
-      if (adminEmail && authModel?.id && authEmail === adminEmail && normalizeUserRole(authModel.role) !== 'admin') {
-        try {
-          await pb.collection('users').update(String(authModel.id), { role: 'admin' });
-          bootLogger.step('auth', 'Updated current admin user role to admin', {
-            userId: String(authModel.id),
-          });
-        } catch (error) {
-          console.error('Failed to sync admin role:', error);
-          bootLogger.error('auth', 'Failed to sync current admin role', normalizeBootError(error));
-        }
-      }
-    })();
 
     const authModel = pb.authStore.model as Record<string, unknown> | null;
     if (authModel && pb.authStore.isValid) {

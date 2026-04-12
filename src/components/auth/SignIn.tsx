@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { AlertCircleIcon, ArrowLeft01Icon, ChromeIcon, GithubIcon, Loading02Icon, LockIcon, Mail01Icon, ViewIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, ChromeIcon, GithubIcon, Loading02Icon, LockIcon, Mail01Icon, ViewIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
@@ -340,17 +340,6 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
           </CardFooter>
         </Card>
 
-        {!import.meta.env.VITE_POCKETBASE_URL && (
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start gap-3">
-              <HugeiconsIcon icon={AlertCircleIcon} className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">PocketBase Setup Required</p>
-                <p>Add VITE_POCKETBASE_URL to your environment before using sign-in or SSO.</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

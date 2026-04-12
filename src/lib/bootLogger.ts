@@ -39,46 +39,6 @@ function formatTimestamp() {
   return new Date().toISOString();
 }
 
-function safeSerialize(value: unknown) {
-  if (value === undefined) {
-    return '';
-  }
-
-  const seen = new WeakSet<object>();
-
-  try {
-    return JSON.stringify(
-      value,
-      (_key, currentValue) => {
-        if (typeof currentValue === 'bigint') {
-          return currentValue.toString();
-        }
-
-        if (currentValue instanceof Error) {
-          return {
-            name: currentValue.name,
-            message: currentValue.message,
-            stack: currentValue.stack,
-          };
-        }
-
-        if (typeof currentValue === 'object' && currentValue !== null) {
-          if (seen.has(currentValue)) {
-            return '[Circular]';
-          }
-
-          seen.add(currentValue);
-        }
-
-        return currentValue;
-      },
-      2,
-    );
-  } catch {
-    return String(value);
-  }
-}
-
 function normalizeError(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -115,7 +75,6 @@ function readDebugPreference() {
 class BootLogger {
   private entries: BootLogEntry[] = [];
   private ready = false;
-  private hasError = false;
   private debugEnabled = false;
   private onceKeys = new Set<string>();
   private globalHandlersBound = false;
@@ -162,12 +121,10 @@ class BootLogger {
   }
 
   error(scope: string, message: string, data?: unknown) {
-    this.hasError = true;
     this.log('error', scope, message, data);
   }
 
   fatal(scope: string, message: string, data?: unknown) {
-    this.hasError = true;
     this.log('fatal', scope, message, data);
   }
 

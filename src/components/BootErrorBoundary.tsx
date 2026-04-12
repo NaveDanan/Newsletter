@@ -66,7 +66,7 @@ export class BootErrorBoundary extends Component<BootErrorBoundaryProps, BootErr
             The app crashed during initial loading.
           </h1>
           <p style={{ margin: '14px 0 0', color: '#525252', lineHeight: 1.6 }}>
-            Open the startup log in the bottom-right corner to see the exact boot sequence and captured errors.
+            Open the browser DevTools console to inspect the startup logs. You can also run window.__NEWSLETTER_DUMP_BOOT_LOGS__() there to print the full captured boot sequence again.
           </p>
           <pre
             style={{

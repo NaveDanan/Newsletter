@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { canCreateNewsletter, canDeleteNewsletter, canEditNewsletter } from '@/lib/auth/permissions';
+import { bootLogger } from '@/lib/bootLogger';
 import { stripCommentFormatting } from '@/lib/comment-formatting';
 import {
   fetchNewsletters,
@@ -32,11 +33,17 @@ export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersO
     let cancelled = false;
 
     setIsLoading(true);
+    bootLogger.once('newsletters:initial-fetch-start', () => {
+      bootLogger.step('newsletters', 'Initial newsletter fetch started');
+    });
     fetchNewsletters()
       .then((data) => {
         if (!cancelled) {
           setNewsletters(data);
           setError(null);
+          bootLogger.success('newsletters', 'Initial newsletter fetch succeeded', {
+            count: data.length,
+          });
         }
       })
       .catch((err: unknown) => {
@@ -45,10 +52,14 @@ export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersO
           console.error('useNewsletters fetch error:', err);
           setError(message);
           toast.error(`Newsletters: ${message}`);
+          bootLogger.error('newsletters', 'Initial newsletter fetch failed', normalizeBootError(err));
         }
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+          bootLogger.step('newsletters', 'Initial newsletter fetch finished');
+        }
       });
 
     return () => {
@@ -318,4 +329,16 @@ export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersO
     addNewsletterComment,
     toggleCommentLike,
   };
+}
+
+function normalizeBootError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return error;
 }

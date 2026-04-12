@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { bootLogger } from '@/lib/bootLogger';
 import {
   ensureConfiguredAdminUser,
   getPocketBase,
@@ -48,9 +49,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    bootLogger.once('auth:provider-effect-start', () => {
+      bootLogger.step('auth', 'Auth provider initialization started');
+    });
+
     void (async () => {
       const syncResult = await ensureConfiguredAdminUser();
       const adminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase();
+
+      bootLogger.step('auth', 'Configured admin sync completed', {
+        result: syncResult,
+      });
 
       if (syncResult === 'password_mismatch') {
         toast.error('Configured admin email exists in PocketBase, but the configured password does not match it.');
@@ -66,8 +75,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (adminEmail && authModel?.id && authEmail === adminEmail && normalizeUserRole(authModel.role) !== 'admin') {
         try {
           await pb.collection('users').update(String(authModel.id), { role: 'admin' });
+          bootLogger.step('auth', 'Updated current admin user role to admin', {
+            userId: String(authModel.id),
+          });
         } catch (error) {
           console.error('Failed to sync admin role:', error);
+          bootLogger.error('auth', 'Failed to sync current admin role', normalizeBootError(error));
         }
       }
     })();
@@ -77,9 +90,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const avatarFile = typeof authModel.avatar === 'string' ? authModel.avatar : '';
       const avatar = avatarFile ? pb.files.getUrl(authModel, avatarFile) : undefined;
       setUser(mapAuthUser(authModel, avatar));
+      bootLogger.step('auth', 'Restored authenticated user from PocketBase auth store', {
+        userId: String(authModel.id ?? ''),
+        role: normalizeUserRole(authModel.role),
+      });
+    } else {
+      bootLogger.step('auth', 'No authenticated user was restored from PocketBase auth store');
     }
 
     setIsLoading(false);
+    bootLogger.step('auth', 'Auth provider finished initial state hydration', {
+      isAuthenticated: Boolean(authModel && pb.authStore.isValid),
+    });
 
     const unsubscribe = pb.authStore.onChange((token, model) => {
       if (token && model) {
@@ -87,10 +109,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const avatarFile = typeof authModelRecord.avatar === 'string' ? authModelRecord.avatar : '';
         const avatar = avatarFile ? pb.files.getUrl(authModelRecord, avatarFile) : undefined;
         setUser(mapAuthUser(authModelRecord, avatar));
+        bootLogger.step('auth', 'PocketBase auth store emitted authenticated user change', {
+          userId: String(authModelRecord.id ?? ''),
+          role: normalizeUserRole(authModelRecord.role),
+        });
         return;
       }
 
       setUser(null);
+      bootLogger.step('auth', 'PocketBase auth store emitted sign-out state');
     });
 
     return () => unsubscribe();
@@ -99,15 +126,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     try {
       setIsLoading(true);
+      bootLogger.step('auth', 'Password login started', { email });
       const authData = await pb.collection('users').authWithPassword(email, password);
       if (!authData.token) {
+        bootLogger.warn('auth', 'Password login completed without a token', { email });
         return false;
       }
 
       toast.success('Welcome back!');
+      bootLogger.success('auth', 'Password login succeeded', { email });
       return true;
     } catch (error) {
       console.error('Login error:', error);
+      bootLogger.error('auth', 'Password login failed', normalizeBootError(error));
       const message = error instanceof Error ? error.message : 'Invalid email or password';
       toast.error(message);
       return false;
@@ -119,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(async (email: string, password: string, name: string) => {
     try {
       setIsLoading(true);
+      bootLogger.step('auth', 'User registration started', { email });
       const record = await pb.collection('users').create({
         email,
         password,
@@ -133,10 +165,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await pb.collection('users').requestVerification(email);
       toast.success('Account created. Please verify your email.');
+      bootLogger.success('auth', 'User registration succeeded', {
+        email,
+        userId: record.id,
+      });
       await login(email, password);
       return true;
     } catch (error) {
       console.error('Registration error:', error);
+      bootLogger.error('auth', 'User registration failed', normalizeBootError(error));
       const message = error instanceof Error ? error.message : 'Failed to create account';
       toast.error(message);
       return false;
@@ -149,10 +186,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetPocketBase();
     setUser(null);
     toast.success('Signed out');
+    bootLogger.step('auth', 'User logged out');
   }, []);
 
   const initiateSSO = useCallback(async (provider: SSOProvider) => {
     try {
+      bootLogger.step('auth', 'SSO login started', { provider });
       const authMethods = await pb.collection('users').listAuthMethods();
       const providers = (authMethods as { authProviders?: Array<Record<string, string>> }).authProviders || [];
       const oauthProvider = providers.find((entry) => entry.name === provider);
@@ -166,9 +205,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('sso_state', oauthProvider.state);
       localStorage.setItem('sso_code_verifier', oauthProvider.codeVerifier);
 
+      bootLogger.step('auth', 'Redirecting browser to SSO provider', {
+        provider,
+      });
       window.location.href = oauthProvider.authUrl + getSSOCallbackUrl();
     } catch (error) {
       console.error('SSO initiation error:', error);
+      bootLogger.error('auth', 'SSO initiation failed', normalizeBootError(error));
       const message = error instanceof Error ? error.message : 'Failed to initiate SSO';
       toast.error(message);
     }
@@ -177,6 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSSOCallback = useCallback(async (code: string, provider: SSOProvider) => {
     try {
       setIsLoading(true);
+      bootLogger.step('auth', 'Processing SSO callback', { provider });
       const codeVerifier = localStorage.getItem('sso_code_verifier');
 
       if (!codeVerifier) {
@@ -190,9 +234,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('sso_state');
       localStorage.removeItem('sso_code_verifier');
       toast.success('Welcome!');
+      bootLogger.success('auth', 'SSO callback succeeded', { provider });
       return true;
     } catch (error) {
       console.error('SSO callback error:', error);
+      bootLogger.error('auth', 'SSO callback failed', normalizeBootError(error));
       const message = error instanceof Error ? error.message : 'SSO authentication failed';
       toast.error(message);
       return false;
@@ -273,6 +319,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+function normalizeBootError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return error;
 }
 
 export function useAuth(): AuthContextType {

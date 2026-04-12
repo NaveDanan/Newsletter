@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { readStoredValue, writeStoredValue } from '@/lib/localStorage';
+import { bootLogger } from '@/lib/bootLogger';
 import { getMessage, type Locale } from '@/locales/messages';
 
 const STORAGE_KEY = 'ai-break-locale';
@@ -37,6 +38,12 @@ function asDate(value: Date | string | number) {
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
     const storedLocale = readStoredValue<string>(STORAGE_KEY, DEFAULT_LOCALE);
+    bootLogger.once(`locale:init:${String(storedLocale)}`, () => {
+      bootLogger.step('locale', 'Resolved initial locale from local storage', {
+        storedLocale,
+        fallbackLocale: DEFAULT_LOCALE,
+      });
+    });
     return isLocale(storedLocale) ? storedLocale : DEFAULT_LOCALE;
   });
 
@@ -44,16 +51,23 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     writeStoredValue(STORAGE_KEY, locale);
+    bootLogger.debug('locale', 'Persisted locale preference', { locale });
   }, [locale]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
     document.documentElement.dir = dir;
     document.body.dataset.locale = locale;
+    bootLogger.step('locale', 'Applied document locale attributes', {
+      locale,
+      dir,
+      intlLocale,
+    });
   }, [dir, locale]);
 
   const setLocale = useCallback((nextLocale: Locale) => {
     setLocaleState(nextLocale);
+    bootLogger.step('locale', 'Locale changed explicitly', { locale: nextLocale });
   }, []);
 
   const toggleLocale = useCallback(() => {

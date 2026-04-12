@@ -14,6 +14,7 @@ import { useAuth } from './contexts/AuthContext';
 import { useLocale } from './contexts/LocaleContext';
 import { useNewsletters } from './hooks/useNewsletters';
 import { canAccessManagerTab, hasManagerAccess } from './lib/auth/permissions';
+import { bootLogger } from './lib/bootLogger';
 import { Toaster } from 'sonner';
 import { toast } from 'sonner';
 import type { Newsletter } from './types/newsletter';
@@ -196,6 +197,7 @@ function App() {
   const currentRoute = useMemo(() => resolveRoute(currentPathname), [currentPathname]);
   const [searchQuery, setSearchQuery] = useState('');
   const managerToastRouteRef = useRef<string | null>(null);
+  const appReadyRef = useRef(false);
   const toasterPosition = isRTL ? 'top-left' : 'top-right';
   const publishedNewsletters = newsletters
     .filter((newsletter) => newsletter.status === 'published')
@@ -215,9 +217,31 @@ function App() {
     const nextRoute = resolveRoute(pathname);
     const historyMethod = replace ? 'replaceState' : 'pushState';
 
+    bootLogger.step('router', 'Navigation requested', {
+      from: window.location.pathname,
+      to: nextRoute.pathname,
+      replace,
+    });
+
     window.history[historyMethod]({}, '', nextRoute.pathname);
     window.dispatchEvent(new Event('app:navigate'));
   }, []);
+
+  useEffect(() => {
+    bootLogger.once('app:mounted', () => {
+      bootLogger.step('app', 'App component mounted');
+    });
+  }, []);
+
+  useEffect(() => {
+    bootLogger.step('router', 'Resolved current route', {
+      pathname: currentRoute.pathname,
+      view: currentRoute.view,
+      articleId: currentRoute.articleId,
+      managerSection: currentRoute.managerSection,
+      projectId: currentRoute.projectId,
+    });
+  }, [currentRoute.articleId, currentRoute.managerSection, currentRoute.pathname, currentRoute.projectId, currentRoute.view]);
 
   useEffect(() => {
     if (currentRoute.view !== 'article' || !currentRoute.articleId) {
@@ -226,6 +250,9 @@ function App() {
 
     if (!selectedArticle) {
       if (areNewslettersLoaded) {
+        bootLogger.warn('router', 'Requested article was not found after newsletters loaded, redirecting home', {
+          articleId: currentRoute.articleId,
+        });
         navigateTo('/', { replace: true });
       }
       return;
@@ -233,6 +260,10 @@ function App() {
 
     const canonicalArticlePath = getArticlePath(selectedArticle);
     if (window.location.pathname !== canonicalArticlePath) {
+      bootLogger.step('router', 'Replacing article URL with canonical path', {
+        from: window.location.pathname,
+        to: canonicalArticlePath,
+      });
       window.history.replaceState({}, '', canonicalArticlePath);
       window.dispatchEvent(new Event('app:navigate'));
     }
@@ -249,11 +280,18 @@ function App() {
     }
 
     if (!isUserAuthenticated) {
+      bootLogger.warn('router', 'Manager route requires authentication, redirecting to sign-in', {
+        pathname: currentRoute.pathname,
+      });
       navigateTo('/sign-in', { replace: true });
       return;
     }
 
     if (!hasManagerAccess(userRole)) {
+      bootLogger.warn('router', 'Manager route denied due to insufficient role, redirecting home', {
+        pathname: currentRoute.pathname,
+        role: userRole,
+      });
       if (managerToastRouteRef.current !== currentRoute.pathname) {
         toast.error(t('app.managerAccessDenied'));
         managerToastRouteRef.current = currentRoute.pathname;
@@ -267,12 +305,72 @@ function App() {
       && currentRoute.managerSection
       && !canAccessManagerTab(userRole, currentRoute.managerSection)
     ) {
+      bootLogger.warn('router', 'Manager subsection denied for current role, redirecting to default manager view', {
+        section: currentRoute.managerSection,
+        role: userRole,
+      });
       navigateTo('/manager', { replace: true });
       return;
     }
 
     managerToastRouteRef.current = null;
   }, [currentRoute.managerSection, currentRoute.pathname, currentRoute.view, isAuthLoading, isUserAuthenticated, navigateTo, t, userRole]);
+
+  useEffect(() => {
+    if (appReadyRef.current) {
+      return;
+    }
+
+    if (currentRoute.view === 'manager' || currentRoute.view === 'gantt-editor') {
+      if (isAuthLoading) {
+        return;
+      }
+
+      if (!isUserAuthenticated || !hasManagerAccess(userRole)) {
+        return;
+      }
+
+      appReadyRef.current = true;
+      bootLogger.markReady('app', 'Manager screen is ready', {
+        pathname: currentRoute.pathname,
+        role: userRole,
+      });
+      return;
+    }
+
+    if (currentRoute.view === 'article') {
+      if (!areNewslettersLoaded) {
+        return;
+      }
+
+      appReadyRef.current = true;
+      bootLogger.markReady('app', selectedArticle ? 'Article view is ready' : 'Article lookup completed', {
+        pathname: currentRoute.pathname,
+        articleId: currentRoute.articleId,
+        articleFound: Boolean(selectedArticle),
+      });
+      return;
+    }
+
+    if (currentRoute.view === 'signin' || currentRoute.view === 'sso-callback' || currentRoute.view === 'migrate') {
+      appReadyRef.current = true;
+      bootLogger.markReady('app', 'Standalone route is ready', {
+        pathname: currentRoute.pathname,
+        view: currentRoute.view,
+      });
+      return;
+    }
+
+    if (!areNewslettersLoaded) {
+      return;
+    }
+
+    appReadyRef.current = true;
+    bootLogger.markReady('app', 'Home screen is ready', {
+      pathname: currentRoute.pathname,
+      publishedCount: publishedNewsletters.length,
+    });
+  }, [areNewslettersLoaded, currentRoute.articleId, currentRoute.pathname, currentRoute.view, isAuthLoading, isUserAuthenticated, publishedNewsletters.length, selectedArticle, userRole]);
 
   const handleManagerClick = () => {
     navigateTo('/manager');
@@ -388,7 +486,14 @@ function App() {
     }
 
     if (!isUserAuthenticated || !hasManagerAccess(userRole)) {
-      return null;
+      return (
+        <div className="min-h-screen bg-white">
+          <Toaster position={toasterPosition} richColors />
+          <div className="flex min-h-screen items-center justify-center text-sm font-medium text-[#737373]">
+            Redirecting to an allowed page...
+          </div>
+        </div>
+      );
     }
 
     if (currentRoute.view === 'gantt-editor' && currentRoute.projectId) {

@@ -8,9 +8,21 @@ imagePullSecrets:
 
 credentials:
   existingSecret: newsletter-pocketbase-env
+  smtpUsername: ""
+  smtpPassword: ""
 
 env:
+  appPublicUrl: https://newsletter.example.com
+  pocketbaseAppName: AI-BREAK
+  pocketbaseMailSenderName: AI-BREAK
+  pocketbaseMailSenderAddress: newsletter@example.com
   pocketbasePublicUrl: https://pb.example.com
+  pocketbaseSmtpEnabled: true
+  pocketbaseSmtpHost: smtp.example.com
+  pocketbaseSmtpPort: 587
+  pocketbaseSmtpAuthMethod: PLAIN
+  pocketbaseSmtpTls: false
+  pocketbaseSmtpLocalName: ""
   pocketbaseRecreateCollections: false
 
 persistence:

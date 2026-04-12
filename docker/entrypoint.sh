@@ -90,6 +90,12 @@ run_first_bootstrap() {
 }
 
 run_safe_bootstrap() {
+  echo 'Syncing PocketBase app schema...'
+  node "$APP_ROOT/scripts/sync-pocketbase-app-schema.mjs"
+
+  echo 'Syncing PocketBase mail settings...'
+  node "$APP_ROOT/scripts/sync-pocketbase-mail-settings.mjs"
+
   echo 'Syncing PocketBase users schema...'
   node "$APP_ROOT/scripts/sync-pocketbase-users-schema.mjs"
 

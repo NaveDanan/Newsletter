@@ -7,6 +7,7 @@ import { Sidebar } from './sections/Sidebar';
 import { ManagerDashboard, type Tab as ManagerTab } from './sections/ManagerDashboard';
 import { GanttEditorPage } from './sections/manager/GanttEditorPage';
 import { NewsletterViewer } from './sections/NewsletterViewer';
+import { PasswordResetPage } from './components/auth/PasswordResetPage';
 import { SignIn } from './components/auth/SignIn';
 import { SSOCallback } from './components/auth/SSOCallback';
 import { MigratePage } from './sections/MigratePage';
@@ -20,7 +21,7 @@ import { toast } from 'sonner';
 import type { Newsletter } from './types/newsletter';
 import './App.css';
 
-export type View = 'home' | 'manager' | 'article' | 'signin' | 'sso-callback' | 'gantt-editor' | 'migrate';
+export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'sso-callback' | 'gantt-editor' | 'migrate';
 
 const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet', 'links'];
 
@@ -30,6 +31,7 @@ interface RouteState {
   articleId?: string;
   managerSection?: ManagerTab;
   projectId?: string;
+  token?: string;
 }
 
 function normalizePathname(pathname: string): string {
@@ -131,6 +133,18 @@ function resolveRoute(pathname: string): RouteState {
 
   if (normalizedPathname === '/sign-in' || normalizedPathname === '/signin') {
     return { view: 'signin', pathname: '/sign-in' };
+  }
+
+  if (normalizedPathname.startsWith('/reset-password/')) {
+    const [, , token] = normalizedPathname.split('/');
+
+    if (token) {
+      return {
+        view: 'reset-password',
+        pathname: normalizedPathname,
+        token: decodeURIComponent(token),
+      };
+    }
   }
 
   if (normalizedPathname === '/sso-callback') {
@@ -240,8 +254,9 @@ function App() {
       articleId: currentRoute.articleId,
       managerSection: currentRoute.managerSection,
       projectId: currentRoute.projectId,
+      token: currentRoute.token,
     });
-  }, [currentRoute.articleId, currentRoute.managerSection, currentRoute.pathname, currentRoute.projectId, currentRoute.view]);
+  }, [currentRoute.articleId, currentRoute.managerSection, currentRoute.pathname, currentRoute.projectId, currentRoute.token, currentRoute.view]);
 
   useEffect(() => {
     if (currentRoute.view !== 'article' || !currentRoute.articleId) {
@@ -352,7 +367,7 @@ function App() {
       return;
     }
 
-    if (currentRoute.view === 'signin' || currentRoute.view === 'sso-callback' || currentRoute.view === 'migrate') {
+    if (currentRoute.view === 'signin' || currentRoute.view === 'reset-password' || currentRoute.view === 'sso-callback' || currentRoute.view === 'migrate') {
       appReadyRef.current = true;
       bootLogger.markReady('app', 'Standalone route is ready', {
         pathname: currentRoute.pathname,
@@ -409,6 +424,10 @@ function App() {
 
   const handleAuthSuccess = () => {
     navigateTo('/', { replace: true });
+  };
+
+  const handlePasswordResetSuccess = () => {
+    navigateTo('/sign-in', { replace: true });
   };
 
   const handleSignOut = () => {
@@ -547,6 +566,19 @@ function App() {
       <div className="min-h-screen bg-white">
         <Toaster position={toasterPosition} richColors />
         <SignIn onBack={handleHomeClick} onSuccess={handleAuthSuccess} />
+      </div>
+    );
+  }
+
+  if (currentRoute.view === 'reset-password' && currentRoute.token) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Toaster position={toasterPosition} richColors />
+        <PasswordResetPage
+          token={currentRoute.token}
+          onBack={() => navigateTo('/sign-in', { replace: true })}
+          onSuccess={handlePasswordResetSuccess}
+        />
       </div>
     );
   }

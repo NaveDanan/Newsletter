@@ -29,7 +29,7 @@ export interface PocketBaseUser {
   updated: string;
 }
 
-export type SSOProvider = 'google' | 'github' | 'microsoft' | 'custom';
+export type SSOProvider = 'oidc' | 'microsoft' | 'custom';
 
 export function getPocketBase(): PocketBase {
   if (!pb) {

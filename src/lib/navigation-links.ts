@@ -14,10 +14,13 @@ export function createNavigationLinkId(): string {
 export function normalizeNavigationLink(candidate: Partial<NavigationLink>): NavigationLink {
   return {
     id: normalizeString(candidate.id) || createNavigationLinkId(),
+    dropdownId: normalizeString(candidate.dropdownId) || 'resources',
     name: normalizeString(candidate.name),
     description: normalizeString(candidate.description),
     url: normalizeString(candidate.url),
     iconUrl: normalizeString(candidate.iconUrl),
+    hidden: typeof candidate.hidden === 'boolean' ? candidate.hidden : false,
+    order: typeof candidate.order === 'number' ? candidate.order : 0,
     created: normalizeString(candidate.created) || undefined,
     updated: normalizeString(candidate.updated) || undefined,
   };

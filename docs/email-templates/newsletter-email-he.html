@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>AI-BREAK תבנית ניוזלטר</title>
+  <style>
+    body,
+    table,
+    td,
+    a {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+
+    table,
+    td {
+      mso-table-lspace: 0;
+      mso-table-rspace: 0;
+    }
+
+    img {
+      -ms-interpolation-mode: bicubic;
+      border: 0;
+      height: auto;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
+      display: block;
+    }
+
+    table {
+      border-collapse: collapse !important;
+    }
+
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      background-color: #f3f4f6;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #171717;
+      direction: rtl;
+      text-align: right;
+    }
+
+    .preheader {
+      display: none !important;
+      visibility: hidden;
+      mso-hide: all;
+      opacity: 0;
+      color: transparent;
+      height: 0;
+      width: 0;
+      overflow: hidden;
+    }
+
+    .wrapper {
+      width: 100%;
+      background-color: #f3f4f6;
+      padding: 24px 0;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background-color: #ffffff;
+      border-radius: 24px;
+      overflow: hidden;
+    }
+
+    .hero {
+      background: linear-gradient(225deg, #171717 0%, #2a2a2a 58%, #d93a3a 100%);
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 8px 14px;
+      background-color: #d93a3a;
+      color: #ffffff;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .brand-chip {
+      display: inline-block;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background-color: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    .meta-pill {
+      display: inline-block;
+      padding: 9px 14px;
+      border-radius: 999px;
+      background-color: #f9fafb;
+      color: #525252;
+      font-size: 12px;
+      line-height: 1;
+      border: 1px solid #ececec;
+      margin-left: 8px;
+      margin-bottom: 8px;
+    }
+
+    .button {
+      display: inline-block;
+      background-color: #d93a3a;
+      color: #ffffff !important;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 16px 26px;
+      border-radius: 999px;
+    }
+
+    .secondary-link {
+      color: #d93a3a;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .section-title {
+      font-size: 20px;
+      line-height: 1.25;
+      font-weight: 700;
+      color: #171717;
+      margin: 0;
+    }
+
+    .body-copy {
+      font-size: 15px;
+      line-height: 1.9;
+      color: #525252;
+      margin: 0;
+    }
+
+    .highlight-card {
+      background-color: #f9fafb;
+      border: 1px solid #e5e5e5;
+      border-radius: 18px;
+    }
+
+    .quote-card {
+      border-right: 4px solid #d93a3a;
+      background-color: #fff6f6;
+      border-radius: 18px 0 0 18px;
+    }
+
+    .footer {
+      color: #737373;
+      font-size: 12px;
+      line-height: 1.9;
+    }
+
+    @media screen and (max-width: 640px) {
+      .wrapper {
+        padding: 12px 0;
+      }
+
+      .mobile-padding {
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+      }
+
+      .hero-title {
+        font-size: 32px !important;
+        line-height: 1.2 !important;
+      }
+
+      .stack {
+        display: block !important;
+        width: 100% !important;
+      }
+
+      .cta-cell {
+        padding-bottom: 16px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="preheader">{{preheader_text}}</div>
+
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="wrapper">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="container">
+          <tr>
+            <td class="mobile-padding" style="padding: 0 20px;">
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="card">
+                <tr>
+                  <td class="hero mobile-padding" style="padding: 28px 36px 32px 36px; text-align: right;">
+                    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="padding-bottom: 20px; text-align: right;">
+                          <span class="brand-chip">AI-BREAK תובנות שבועיות</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding-bottom: 18px; text-align: right;">
+                          <span class="eyebrow">הניוזלטר האחרון</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding-bottom: 14px; font-size: 42px; line-height: 1.12; font-weight: 700; color: #ffffff; text-align: right;" class="hero-title">
+                          {{newsletter_title}}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding-bottom: 22px; font-size: 17px; line-height: 1.9; color: rgba(255, 255, 255, 0.82); text-align: right;">
+                          {{newsletter_subtitle}}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="font-size: 0; text-align: right;">
+                          <span class="meta-pill">{{publish_date}}</span>
+                          <span class="meta-pill">{{author_name}}</span>
+                          <span class="meta-pill">{{read_time}}</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="background-color: #ffffff;">
+                    <img src="{{cover_image_url}}" alt="{{newsletter_title}}" width="640" style="width: 100%; max-width: 640px;" />
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="mobile-padding" style="padding: 36px 36px 24px 36px; text-align: right;">
+                    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="padding-bottom: 14px; text-align: right;">
+                          <h2 class="section-title">מה חשוב השבוע</h2>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding-bottom: 26px; text-align: right;">
+                          <p class="body-copy">{{newsletter_excerpt}}</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="highlight-card">
+                            <tr>
+                              <td style="padding: 22px 22px 18px 22px; text-align: right;">
+                                <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                                  <tr>
+                                    <td style="padding-bottom: 14px; font-size: 12px; letter-spacing: 0.08em; color: #d93a3a; font-weight: 700; text-align: right;">
+                                      בתוך הגיליון הזה
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding-bottom: 12px; font-size: 15px; line-height: 1.8; color: #171717; text-align: right;">
+                                      1. {{highlight_1}}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding-bottom: 12px; font-size: 15px; line-height: 1.8; color: #171717; text-align: right;">
+                                      2. {{highlight_2}}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td style="font-size: 15px; line-height: 1.8; color: #171717; text-align: right;">
+                                      3. {{highlight_3}}
+                                    </td>
+                                  </tr>
+                                </table>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="mobile-padding" style="padding: 0 36px 24px 36px; text-align: right;">
+                    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="quote-card">
+                      <tr>
+                        <td style="padding: 22px 24px; text-align: right;">
+                          <p style="margin: 0; font-size: 18px; line-height: 1.8; color: #171717; font-weight: 700;">
+                            “{{featured_quote}}”
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="mobile-padding" style="padding: 0 36px 36px 36px; text-align: right;">
+                    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td class="stack cta-cell" align="right" style="padding-left: 12px;">
+                          <a href="{{article_url}}" target="_blank" rel="noopener noreferrer" class="button">לקריאת הבריפינג המלא</a>
+                        </td>
+                        <td class="stack" align="right" style="padding-top: 18px;">
+                          <a href="{{web_version_url}}" target="_blank" rel="noopener noreferrer" class="secondary-link">לפתיחה בדפדפן</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" class="footer" style="padding: 22px 20px 8px 20px; text-align: center;">
+                    קיבלתם את המייל הזה כי נרשמתם לעדכוני AI-BREAK.<br />
+                    <a href="{{manage_preferences_url}}" style="color: #737373; text-decoration: underline;">ניהול העדפות</a>
+                    &nbsp;&nbsp;|&nbsp;&nbsp;
+                    <a href="{{unsubscribe_url}}" style="color: #737373; text-decoration: underline;">הסרה מהרשימה</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" class="footer" style="padding: 0 20px 20px 20px; text-align: center;">
+                    AI-BREAK<br />
+                    {{footer_address}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

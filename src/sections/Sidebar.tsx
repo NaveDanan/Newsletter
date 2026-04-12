@@ -1,19 +1,45 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useLocale } from '@/contexts/LocaleContext';
+import { subscribeToNewsletter } from '@/lib/pocketbase/subscribers';
 
 export function Sidebar() {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
       toast.error(t('sidebar.emptyEmail'));
       return;
     }
-    toast.success(t('sidebar.subscribeSuccess'));
-    setEmail('');
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast.error(t('sidebar.invalidEmail'));
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await subscribeToNewsletter({
+        email: trimmedEmail,
+        locale,
+        source: 'sidebar',
+      });
+
+      toast.success(t('sidebar.subscribeSuccess'));
+      setEmail('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('sidebar.subscribeFailed');
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -35,16 +61,17 @@ export function Sidebar() {
           {t('sidebar.description')}
         </p>
         <form onSubmit={handleSubscribe} className="space-y-3">
-          <input
+          <Input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder={t('sidebar.emailPlaceholder')}
             className="w-full"
+            disabled={isSubmitting}
           />
-          <button type="submit" className="btn-primary w-full">
-            {t('sidebar.subscribe')}
-          </button>
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? t('sidebar.subscribePending') : t('sidebar.subscribe')}
+          </Button>
         </form>
       </div>
 

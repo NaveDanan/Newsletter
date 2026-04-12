@@ -39,6 +39,10 @@ spec:
               containerPort: 8090
               protocol: TCP
           env:
+            - name: APP_PUBLIC_URL
+              value: {{ .Values.env.appPublicUrl | quote }}
+            - name: POCKETBASE_APP_NAME
+              value: {{ .Values.env.pocketbaseAppName | quote }}
             - name: POCKETBASE_SUPERUSER_EMAIL
               valueFrom:
                 secretKeyRef:
@@ -61,8 +65,36 @@ spec:
                   name: {{ include "newsletter.secretName" . }}
                   key: POCKETBASE_ADMIN_PASSWORD
                   optional: true
+            - name: POCKETBASE_MAIL_SENDER_NAME
+              value: {{ .Values.env.pocketbaseMailSenderName | quote }}
+            - name: POCKETBASE_MAIL_SENDER_ADDRESS
+              value: {{ .Values.env.pocketbaseMailSenderAddress | quote }}
             - name: POCKETBASE_PUBLIC_URL
               value: {{ .Values.env.pocketbasePublicUrl | quote }}
+            - name: POCKETBASE_SMTP_ENABLED
+              value: {{ ternary "1" "0" .Values.env.pocketbaseSmtpEnabled | quote }}
+            - name: POCKETBASE_SMTP_HOST
+              value: {{ .Values.env.pocketbaseSmtpHost | quote }}
+            - name: POCKETBASE_SMTP_PORT
+              value: {{ .Values.env.pocketbaseSmtpPort | quote }}
+            - name: POCKETBASE_SMTP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "newsletter.secretName" . }}
+                  key: POCKETBASE_SMTP_USERNAME
+                  optional: true
+            - name: POCKETBASE_SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "newsletter.secretName" . }}
+                  key: POCKETBASE_SMTP_PASSWORD
+                  optional: true
+            - name: POCKETBASE_SMTP_AUTH_METHOD
+              value: {{ .Values.env.pocketbaseSmtpAuthMethod | quote }}
+            - name: POCKETBASE_SMTP_TLS
+              value: {{ ternary "1" "0" .Values.env.pocketbaseSmtpTls | quote }}
+            - name: POCKETBASE_SMTP_LOCAL_NAME
+              value: {{ .Values.env.pocketbaseSmtpLocalName | quote }}
             - name: POCKETBASE_RECREATE_COLLECTIONS
               value: {{ ternary "1" "0" .Values.env.pocketbaseRecreateCollections | quote }}
             {{- with .Values.extraEnv }}

@@ -100,7 +100,10 @@ PocketBase UI: `http://localhost:8090/_/`
 Notes:
 - The frontend reads PocketBase URL from a runtime `app-config.js`, so the container image is not locked to a single backend URL.
 - Destructive collection recreation is disabled by default. Set `POCKETBASE_RECREATE_COLLECTIONS=1` only if you intentionally want startup to drop and recreate the app collections.
-- The users schema sync and optional app-admin bootstrap run on every start.
+- Safe collection schema sync, mail settings sync, users schema sync, and optional app-admin bootstrap run on every start.
+- Set `APP_PUBLIC_URL` to the public frontend URL. It is used for newsletter article links and the frontend password reset page.
+- Set `POCKETBASE_PUBLIC_URL` to the public PocketBase URL. It is written into PocketBase mail settings and dashboard-generated links.
+- SMTP is configured with the `POCKETBASE_MAIL_*` and `POCKETBASE_SMTP_*` environment variables.
 
 ### Kubernetes
 Helm chart support is available in `helm/newsletter`.
@@ -109,6 +112,29 @@ Helm chart support is available in `helm/newsletter`.
 - Dev example: `helm/newsletter/values.dev.example.yaml`
 - Production example: `helm/newsletter/values.production.example.yaml`
 - Deployment guide: `docs/kubernetes.md`
+
+### Email Delivery
+
+PocketBase now handles both mail flows server-side:
+
+- Forgot-password emails are sent by PocketBase and link users to `APP_PUBLIC_URL/reset-password/:token`.
+- Newsletter publish notifications are sent to subscribed users when a newsletter is first published.
+
+Relevant environment variables:
+
+- `APP_PUBLIC_URL`
+- `POCKETBASE_PUBLIC_URL`
+- `POCKETBASE_APP_NAME`
+- `POCKETBASE_MAIL_SENDER_NAME`
+- `POCKETBASE_MAIL_SENDER_ADDRESS`
+- `POCKETBASE_SMTP_ENABLED`
+- `POCKETBASE_SMTP_HOST`
+- `POCKETBASE_SMTP_PORT`
+- `POCKETBASE_SMTP_USERNAME`
+- `POCKETBASE_SMTP_PASSWORD`
+- `POCKETBASE_SMTP_AUTH_METHOD`
+- `POCKETBASE_SMTP_TLS`
+- `POCKETBASE_SMTP_LOCAL_NAME`
 
 ---
 

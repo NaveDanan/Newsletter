@@ -37,6 +37,8 @@ The secret keys expected by the chart are:
 - `POCKETBASE_SUPERUSER_PASSWORD`
 - `POCKETBASE_ADMIN_EMAIL`
 - `POCKETBASE_ADMIN_PASSWORD`
+- `POCKETBASE_SMTP_USERNAME`
+- `POCKETBASE_SMTP_PASSWORD`
 
 Example:
 
@@ -48,7 +50,9 @@ kubectl create secret generic newsletter-pocketbase-env \
   --from-literal=POCKETBASE_SUPERUSER_EMAIL=superuser@example.com \
   --from-literal=POCKETBASE_SUPERUSER_PASSWORD=change-this-password \
   --from-literal=POCKETBASE_ADMIN_EMAIL=admin@example.com \
-  --from-literal=POCKETBASE_ADMIN_PASSWORD=change-this-password
+  --from-literal=POCKETBASE_ADMIN_PASSWORD=change-this-password \
+  --from-literal=POCKETBASE_SMTP_USERNAME=smtp-user \
+  --from-literal=POCKETBASE_SMTP_PASSWORD=smtp-password
 ```
 
 ## Install
@@ -74,6 +78,21 @@ helm upgrade --install newsletter ./helm/newsletter \
   --set image.repository=registry.example.com/newsletter \
   --set image.tag=2026.04.12
 ```
+
+## Mail and Reset Links
+
+Set both public URLs in your values file:
+
+```yaml
+env:
+  appPublicUrl: https://newsletter.example.com
+  pocketbasePublicUrl: https://pb.example.com
+```
+
+- `appPublicUrl` is used for newsletter article links and the frontend password-reset page.
+- `pocketbasePublicUrl` is written into PocketBase mail settings and other PocketBase-generated URLs.
+
+SMTP settings are exposed directly in chart values, while the SMTP username and password stay in the Kubernetes secret.
 
 ## Port Forwarding
 

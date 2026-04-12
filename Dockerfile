@@ -39,6 +39,7 @@ COPY --from=runtime-deps /app/node_modules ./node_modules
 COPY package.json ./package.json
 COPY scripts ./scripts
 COPY docker ./docker
+COPY pb_hooks /opt/pocketbase/pb_hooks
 COPY --from=frontend-build /app/dist /usr/share/nginx/html
 COPY --from=pocketbase-dist /pocketbase /opt/pocketbase/pocketbase
 COPY --from=pocketbase-dist /pb_migrations /opt/pocketbase/pb_migrations

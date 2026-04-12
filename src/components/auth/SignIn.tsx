@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowLeft01Icon, ChromeIcon, GithubIcon, Loading02Icon, LockIcon, Mail01Icon, ViewIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, Loading02Icon, LockIcon, Mail01Icon, ViewIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
@@ -103,10 +103,10 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
     }
   };
 
-  const handleSSO = async (provider: 'google' | 'github') => {
+  const handleSSO = async () => {
     setIsLoading(true);
     try {
-      await initiateSSO(provider);
+      await initiateSSO('oidc');
     } finally {
       setIsLoading(false);
     }
@@ -216,16 +216,10 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" onClick={() => handleSSO('google')} disabled={isLoading} className="w-full">
-                <HugeiconsIcon icon={ChromeIcon} className="mr-2 h-4 w-4" />
-                Google
-              </Button>
-              <Button variant="outline" onClick={() => handleSSO('github')} disabled={isLoading} className="w-full">
-                <HugeiconsIcon icon={GithubIcon} className="mr-2 h-4 w-4" />
-                GitHub
-              </Button>
-            </div>
+            <Button variant="outline" onClick={handleSSO} disabled={isLoading} className="w-full">
+              {isLoading && <HugeiconsIcon icon={Loading02Icon} className="mr-2 h-4 w-4 animate-spin" />}
+              {t('auth.signInWithSSO')}
+            </Button>
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

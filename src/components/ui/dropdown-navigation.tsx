@@ -23,6 +23,7 @@ export interface DropdownNavigationItem {
   label: string;
   link?: string;
   dotClassName?: string;
+  dotStyle?: React.CSSProperties;
   subMenus?: DropdownNavigationMenuGroup[];
   onSelect?: () => void;
 }
@@ -93,8 +94,8 @@ export function DropdownNavigation({ navItems, className }: DropdownNavigationPr
                   setHoveredItem(isOpen ? null : navItem.id);
                 }}
               >
-                {navItem.dotClassName ? (
-                  <span className={cn('h-2 w-2 rounded-full', navItem.dotClassName)} aria-hidden="true" />
+                {(navItem.dotClassName || navItem.dotStyle) ? (
+                  <span className={cn('h-2 w-2 rounded-full', navItem.dotClassName)} style={navItem.dotStyle} aria-hidden="true" />
                 ) : null}
                 <span>{navItem.label}</span>
                 <ChevronDown
@@ -116,8 +117,8 @@ export function DropdownNavigation({ navItems, className }: DropdownNavigationPr
                 className="nav-link group relative flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3"
                 onClick={(event) => handleLeafItemClick(event, navItem.onSelect)}
               >
-                {navItem.dotClassName ? (
-                  <span className={cn('h-2 w-2 rounded-full', navItem.dotClassName)} aria-hidden="true" />
+                {(navItem.dotClassName || navItem.dotStyle) ? (
+                  <span className={cn('h-2 w-2 rounded-full', navItem.dotClassName)} style={navItem.dotStyle} aria-hidden="true" />
                 ) : null}
                 <span>{navItem.label}</span>
                 {hoveredItem === navItem.id ? (

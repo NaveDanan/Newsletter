@@ -38,9 +38,21 @@ credentials:
   superuserPassword: change-this-password
   adminEmail: admin@example.com
   adminPassword: change-this-password
+  smtpUsername: ""
+  smtpPassword: ""
 
 env:
+  appPublicUrl: ""
+  pocketbaseAppName: "AI-BREAK"
+  pocketbaseMailSenderName: "AI-BREAK"
+  pocketbaseMailSenderAddress: "newsletter@example.com"
   pocketbasePublicUrl: ""
+  pocketbaseSmtpEnabled: false
+  pocketbaseSmtpHost: ""
+  pocketbaseSmtpPort: 587
+  pocketbaseSmtpAuthMethod: "PLAIN"
+  pocketbaseSmtpTls: false
+  pocketbaseSmtpLocalName: ""
   pocketbaseRecreateCollections: false
 
 extraEnv: []

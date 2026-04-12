@@ -92,7 +92,7 @@ async function main() {
   console.log('Synced users collection schema.');
 
   const adminEmails = new Set();
-  const configuredAdminEmail = env.VITE_ADMIN_EMAIL?.trim();
+  const configuredAdminEmail = env.POCKETBASE_ADMIN_EMAIL?.trim() || env.VITE_ADMIN_EMAIL?.trim();
   if (configuredAdminEmail) {
     adminEmails.add(configuredAdminEmail);
   }

@@ -1,5 +1,6 @@
 image:
-  repository: ghcr.io/example/newsletter
+  registry: ghcr.io
+  repository: example/newsletter
   tag: dev
 
 credentials:

@@ -24,6 +24,12 @@ docker push registry.example.com/newsletter:2026.04.12
 - `helm/newsletter/values.dev.example.yaml`: example for local ingress-based dev clusters
 - `helm/newsletter/values.production.example.yaml`: example for production-style deployment
 
+Image values are split as follows:
+
+- `image.registry`: optional registry host, for example `ghcr.io` or `registry.example.com`
+- `image.repository`: repository path inside that registry, for example `example/newsletter` or `newsletter`
+- `image.tag`: image tag
+
 ## Credentials
 
 The chart supports two modes:
@@ -39,6 +45,9 @@ The secret keys expected by the chart are:
 - `POCKETBASE_ADMIN_PASSWORD`
 - `POCKETBASE_SMTP_USERNAME`
 - `POCKETBASE_SMTP_PASSWORD`
+
+The example below assumes the namespace already exists and is mainly for manual Helm installs.
+If you deploy with ArgoCD and enable namespace auto-creation, either let the chart create the secret from `credentials.*` values, or sync a Secret or ExternalSecret manifest into the same namespace.
 
 Example:
 
@@ -64,7 +73,8 @@ helm upgrade --install newsletter ./helm/newsletter \
   --namespace newsletter \
   --create-namespace \
   -f ./helm/newsletter/values.dev.example.yaml \
-  --set image.repository=ghcr.io/example/newsletter \
+  --set image.registry=ghcr.io \
+  --set image.repository=example/newsletter \
   --set image.tag=dev
 ```
 
@@ -75,9 +85,18 @@ helm upgrade --install newsletter ./helm/newsletter \
   --namespace newsletter \
   --create-namespace \
   -f ./helm/newsletter/values.production.example.yaml \
-  --set image.repository=registry.example.com/newsletter \
+  --set image.registry=registry.example.com \
+  --set image.repository=newsletter \
   --set image.tag=2026.04.12
 ```
+
+## ArgoCD
+
+If you deploy this chart with ArgoCD and want ArgoCD to create the namespace automatically, set the destination namespace on the Application and add `CreateNamespace=true` under `spec.syncPolicy.syncOptions`.
+
+A complete example Application manifest is available in `docs/argocd-application.example.yaml`.
+
+Important detail: `CreateNamespace=true` only creates the namespace. If your chart values use `credentials.existingSecret`, that secret still needs to be created declaratively in the target namespace.
 
 ## Mail and Reset Links
 

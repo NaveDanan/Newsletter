@@ -47,3 +47,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-pb-data" (include "newsletter.fullname" .) -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "newsletter.image" -}}
+{{- $repository := .Values.image.repository -}}
+{{- if .Values.image.registry -}}
+{{- printf "%s/%s:%s" (.Values.image.registry | trimSuffix "/") ($repository | trimPrefix "/") .Values.image.tag -}}
+{{- else -}}
+{{- printf "%s:%s" $repository .Values.image.tag -}}
+{{- end -}}
+{{- end -}}

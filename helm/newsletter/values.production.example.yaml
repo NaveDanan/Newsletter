@@ -1,5 +1,6 @@
 image:
-  repository: registry.example.com/newsletter
+  registry: registry.example.com
+  repository: newsletter
   tag: 2026.04.12
   pullPolicy: IfNotPresent
 

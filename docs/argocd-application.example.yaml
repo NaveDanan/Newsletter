@@ -1,0 +1,59 @@
+# ArgoCD Application example for deploying this chart.
+#
+# Replace the repo URL, revision, image values, and credentials before use.
+# For production, prefer managing secrets separately with SealedSecret,
+# ExternalSecret, or another secret controller and set credentials.existingSecret.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: newsletter
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/Newsletter.git
+    targetRevision: main
+    path: helm/newsletter
+    helm:
+      releaseName: newsletter
+      valuesObject:
+        image:
+          registry: registry.example.com
+          repository: newsletter
+          tag: "2026.04.12"
+          pullPolicy: IfNotPresent
+        credentials:
+          superuserEmail: superuser@example.com
+          superuserPassword: change-this-password
+          adminEmail: admin@example.com
+          adminPassword: change-this-password
+          smtpUsername: smtp-user
+          smtpPassword: smtp-password
+        env:
+          appPublicUrl: https://newsletter.example.com
+          pocketbaseAppName: AI-BREAK
+          pocketbaseMailSenderName: AI-BREAK
+          pocketbaseMailSenderAddress: newsletter@example.com
+          pocketbasePublicUrl: https://pb.example.com
+          pocketbaseSmtpEnabled: true
+          pocketbaseSmtpHost: smtp.example.com
+          pocketbaseSmtpPort: 587
+          pocketbaseSmtpAuthMethod: PLAIN
+          pocketbaseSmtpTls: false
+          pocketbaseSmtpLocalName: ""
+          pocketbaseRecreateCollections: false
+        persistence:
+          enabled: true
+          size: 20Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: newsletter
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    managedNamespaceMetadata:
+      labels:
+        app.kubernetes.io/name: newsletter
+    syncOptions:
+      - CreateNamespace=true

@@ -29,7 +29,7 @@ spec:
       {{- end }}
       containers:
         - name: newsletter
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: {{ include "newsletter.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: frontend

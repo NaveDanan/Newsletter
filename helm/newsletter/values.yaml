@@ -1,7 +1,8 @@
 replicaCount: 1
 
 image:
-  repository: your-registry/newsletter
+  registry: ""
+  repository: your-org/newsletter
   tag: latest
   pullPolicy: IfNotPresent
 

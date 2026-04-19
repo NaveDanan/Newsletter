@@ -32,11 +32,15 @@ write_app_config() {
 const fs = require('node:fs');
 
 const outputPath = process.env.APP_CONFIG_PATH;
-const publicUrl = (process.env.POCKETBASE_PUBLIC_URL || '').trim();
+const pocketbasePublicUrl = (process.env.POCKETBASE_PUBLIC_URL || '').trim();
+const appPublicUrl = (process.env.APP_PUBLIC_URL || '').trim();
+const telemetryRaw = (process.env.NEWSLETTER_TELEMETRY || 'false').trim().toLowerCase();
+const telemetry = telemetryRaw === 'true' || telemetryRaw === '1';
+const resolvedPocketBaseUrlExpression = JSON.stringify(pocketbasePublicUrl || appPublicUrl) + ' || window.location.origin';
 
 fs.writeFileSync(
   outputPath,
-  `window.__APP_CONFIG__ = Object.freeze(${JSON.stringify({ VITE_POCKETBASE_URL: publicUrl })});\n`,
+  `window.__APP_CONFIG__ = Object.freeze({ VITE_POCKETBASE_URL: ${resolvedPocketBaseUrlExpression}, NEWSLETTER_TELEMETRY: ${JSON.stringify(telemetry)} });\n`,
   'utf8',
 );
 EOF

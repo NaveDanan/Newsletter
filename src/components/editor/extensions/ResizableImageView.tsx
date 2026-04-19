@@ -29,6 +29,20 @@ function getWrapPresetWidth(currentWidth: string, container: HTMLDivElement | nu
   return `${nextWidth}px`;
 }
 
+function normalizeOffset(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getPointerAngle(clientX: number, clientY: number, centerX: number, centerY: number) {
+  return (Math.atan2(clientY - centerY, clientX - centerX) * 180) / Math.PI;
+}
+
+function normalizeRotation(value: number) {
+  const normalized = value % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
 export function ResizableImageView({ node, updateAttributes, deleteNode, selected }: NodeViewProps) {
   const {
     src,
@@ -38,65 +52,90 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
     height: initialHeight,
     rotation: initialRotation,
     textWrap: initialTextWrap,
+    offsetX: initialOffsetX,
+    offsetY: initialOffsetY,
   } = node.attrs;
   
   const [width, setWidth] = useState(normalizeDimension(initialWidth, '100%'));
   const [, setHeight] = useState(normalizeDimension(initialHeight, 'auto'));
   const [rotation, setRotation] = useState(initialRotation || 0);
   const [textWrap, setTextWrap] = useState<ResizableImageTextWrap>(initialTextWrap || 'break');
+  const [offset, setOffset] = useState({
+    x: normalizeOffset(initialOffsetX),
+    y: normalizeOffset(initialOffsetY),
+  });
   const [isResizing, setIsResizing] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const dragStartRef = useRef({ x: 0, y: 0 });
+  const rotateStartRef = useRef({ centerX: 0, centerY: 0, angleOffset: 0 });
   const aspectRatioRef = useRef(1);
   const widthRef = useRef(normalizeDimension(initialWidth, '100%'));
   const heightRef = useRef(normalizeDimension(initialHeight, 'auto'));
   const rotationRef = useRef(initialRotation || 0);
   const textWrapRef = useRef<ResizableImageTextWrap>(initialTextWrap || 'break');
+  const offsetRef = useRef({
+    x: normalizeOffset(initialOffsetX),
+    y: normalizeOffset(initialOffsetY),
+  });
 
   useEffect(() => {
     const nextWidth = normalizeDimension(node.attrs.width, '100%');
     const nextHeight = normalizeDimension(node.attrs.height, 'auto');
     const nextRotation = Number(node.attrs.rotation || 0);
     const nextTextWrap = (node.attrs.textWrap || 'break') as ResizableImageTextWrap;
+    const nextOffset = {
+      x: normalizeOffset(node.attrs.offsetX),
+      y: normalizeOffset(node.attrs.offsetY),
+    };
 
     widthRef.current = nextWidth;
     heightRef.current = nextHeight;
     rotationRef.current = nextRotation;
     textWrapRef.current = nextTextWrap;
+    offsetRef.current = nextOffset;
 
     setWidth(nextWidth);
     setHeight(nextHeight);
     setRotation(nextRotation);
     setTextWrap(nextTextWrap);
-  }, [node.attrs.height, node.attrs.rotation, node.attrs.textWrap, node.attrs.width]);
+    setOffset(nextOffset);
+  }, [node.attrs.height, node.attrs.offsetX, node.attrs.offsetY, node.attrs.rotation, node.attrs.textWrap, node.attrs.width]);
 
   const commitAttributes = useCallback((overrides: Partial<{
     width: string;
     height: string;
     rotation: number;
     textWrap: ResizableImageTextWrap;
+    offsetX: number;
+    offsetY: number;
   }> = {}) => {
     const nextWidth = normalizeDimension(overrides.width ?? widthRef.current, '100%');
     const nextHeight = normalizeDimension(overrides.height ?? heightRef.current, 'auto');
     const nextRotation = Number(overrides.rotation ?? rotationRef.current ?? 0);
     const nextTextWrap = (overrides.textWrap ?? textWrapRef.current ?? 'break') as ResizableImageTextWrap;
+    const nextOffsetX = normalizeOffset(overrides.offsetX ?? offsetRef.current.x);
+    const nextOffsetY = normalizeOffset(overrides.offsetY ?? offsetRef.current.y);
 
     const currentWidth = normalizeDimension(node.attrs.width, '100%');
     const currentHeight = normalizeDimension(node.attrs.height, 'auto');
     const currentRotation = Number(node.attrs.rotation || 0);
     const currentTextWrap = (node.attrs.textWrap || 'break') as ResizableImageTextWrap;
+    const currentOffsetX = normalizeOffset(node.attrs.offsetX);
+    const currentOffsetY = normalizeOffset(node.attrs.offsetY);
 
     if (
       currentWidth === nextWidth &&
       currentHeight === nextHeight &&
       currentRotation === nextRotation &&
-      currentTextWrap === nextTextWrap
+      currentTextWrap === nextTextWrap &&
+      currentOffsetX === nextOffsetX &&
+      currentOffsetY === nextOffsetY
     ) {
       return;
     }
@@ -106,8 +145,10 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
       height: nextHeight,
       rotation: nextRotation,
       textWrap: nextTextWrap,
+      offsetX: nextOffsetX,
+      offsetY: nextOffsetY,
     });
-  }, [node.attrs.height, node.attrs.rotation, node.attrs.textWrap, node.attrs.width, updateAttributes]);
+  }, [node.attrs.height, node.attrs.offsetX, node.attrs.offsetY, node.attrs.rotation, node.attrs.textWrap, node.attrs.width, updateAttributes]);
 
   // Handle resize start
   const handleResizeStart = useCallback((e: React.MouseEvent, corner: string) => {
@@ -115,12 +156,11 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
     e.stopPropagation();
     
     setIsResizing(true);
-    const imageRect = imageRef.current?.getBoundingClientRect();
     resizeStartRef.current = {
       x: e.clientX,
       y: e.clientY,
-      width: imageRect?.width || containerRef.current?.offsetWidth || 0,
-      height: imageRect?.height || containerRef.current?.offsetHeight || 0,
+      width: containerRef.current?.offsetWidth || 0,
+      height: containerRef.current?.offsetHeight || 0,
     };
 
     const handleResizeMove = (moveEvent: MouseEvent) => {
@@ -181,12 +221,44 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
     document.addEventListener('mouseup', handleResizeEnd);
   }, [commitAttributes]);
 
-  // Handle rotation
-  const handleRotate = useCallback((direction: number) => {
-    const nextRotation = (rotationRef.current + direction * 90 + 360) % 360;
-    rotationRef.current = nextRotation;
-    setRotation(nextRotation);
-    commitAttributes({ rotation: nextRotation });
+  const handleRotateStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const bounds = containerRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return;
+    }
+
+    rotateStartRef.current = {
+      centerX: bounds.left + (bounds.width / 2),
+      centerY: bounds.top + (bounds.height / 2),
+      angleOffset: getPointerAngle(e.clientX, e.clientY, bounds.left + (bounds.width / 2), bounds.top + (bounds.height / 2)) - rotationRef.current,
+    };
+
+    setIsRotating(true);
+
+    const handleRotateMove = (moveEvent: MouseEvent) => {
+      const currentAngle = getPointerAngle(
+        moveEvent.clientX,
+        moveEvent.clientY,
+        rotateStartRef.current.centerX,
+        rotateStartRef.current.centerY,
+      );
+      const nextRotation = normalizeRotation(currentAngle - rotateStartRef.current.angleOffset);
+      rotationRef.current = nextRotation;
+      setRotation(nextRotation);
+    };
+
+    const handleRotateEnd = () => {
+      setIsRotating(false);
+      commitAttributes({ rotation: rotationRef.current });
+      document.removeEventListener('mousemove', handleRotateMove);
+      document.removeEventListener('mouseup', handleRotateEnd);
+    };
+
+    document.addEventListener('mousemove', handleRotateMove);
+    document.addEventListener('mouseup', handleRotateEnd);
   }, [commitAttributes]);
 
   const handleWrapChange = useCallback((nextWrap: ResizableImageTextWrap) => {
@@ -194,7 +266,8 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
     setTextWrap(nextWrap);
     heightRef.current = 'auto';
     setHeight('auto');
-    setPosition({ x: 0, y: 0 });
+    offsetRef.current = { x: 0, y: 0 };
+    setOffset({ x: 0, y: 0 });
 
     let nextWidth = widthRef.current;
     if (nextWrap !== 'break') {
@@ -207,6 +280,8 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
       width: nextWidth,
       height: heightRef.current,
       textWrap: nextWrap,
+      offsetX: 0,
+      offsetY: 0,
     });
   }, [commitAttributes]);
 
@@ -244,31 +319,40 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
     e.stopPropagation();
     setIsDragging(true);
     dragStartRef.current = {
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
+      x: e.clientX - offsetRef.current.x,
+      y: e.clientY - offsetRef.current.y,
     };
 
     const handleDragMove = (moveEvent: MouseEvent) => {
-      setPosition({
+      const nextOffset = {
         x: moveEvent.clientX - dragStartRef.current.x,
         y: moveEvent.clientY - dragStartRef.current.y,
-      });
+      };
+      offsetRef.current = nextOffset;
+      setOffset(nextOffset);
     };
 
     const handleDragEnd = () => {
       setIsDragging(false);
+      commitAttributes({
+        offsetX: offsetRef.current.x,
+        offsetY: offsetRef.current.y,
+      });
       document.removeEventListener('mousemove', handleDragMove);
       document.removeEventListener('mouseup', handleDragEnd);
     };
 
     document.addEventListener('mousemove', handleDragMove);
     document.addEventListener('mouseup', handleDragEnd);
-  }, [position]);
+  }, [commitAttributes]);
 
   // Reset position
   const handleResetPosition = useCallback(() => {
-    setPosition({ x: 0, y: 0 });
-  }, []);
+    const nextOffset = { x: 0, y: 0 };
+    offsetRef.current = nextOffset;
+    setOffset(nextOffset);
+    commitAttributes({ offsetX: 0, offsetY: 0 });
+  }, [commitAttributes]);
 
   const handleImageLoad = useCallback(() => {
     if (!imageRef.current) {
@@ -286,18 +370,18 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
       as="div"
       className={`resizable-image-wrapper ${selected ? 'selected' : ''}`}
       data-text-wrap={textWrap}
+      style={{
+        width,
+        transform: (offset.x !== 0 || offset.y !== 0) ? `translate(${offset.x}px, ${offset.y}px)` : undefined,
+        cursor: isDragging ? 'grabbing' : undefined,
+      }}
       onMouseEnter={() => setShowControls(true)}
-      onMouseLeave={() => !isResizing && !isDragging && setShowControls(false)}
+      onMouseLeave={() => !isResizing && !isDragging && !isRotating && setShowControls(false)}
     >
       <div
         ref={containerRef}
         className="resizable-image-container"
-        style={{
-          width: typeof width === 'string' ? width : `${width}px`,
-          transform: `translate(${position.x}px, ${position.y}px) rotate(${rotation}deg)`,
-          position: isDragging ? 'relative' : 'static',
-          cursor: isDragging ? 'grabbing' : 'default',
-        }}
+        style={{ width: '100%' }}
       >
         <img
           ref={imageRef}
@@ -307,6 +391,10 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
           className="resizable-image"
           draggable={false}
           onLoad={handleImageLoad}
+          style={{
+            transform: rotation !== 0 ? `rotate(${rotation}deg)` : undefined,
+            transformOrigin: 'center center',
+          }}
         />
 
         {/* Resize handles - only show when selected */}
@@ -375,16 +463,9 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
               <HugeiconsIcon icon={TextAlignRightIcon} className="w-4 h-4" />
             </button>
             <button
-              className="image-control-btn"
-              onClick={() => handleRotate(-1)}
-              title="Rotate left"
-            >
-              <HugeiconsIcon icon={RotateRight01Icon} className="w-4 h-4" style={{ transform: 'scaleX(-1)' }} />
-            </button>
-            <button
-              className="image-control-btn"
-              onClick={() => handleRotate(1)}
-              title="Rotate right"
+              className={`image-control-btn ${isRotating ? 'image-control-btn-active' : ''}`}
+              onMouseDown={handleRotateStart}
+              title="Rotate image"
             >
               <HugeiconsIcon icon={RotateRight01Icon} className="w-4 h-4" />
             </button>
@@ -395,7 +476,7 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
             >
               <HugeiconsIcon icon={MoveIcon} className="w-4 h-4" />
             </button>
-            {(position.x !== 0 || position.y !== 0) && (
+            {(offset.x !== 0 || offset.y !== 0) && (
               <button
                 className="image-control-btn"
                 onClick={handleResetPosition}

@@ -279,37 +279,41 @@
 }
 
 /* Resizable Image Styles */
-.resizable-image-wrapper {
+.resizable-image-wrapper,
+.media-embed-wrapper {
   position: relative;
   display: block;
-  width: fit-content;
   max-width: 100%;
   clear: both;
   margin: 1rem auto;
 }
 
-.resizable-image-wrapper[data-text-wrap="left"] {
+.resizable-image-wrapper[data-text-wrap="left"],
+.media-embed-wrapper[data-text-wrap="left"] {
   float: left;
   clear: none;
   margin: 0.35rem 1.5rem 1rem 0;
 }
 
-.resizable-image-wrapper[data-text-wrap="right"] {
+.resizable-image-wrapper[data-text-wrap="right"],
+.media-embed-wrapper[data-text-wrap="right"] {
   float: right;
   clear: none;
   margin: 0.35rem 0 1rem 1.5rem;
 }
 
-.resizable-image-wrapper.selected {
+.resizable-image-wrapper.selected,
+.media-embed-wrapper.selected {
   outline: 2px solid #D93A3A;
   outline-offset: 4px;
   border-radius: 4px;
 }
 
-.resizable-image-container {
+.resizable-image-container,
+.media-embed-container {
   position: relative;
   display: block;
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
 }
 
@@ -416,7 +420,9 @@
 }
 
 .resizable-image-wrapper:hover .image-controls,
-.resizable-image-wrapper.selected .image-controls {
+.resizable-image-wrapper.selected .image-controls,
+.media-embed-wrapper:hover .image-controls,
+.media-embed-wrapper.selected .image-controls {
   opacity: 1;
   visibility: visible;
 }
@@ -450,7 +456,11 @@
 
 /* ProseMirror specific for resizable images */
 .ProseMirror .resizable-image-wrapper {
-  width: fit-content;
+  max-width: 100%;
+  margin: 1.5em auto;
+}
+
+.ProseMirror .media-embed-wrapper {
   max-width: 100%;
   margin: 1.5em auto;
 }
@@ -460,7 +470,17 @@
   outline-offset: 4px;
 }
 
+.ProseMirror .media-embed-wrapper.ProseMirror-selectednode {
+  outline: 2px solid #D93A3A;
+  outline-offset: 4px;
+}
+
 .ProseMirror .resizable-image-wrapper.ProseMirror-selectednode .image-controls {
+  opacity: 1;
+  visibility: visible;
+}
+
+.ProseMirror .media-embed-wrapper.ProseMirror-selectednode .image-controls {
   opacity: 1;
   visibility: visible;
 }
@@ -874,6 +894,11 @@
 
 /* RTL image alignment */
 .ProseMirror [dir="rtl"] .resizable-image-wrapper {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.ProseMirror [dir="rtl"] .media-embed-wrapper {
   margin-left: auto;
   margin-right: 0;
 }

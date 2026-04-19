@@ -10,10 +10,15 @@ export interface ResizableImageOptions {
 
 export type ResizableImageTextWrap = 'break' | 'left' | 'right';
 
+function normalizeImageOffset(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     resizableImage: {
-      setResizableImage: (options: { src: string; alt?: string; title?: string; width?: string; height?: string; rotation?: number; textWrap?: ResizableImageTextWrap }) => ReturnType;
+      setResizableImage: (options: { src: string; alt?: string; title?: string; width?: string; height?: string; rotation?: number; textWrap?: ResizableImageTextWrap; offsetX?: number; offsetY?: number }) => ReturnType;
     };
   }
 }
@@ -64,6 +69,12 @@ export const ResizableImage = Node.create<ResizableImageOptions>({
       textWrap: {
         default: 'break',
       },
+      offsetX: {
+        default: 0,
+      },
+      offsetY: {
+        default: 0,
+      },
       style: {
         default: null,
         parseHTML: (element) => element.getAttribute('style'),
@@ -94,6 +105,8 @@ export const ResizableImage = Node.create<ResizableImageOptions>({
             height: element.style.height || element.getAttribute('height') || 'auto',
             rotation: parseInt(element.getAttribute('data-rotation') || '0'),
             textWrap: element.getAttribute('data-text-wrap') || element.style.float || 'break',
+            offsetX: normalizeImageOffset(element.getAttribute('data-offset-x')),
+            offsetY: normalizeImageOffset(element.getAttribute('data-offset-y')),
           };
         },
       },
@@ -101,12 +114,25 @@ export const ResizableImage = Node.create<ResizableImageOptions>({
   },
 
   renderHTML({ HTMLAttributes }) {
-    const { width, height, rotation, textWrap, ...attrs } = HTMLAttributes;
+    const { width, height, rotation, textWrap, offsetX, offsetY, style: _style, ...attrs } = HTMLAttributes;
     
     const styleParts: string[] = [];
     if (width && width !== 'auto') styleParts.push(`width: ${width}`);
     if (height && height !== 'auto') styleParts.push(`height: ${height}`);
-    if (rotation) styleParts.push(`transform: rotate(${rotation}deg)`);
+
+    const normalizedOffsetX = normalizeImageOffset(offsetX);
+    const normalizedOffsetY = normalizeImageOffset(offsetY);
+    const transformParts: string[] = [];
+    if (normalizedOffsetX !== 0 || normalizedOffsetY !== 0) {
+      transformParts.push(`translate(${normalizedOffsetX}px, ${normalizedOffsetY}px)`);
+    }
+    if (rotation) {
+      transformParts.push(`rotate(${rotation}deg)`);
+    }
+    if (transformParts.length > 0) {
+      styleParts.push(`transform: ${transformParts.join(' ')}`);
+    }
+
     if (textWrap === 'left') {
       styleParts.push('float: left');
       styleParts.push('margin: 0.35em 1.5em 1em 0');
@@ -126,6 +152,8 @@ export const ResizableImage = Node.create<ResizableImageOptions>({
         style: styleParts.join('; '),
         'data-rotation': rotation || '0',
         'data-text-wrap': textWrap || 'break',
+        'data-offset-x': String(normalizedOffsetX),
+        'data-offset-y': String(normalizedOffsetY),
       },
     ];
   },

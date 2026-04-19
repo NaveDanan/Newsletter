@@ -2,6 +2,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, FloppyDiskIcon, Tag01Icon, UserIcon, ViewIcon } from "@hugeicons/core-free-icons";
 import { forwardRef, startTransition, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
+import { NewsletterContent } from '@/components/newsletter/NewsletterContent';
 import { cn } from '@/lib/utils';
 import { AdvancedEditor, type AdvancedEditorHandle } from '../../components/editor/AdvancedEditor';
 import { FileUploadZone } from '../../components/upload/FileUploadZone';
@@ -42,6 +43,7 @@ interface NewsletterEditorProps {
   onSave: (data: NewsletterFormData) => void;
   onUpdate?: (id: string, data: Partial<NewsletterFormData>) => void;
   onAutoSave?: (id: string | null, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
+  onUploadPresentation?: (id: string, file: File) => Promise<{ newsletter: Newsletter; url: string; fileName: string } | null> | { newsletter: Newsletter; url: string; fileName: string } | null;
   onCancel: () => void;
   isEditing?: boolean;
 }
@@ -51,6 +53,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
   onSave, 
   onUpdate, 
   onAutoSave,
+  onUploadPresentation,
   onCancel,
   isEditing = false 
 }, ref) {
@@ -147,6 +150,49 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
 
     return result;
   }, [autoSaveDraftId, getCurrentFormData, isAutoSaveEnabled, onAutoSave]);
+
+  const handleUploadPresentation = useCallback(async (file: File) => {
+    if (!onUploadPresentation) {
+      return null;
+    }
+
+    let targetNewsletterId = autoSaveDraftId;
+
+    if (!targetNewsletterId && onAutoSave) {
+      const nextFormData = getCurrentFormData();
+      const seedDraftResult = onAutoSave(null, {
+        ...nextFormData,
+        title: nextFormData.title.trim() || 'Untitled Draft',
+        status: 'draft',
+      });
+      const seededDraft = seedDraftResult instanceof Promise ? await seedDraftResult : seedDraftResult;
+      if (seededDraft) {
+        targetNewsletterId = seededDraft.id;
+        setAutoSaveDraftId(seededDraft.id);
+        setLastAutoSavedAt(new Date());
+      }
+    }
+
+    if (!targetNewsletterId) {
+      toast.error(t('editor.presentationDraftRequired'));
+      return null;
+    }
+
+    const uploadResult = onUploadPresentation(targetNewsletterId, file);
+    const uploaded = uploadResult instanceof Promise ? await uploadResult : uploadResult;
+
+    if (!uploaded) {
+      return null;
+    }
+
+    setAutoSaveDraftId(uploaded.newsletter.id);
+    setLastAutoSavedAt(new Date());
+
+    return {
+      src: uploaded.url,
+      title: file.name,
+    };
+  }, [autoSaveDraftId, getCurrentFormData, onAutoSave, onUploadPresentation, t]);
 
   useEffect(() => {
     if (!isAutoSaveEnabled || isHydratingFromNewsletter.current) {
@@ -321,10 +367,10 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
             )}
 
             {/* Article Body */}
-            <div 
+            <NewsletterContent
+              html={formData.content}
               className="newsletter-article"
               dir="auto"
-              dangerouslySetInnerHTML={{ __html: formData.content }}
             />
           </div>
         </div>
@@ -404,7 +450,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
             value={formData.coverImage}
             onChange={(url) => setFormData(prev => ({ ...prev, coverImage: url }))}
             label={t('manager.uploadCoverImage')}
-            maxSize={5}
+            maxSize={10}
           />
         </div>
 
@@ -480,6 +526,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
             onChange={(content) => setFormData(prev => ({ ...prev, content }))}
             placeholder={t('manager.editorPlaceholder')}
             title={formData.title || t('manager.editorTitleFallback')}
+            onUploadPresentation={handleUploadPresentation}
           />
         </div>
 

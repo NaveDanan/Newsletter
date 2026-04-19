@@ -94,15 +94,23 @@ This repo includes a single-container setup that serves the React frontend on po
 docker compose --env-file .env up --build
 ```
 
+If you prefer building and running directly without Compose, use the PocketBase build context explicitly and pass the Docker env file at runtime:
+
+```bash
+docker build --build-context pocketbase-dist=C:/Users/your-user/Downloads/pocketbase_0.36.9_linux_amd64 -t newsletter:v1.0.4 .
+docker run -d --name newsletter-app --env-file .env.docker.example -p 8080:8080 -p 8090:8090 -v C:/path/to/pb_data:/pb_data newsletter:v1.0.4
+```
+
 Frontend: `http://localhost:8080`
 PocketBase UI: `http://localhost:8090/_/`
 
 Notes:
 - The frontend reads PocketBase URL from a runtime `app-config.js`, so the container image is not locked to a single backend URL.
+- The container Nginx proxies `/api/*` and `/_/` to the PocketBase process on port `8090`, so browser traffic can use the same public origin as the frontend.
 - Destructive collection recreation is disabled by default. Set `POCKETBASE_RECREATE_COLLECTIONS=1` only if you intentionally want startup to drop and recreate the app collections.
 - Safe collection schema sync, mail settings sync, users schema sync, and optional app-admin bootstrap run on every start.
 - Set `APP_PUBLIC_URL` to the public frontend URL. It is used for newsletter article links and the frontend password reset page.
-- Set `POCKETBASE_PUBLIC_URL` to the public PocketBase URL. It is written into PocketBase mail settings and dashboard-generated links.
+- Leave `POCKETBASE_PUBLIC_URL` empty when you want the frontend to use the same public origin as the app through the built-in Nginx proxy. Set it only if you intentionally expose PocketBase on a separate public address.
 - SMTP is configured with the `POCKETBASE_MAIL_*` and `POCKETBASE_SMTP_*` environment variables.
 
 ### Kubernetes

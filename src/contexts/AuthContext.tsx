@@ -42,6 +42,15 @@ function mapAuthUser(model: Record<string, unknown>, avatarUrl?: string): Pocket
   };
 }
 
+function getRecordFileUrl(pb: ReturnType<typeof getPocketBase>, record: Record<string, unknown>, fileName: string): string {
+  const files = pb.files as { getURL?: (record: Record<string, unknown>, fileName: string) => string; getUrl?: (record: Record<string, unknown>, fileName: string) => string };
+  if (typeof files.getURL === 'function') {
+    return files.getURL(record, fileName);
+  }
+
+  return files.getUrl ? files.getUrl(record, fileName) : '';
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pb = getPocketBase();
   const [user, setUser] = useState<PocketBaseUser | null>(null);
@@ -55,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const authModel = pb.authStore.model as Record<string, unknown> | null;
     if (authModel && pb.authStore.isValid) {
       const avatarFile = typeof authModel.avatar === 'string' ? authModel.avatar : '';
-      const avatar = avatarFile ? pb.files.getUrl(authModel, avatarFile) : undefined;
+      const avatar = avatarFile ? getRecordFileUrl(pb, authModel, avatarFile) : undefined;
       setUser(mapAuthUser(authModel, avatar));
       bootLogger.step('auth', 'Restored authenticated user from PocketBase auth store', {
         userId: String(authModel.id ?? ''),
@@ -74,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (token && model) {
         const authModelRecord = model as Record<string, unknown>;
         const avatarFile = typeof authModelRecord.avatar === 'string' ? authModelRecord.avatar : '';
-        const avatar = avatarFile ? pb.files.getUrl(authModelRecord, avatarFile) : undefined;
+        const avatar = avatarFile ? getRecordFileUrl(pb, authModelRecord, avatarFile) : undefined;
         setUser(mapAuthUser(authModelRecord, avatar));
         bootLogger.step('auth', 'PocketBase auth store emitted authenticated user change', {
           userId: String(authModelRecord.id ?? ''),

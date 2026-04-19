@@ -5,6 +5,15 @@ import type { NavigationLink, NavigationLinkFormData } from '@/types/navigation-
 
 export const NAVIGATION_LINKS_COLLECTION = 'navigation_links';
 
+function getRecordFileUrl(pb: ReturnType<typeof getPocketBase>, record: RecordModel, fileName: string): string {
+  const files = pb.files as { getURL?: (record: RecordModel, fileName: string) => string; getUrl?: (record: RecordModel, fileName: string) => string };
+  if (typeof files.getURL === 'function') {
+    return files.getURL(record, fileName);
+  }
+
+  return files.getUrl ? files.getUrl(record, fileName) : '';
+}
+
 /**
  * Check if a string is a base64 data URI (custom uploaded image, not an SVG default icon).
  */
@@ -32,7 +41,7 @@ export function mapPBRecordToNavigationLink(record: RecordModel): NavigationLink
   // Resolve icon: prefer uploaded file, fall back to iconUrl text field
   let resolvedIconUrl = record['iconUrl'] ?? '';
   if (record['icon']) {
-    resolvedIconUrl = pb.files.getUrl(record, record['icon']);
+    resolvedIconUrl = getRecordFileUrl(pb, record, record['icon']);
   }
 
   return normalizeNavigationLink({

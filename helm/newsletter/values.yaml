@@ -55,6 +55,7 @@ env:
   pocketbaseSmtpTls: false
   pocketbaseSmtpLocalName: ""
   pocketbaseRecreateCollections: false
+  newsletterTelemetry: false
 
 extraEnv: []
 # - name: NODE_ENV

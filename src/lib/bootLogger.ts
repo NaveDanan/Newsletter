@@ -1,3 +1,5 @@
+import { isTelemetryEnabled } from './runtime-config';
+
 type BootLogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal' | 'success';
 
 export interface BootLogEntry {
@@ -90,9 +92,11 @@ class BootLogger {
     this.registerDumpHelper();
     window.__NEWSLETTER_BOOT_LOGS__ = this.entries;
 
-    console.info(
-      '[boot] Startup logger initialized. Inspect window.__NEWSLETTER_BOOT_LOGS__ or run window.__NEWSLETTER_DUMP_BOOT_LOGS__() in the browser console.',
-    );
+    if (isTelemetryEnabled()) {
+      console.info(
+        '[boot] Startup logger initialized. Inspect window.__NEWSLETTER_BOOT_LOGS__ or run window.__NEWSLETTER_DUMP_BOOT_LOGS__() in the browser console.',
+      );
+    }
   }
 
   once(key: string, callback: () => void) {
@@ -164,26 +168,28 @@ class BootLogger {
       window.__NEWSLETTER_BOOT_LOGS__ = this.entries;
     }
 
-    const consoleMethod = level === 'fatal'
-      ? 'error'
-      : level === 'error'
+    if (isTelemetryEnabled()) {
+      const consoleMethod = level === 'fatal'
         ? 'error'
-        : level === 'warn'
-          ? 'warn'
-          : 'log';
+        : level === 'error'
+          ? 'error'
+          : level === 'warn'
+            ? 'warn'
+            : 'log';
 
-    const prefix = `${entry.elapsedLabel} [boot:${scope}] ${message}`;
+      const prefix = `${entry.elapsedLabel} [boot:${scope}] ${message}`;
 
-    if (data === undefined) {
-      console[consoleMethod](prefix);
-    } else {
-      console.groupCollapsed(prefix);
-      console[consoleMethod](data);
-      console.groupEnd();
-    }
+      if (data === undefined) {
+        console[consoleMethod](prefix);
+      } else {
+        console.groupCollapsed(prefix);
+        console[consoleMethod](data);
+        console.groupEnd();
+      }
 
-    if (level === 'fatal') {
-      this.dumpToConsole('fatal-error');
+      if (level === 'fatal') {
+        this.dumpToConsole('fatal-error');
+      }
     }
   }
 
@@ -221,6 +227,10 @@ class BootLogger {
   }
 
   private dumpToConsole(reason: string) {
+    if (!isTelemetryEnabled()) {
+      return;
+    }
+
     if (this.entries.length === 0) {
       console.info(`[boot] No startup logs collected for ${reason}.`);
       return;

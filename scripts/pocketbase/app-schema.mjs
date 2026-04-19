@@ -24,7 +24,7 @@ const bool = (name, options = {}) => withFieldOptions({
   required: false,
 }, options);
 
-const file = (name, maxSelect = 1, maxSize = 5242880, mimeTypes = [], options = {}) => withFieldOptions({
+const file = (name, maxSelect = 1, maxSize = 10485760, mimeTypes = [], options = {}) => withFieldOptions({
   name,
   type: 'file',
   required: false,
@@ -92,6 +92,10 @@ export const NEWSLETTERS_SCHEMA = {
     text('publishedAt'),
     text('readTime'),
     text('coverImage', 20000000),
+    file('presentationFiles', 25, 104857600, [
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.ms-powerpoint',
+    ]),
     bool('hasAudio'),
     text('audioDuration'),
     number('likes'),
@@ -122,7 +126,7 @@ export const NAVIGATION_LINKS_SCHEMA = {
     text('description', 5000),
     text('url', 200000),
     text('iconUrl', 200000),
-    file('icon', 1, 5242880, [
+    file('icon', 1, 10485760, [
       'image/png', 'image/jpeg', 'image/gif', 'image/svg+xml', 'image/webp',
     ]),
     bool('hidden'),
@@ -174,10 +178,35 @@ export const NEWSLETTER_SUBSCRIBERS_SCHEMA = {
   deleteRule: '@request.auth.role = "admin"',
 };
 
+export const LINKS_SCHEMA = {
+  name: 'links',
+  type: 'base',
+  fields: [
+    autodate('created', true, false),
+    autodate('updated', true, true),
+    text('title', 1000, { required: true }),
+    text('url', 200000, { required: true }),
+    text('description', 10000),
+    text('category', 500),
+    text('iconUrl', 200000),
+    file('icon', 1, 10485760, [
+      'image/png', 'image/jpeg', 'image/gif', 'image/svg+xml', 'image/webp',
+    ]),
+    bool('hidden'),
+    number('order'),
+  ],
+  listRule: '',
+  viewRule: '',
+  createRule: '@request.auth.role = "admin"',
+  updateRule: '@request.auth.role = "admin"',
+  deleteRule: '@request.auth.role = "admin"',
+};
+
 export const APP_COLLECTION_SCHEMAS = [
   PROJECTS_SCHEMA,
   NEWSLETTERS_SCHEMA,
   NAVIGATION_LINKS_SCHEMA,
   NAV_DROPDOWNS_SCHEMA,
   NEWSLETTER_SUBSCRIBERS_SCHEMA,
+  LINKS_SCHEMA,
 ];

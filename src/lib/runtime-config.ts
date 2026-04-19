@@ -31,3 +31,22 @@ export function getDefaultPocketBaseUrl(): string {
 export function getPocketBaseUrl(): string {
   return getAppConfigValue('VITE_POCKETBASE_URL') || getDefaultPocketBaseUrl();
 }
+
+export function isTelemetryEnabled(): boolean {
+  const runtimeValue = runtimeConfig['NEWSLETTER_TELEMETRY'];
+  if (typeof runtimeValue === 'boolean') {
+    return runtimeValue;
+  }
+  if (typeof runtimeValue === 'string') {
+    const v = runtimeValue.toLowerCase();
+    return v === 'true' || v === '1';
+  }
+
+  const buildValue = import.meta.env.VITE_NEWSLETTER_TELEMETRY;
+  if (typeof buildValue === 'string') {
+    const v = buildValue.toLowerCase();
+    return v === 'true' || v === '1';
+  }
+
+  return false;
+}

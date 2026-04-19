@@ -28,22 +28,13 @@ export function useNavigationDropdowns() {
     pbFetchDropdowns()
       .then((data) => {
         if (cancelled) return;
-        // If PB collection is empty, seed it from defaults
+        // If the collection is empty, fall back to local defaults instead of
+        // attempting to seed PocketBase from the client. Client-side seeding
+        // can fail on environments where the current user cannot create these
+        // admin-only records yet.
         if (data.length === 0) {
-          const seed = readStoredDropdowns();
-          Promise.all(seed.map((d) => pbCreateDropdown({ label: d.label, dotColor: d.dotColor, hidden: d.hidden, order: d.order })))
-            .then((created) => {
-              if (!cancelled) {
-                setDropdowns(created);
-                setStorageMode('pocketbase');
-              }
-            })
-            .catch(() => {
-              if (!cancelled) {
-                setDropdowns(seed);
-                setStorageMode('local');
-              }
-            });
+          setDropdowns(readStoredDropdowns());
+          setStorageMode('local');
         } else {
           setDropdowns(data);
           setStorageMode('pocketbase');

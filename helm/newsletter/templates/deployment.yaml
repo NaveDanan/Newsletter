@@ -97,6 +97,8 @@ spec:
               value: {{ .Values.env.pocketbaseSmtpLocalName | quote }}
             - name: POCKETBASE_RECREATE_COLLECTIONS
               value: {{ ternary "1" "0" .Values.env.pocketbaseRecreateCollections | quote }}
+            - name: NEWSLETTER_TELEMETRY
+              value: {{ ternary "true" "false" .Values.env.newsletterTelemetry | quote }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

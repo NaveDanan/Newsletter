@@ -3,7 +3,6 @@ import { Heart, Message01Icon, SentIcon, SmileIcon, TextBoldIcon, TextItalicIcon
 import { useEffect, useState, type ReactNode } from 'react';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
-import UnderlineExtension from '@tiptap/extension-underline';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { COMMENT_EMOJIS, formatCommentBodyToHtml, stripCommentFormatting } from '@/lib/comment-formatting';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -107,7 +106,6 @@ export function CommentReply({
       Placeholder.configure({
         placeholder: isAuthenticated ? t('comment.replyPlaceholder') : t('comment.signInToReply'),
       }),
-      UnderlineExtension,
     ],
     content: value || '',
     onUpdate: ({ editor: currentEditor }) => {

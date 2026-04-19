@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { CommentReply } from '@/components/ui/comment-reply';
 import { useLocale } from '@/contexts/LocaleContext';
+import { NewsletterContent } from '@/components/newsletter/NewsletterContent';
 import { stripCommentFormatting } from '@/lib/comment-formatting';
 import { cn } from '@/lib/utils';
 import type { PocketBaseUser } from '@/lib/pocketbase/client';
@@ -220,10 +221,10 @@ export function NewsletterViewer({
           </div>
         )}
 
-        <div
+        <NewsletterContent
+          html={newsletter.content}
           className="newsletter-article"
           dir="auto"
-          dangerouslySetInnerHTML={{ __html: newsletter.content }}
         />
 
         {/* <div className="mt-10 grid gap-4 rounded-[2rem] border border-[#E5E5E5] bg-[#FAFAFA] p-4 sm:grid-cols-3 sm:p-5">

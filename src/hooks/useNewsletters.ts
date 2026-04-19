@@ -8,6 +8,7 @@ import {
   createNewsletter,
   patchNewsletter,
   removeNewsletter,
+  uploadNewsletterPresentation,
 } from '@/lib/pocketbase/newsletters';
 import type { PocketBaseUser, UserRole } from '@/lib/pocketbase/client';
 import type { Newsletter, NewsletterComment, NewsletterFormData } from '../types/newsletter';
@@ -313,6 +314,24 @@ export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersO
     }
   }, [currentUser?.id, newsletters]);
 
+  const uploadPresentation = useCallback(async (id: string, file: File) => {
+    const existing = newsletters.find((newsletter) => newsletter.id === id);
+    if (!existing) return null;
+    if (!canEditNewsletter(currentUserRole, currentUser?.id, existing)) return null;
+
+    try {
+      const uploaded = await uploadNewsletterPresentation(id, file);
+      setNewsletters((prev) => prev.map((newsletter) => (
+        newsletter.id === id ? uploaded.newsletter : newsletter
+      )));
+      return uploaded;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to upload PowerPoint file';
+      toast.error(message);
+      return null;
+    }
+  }, [currentUser?.id, currentUserRole, newsletters]);
+
   return {
     newsletters,
     isLoading,
@@ -328,6 +347,7 @@ export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersO
     toggleNewsletterLike,
     addNewsletterComment,
     toggleCommentLike,
+    uploadPresentation,
   };
 }
 

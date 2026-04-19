@@ -46,6 +46,7 @@ interface ManagerDashboardProps {
   addNewsletter: (data: NewsletterFormData) => Promise<Newsletter | null> | Newsletter | null;
   upsertDraftNewsletter: (id: string | null, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
   updateNewsletter: (id: string, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
+  uploadPresentation: (id: string, file: File) => Promise<{ newsletter: Newsletter; url: string; fileName: string } | null> | { newsletter: Newsletter; url: string; fileName: string } | null;
   deleteNewsletter: (id: string) => Promise<boolean> | boolean;
   onToggleNewsletterLike: (newsletterId: string) => void;
   onAddNewsletterComment: (newsletterId: string, body: string) => Promise<NewsletterComment | null> | NewsletterComment | null;
@@ -64,6 +65,7 @@ export function ManagerDashboard({
   addNewsletter,
   upsertDraftNewsletter,
   updateNewsletter,
+  uploadPresentation,
   deleteNewsletter,
   onToggleNewsletterLike,
   onAddNewsletterComment,
@@ -205,6 +207,7 @@ export function ManagerDashboard({
             onSave={handleSaveNewsletter}
             onUpdate={handleUpdateNewsletter}
             onAutoSave={handleAutoSaveNewsletter}
+            onUploadPresentation={uploadPresentation}
             onCancel={() => requestLeaveEditor(handleBackToList)}
             isEditing={!!editingNewsletter}
           />

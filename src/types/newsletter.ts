@@ -28,6 +28,7 @@ export interface Newsletter {
   status: 'draft' | 'published';
   hasAudio?: boolean;
   audioDuration?: string;
+  presentationFiles?: string[];
   likedByUserIds: string[];
   commentItems: NewsletterComment[];
 }

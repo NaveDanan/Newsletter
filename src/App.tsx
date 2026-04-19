@@ -195,6 +195,7 @@ function App() {
     addNewsletter,
     upsertDraftNewsletter,
     updateNewsletter,
+    uploadPresentation,
     deleteNewsletter,
     toggleNewsletterLike,
     addNewsletterComment,
@@ -543,6 +544,7 @@ function App() {
           addNewsletter={addNewsletter}
           upsertDraftNewsletter={upsertDraftNewsletter}
           updateNewsletter={updateNewsletter}
+          uploadPresentation={uploadPresentation}
           deleteNewsletter={deleteNewsletter}
           onToggleNewsletterLike={handleArticleLike}
           onAddNewsletterComment={handleArticleComment}

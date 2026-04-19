@@ -32,7 +32,9 @@ function isLocale(value: unknown): value is Locale {
 }
 
 function asDate(value: Date | string | number) {
-  return value instanceof Date ? value : new Date(value);
+  if (value instanceof Date) return value;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? new Date() : d;
 }
 
 export function LocaleProvider({ children }: { children: ReactNode }) {

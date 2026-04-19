@@ -1,5 +1,5 @@
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import { ArrowDown01Icon, CheckmarkSquare01Icon, CodeIcon, FolderOpenIcon, GlobeIcon, Image01Icon, LeftToRightListNumberIcon, Link01Icon, List, MinusSignIcon, QuoteUpIcon, RedoIcon, Search01Icon, TextBoldIcon, TextClearIcon, TextItalicIcon, TextStrikethroughIcon, TextSubscriptIcon, TextSuperscriptIcon, TextUnderlineIcon, UndoIcon, Upload01Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, CheckmarkSquare01Icon, CodeIcon, FolderOpenIcon, GlobeIcon, Image01Icon, LeftToRightListNumberIcon, Link01Icon, List, MinusSignIcon, MusicNote01Icon, Pdf01Icon, Presentation01Icon, QuoteUpIcon, RedoIcon, Search01Icon, TextBoldIcon, TextClearIcon, TextItalicIcon, TextStrikethroughIcon, TextSubscriptIcon, TextSuperscriptIcon, TextUnderlineIcon, UndoIcon, Upload01Icon, Video01Icon } from "@hugeicons/core-free-icons";
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -21,6 +21,7 @@ import Typography from '@tiptap/extension-typography';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useLocale } from '@/contexts/LocaleContext';
+import { MediaEmbed, type MediaEmbedType } from './extensions/MediaEmbed';
 import { ResizableImage } from './extensions/ResizableImage';
 import { FontSelector } from './toolbar/FontSelector';
 import { FontSizeSelector } from './toolbar/FontSizeSelector';
@@ -44,6 +45,7 @@ interface AdvancedEditorProps {
   onChange: (content: string) => void;
   placeholder?: string;
   title?: string;
+  onUploadPresentation?: (file: File) => Promise<{ src: string; title?: string } | null>;
 }
 
 export interface AdvancedEditorHandle {
@@ -87,12 +89,15 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
   onChange,
   placeholder,
   title,
+  onUploadPresentation,
 }, ref) {
   const { isRTL, locale, t } = useLocale();
   const [isDragging, setIsDragging] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFindReplace, setShowFindReplace] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaFileInputRef = useRef<HTMLInputElement>(null);
+  const mediaFileTypeRef = useRef<MediaEmbedType>('video');
   const resolvedPlaceholder = placeholder ?? t('editor.startWriting');
   const withShortcut = useCallback((label: string, shortcut: string) => `${label} (${shortcut})`, []);
 
@@ -136,6 +141,7 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
       }),
       CharacterCount,
       Typography,
+      MediaEmbed,
     ],
     textDirection: isRTL ? 'rtl' : 'ltr',
     content,
@@ -267,6 +273,88 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
     toast.success(t('editor.formattingCleared'));
   }, [editor, t]);
 
+  // Media helpers
+  const insertMediaFromUrl = useCallback((mediaType: MediaEmbedType) => {
+    if (!editor) return;
+    const promptText: Record<MediaEmbedType, string> = {
+      video: t('editor.enterVideoUrl'),
+      audio: t('editor.enterAudioUrl'),
+      pdf: t('editor.enterPdfUrl'),
+      pptx: t('editor.enterPdfUrl'),
+    };
+    const url = window.prompt(promptText[mediaType]);
+    if (url?.trim()) {
+      editor.chain().focus().insertMediaEmbed({ src: url.trim(), mediaType }).run();
+    }
+  }, [editor, t]);
+
+  const processMediaFile = useCallback(async (file: File, mediaType: MediaEmbedType) => {
+    if (!editor) return;
+    const allowedTypes: Record<MediaEmbedType, string[]> = {
+      video: ['video/'],
+      audio: ['audio/'],
+      pdf: ['application/pdf'],
+      pptx: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+    };
+    const isPptxFile = mediaType === 'pptx' && file.name.toLowerCase().endsWith('.pptx');
+    const isValidType = isPptxFile || allowedTypes[mediaType].some((prefix) => file.type.startsWith(prefix));
+    if (!isValidType) {
+      toast.error(mediaType === 'pptx' ? t('editor.onlyPptxFiles') : t('editor.invalidMediaType'));
+      return;
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error(t('editor.mediaTooLarge'));
+      return;
+    }
+
+    if (mediaType === 'pptx') {
+      if (!onUploadPresentation) {
+        toast.error(t('editor.presentationUploadUnavailable'));
+        return;
+      }
+
+      const uploaded = await onUploadPresentation(file);
+      if (!uploaded) {
+        return;
+      }
+
+      editor.chain().focus().insertMediaEmbed({
+        src: uploaded.src,
+        mediaType,
+        title: uploaded.title ?? file.name,
+      }).run();
+      toast.success(t('editor.mediaInserted'));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (result) {
+        editor.chain().focus().insertMediaEmbed({ src: result, mediaType, title: file.name }).run();
+        toast.success(t('editor.mediaInserted'));
+      }
+    };
+    reader.onerror = () => toast.error(t('editor.mediaReadFailed'));
+    reader.readAsDataURL(file);
+  }, [editor, onUploadPresentation, t]);
+
+  const openMediaFilePicker = useCallback((mediaType: MediaEmbedType, accept: string) => {
+    mediaFileTypeRef.current = mediaType;
+    if (mediaFileInputRef.current) {
+      mediaFileInputRef.current.accept = accept;
+      mediaFileInputRef.current.click();
+    }
+  }, []);
+
+  const handleMediaFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      void processMediaFile(files[0], mediaFileTypeRef.current);
+    }
+    if (mediaFileInputRef.current) mediaFileInputRef.current.value = '';
+  }, [processMediaFile]);
+
   const editorContainerClass = isFullscreen 
     ? 'fixed inset-0 z-50 bg-white flex flex-col' 
     : 'border border-[#E5E5E5] rounded-xl overflow-hidden bg-white flex flex-col';
@@ -283,6 +371,12 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
         accept="image/*"
         multiple
         onChange={handleFileSelect}
+        className="hidden"
+      />
+      <input
+        ref={mediaFileInputRef}
+        type="file"
+        onChange={handleMediaFileSelect}
         className="hidden"
       />
 
@@ -436,6 +530,77 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
               >
                 <HugeiconsIcon icon={FolderOpenIcon} className="h-4 w-4 text-[#737373]" />
                 <span>{t('editor.insertImageFromFiles')}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                title={t('editor.insertMedia')}
+                className="flex items-center gap-1 rounded px-2 py-1.5 text-sm text-[#737373] transition-colors hover:bg-[#F3F4F6] hover:text-[#171717] data-[state=open]:bg-[#D93A3A]/10 data-[state=open]:text-[#D93A3A]"
+              >
+                <HugeiconsIcon icon={Video01Icon} className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('editor.media')}</span>
+                <HugeiconsIcon icon={ArrowDown01Icon} className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align={isRTL ? 'end' : 'start'}
+              className="w-60 border-[#E5E5E5] bg-white p-1.5 shadow-lg"
+            >
+              {/* Video */}
+              <DropdownMenuItem
+                onClick={() => insertMediaFromUrl('video')}
+                className="gap-3 rounded-md px-3 py-2 text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
+              >
+                <HugeiconsIcon icon={GlobeIcon} className="h-4 w-4 text-[#737373]" />
+                <span>{t('editor.insertVideoFromUrl')}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => openMediaFilePicker('video', 'video/*')}
+                className="gap-3 rounded-md px-3 py-2 text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
+              >
+                <HugeiconsIcon icon={Video01Icon} className="h-4 w-4 text-[#737373]" />
+                <span>{t('editor.insertVideoFromFiles')}</span>
+              </DropdownMenuItem>
+              {/* Audio */}
+              <DropdownMenuItem
+                onClick={() => insertMediaFromUrl('audio')}
+                className="gap-3 rounded-md px-3 py-2 text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
+              >
+                <HugeiconsIcon icon={GlobeIcon} className="h-4 w-4 text-[#737373]" />
+                <span>{t('editor.insertAudioFromUrl')}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => openMediaFilePicker('audio', 'audio/*')}
+                className="gap-3 rounded-md px-3 py-2 text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
+              >
+                <HugeiconsIcon icon={MusicNote01Icon} className="h-4 w-4 text-[#737373]" />
+                <span>{t('editor.insertAudioFromFiles')}</span>
+              </DropdownMenuItem>
+              {/* PDF */}
+              <DropdownMenuItem
+                onClick={() => insertMediaFromUrl('pdf')}
+                className="gap-3 rounded-md px-3 py-2 text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
+              >
+                <HugeiconsIcon icon={GlobeIcon} className="h-4 w-4 text-[#737373]" />
+                <span>{t('editor.insertPdfFromUrl')}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => openMediaFilePicker('pdf', 'application/pdf')}
+                className="gap-3 rounded-md px-3 py-2 text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
+              >
+                <HugeiconsIcon icon={Pdf01Icon} className="h-4 w-4 text-[#737373]" />
+                <span>{t('editor.insertPdfFromFiles')}</span>
+              </DropdownMenuItem>
+              {/* PowerPoint */}
+              <DropdownMenuItem
+                onClick={() => openMediaFilePicker('pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx')}
+                className="gap-3 rounded-md px-3 py-2 text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
+              >
+                <HugeiconsIcon icon={Presentation01Icon} className="h-4 w-4 text-[#737373]" />
+                <span>{t('editor.insertPptxFromFiles')}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

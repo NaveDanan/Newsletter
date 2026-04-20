@@ -153,7 +153,7 @@ export function ManagerDashboard({
   };
 
   const handleDeleteNewsletter = (id: string) => {
-    void deleteNewsletter(id);
+    return deleteNewsletter(id);
   };
 
   const handleBackToList = () => {

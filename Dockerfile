@@ -33,7 +33,10 @@ RUN pnpm install --prod --frozen-lockfile
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
-RUN apk add --no-cache curl nginx tini
+RUN apk add --no-cache --allow-untrusted \
+      --repository http://dl-cdn.alpinelinux.org/alpine/v3.23/main \
+      --repository http://dl-cdn.alpinelinux.org/alpine/v3.23/community \
+      curl nginx tini
 
 COPY --from=runtime-deps /app/node_modules ./node_modules
 COPY package.json ./package.json

@@ -10,7 +10,7 @@ interface NewsletterListProps {
   newsletters: Newsletter[];
   onCreate: () => void;
   onEdit: (newsletter: Newsletter) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<boolean> | boolean;
   onView: (newsletter: Newsletter) => void;
   canCreate: boolean;
   canEdit: (newsletter: Newsletter) => boolean;
@@ -31,6 +31,7 @@ export function NewsletterList({
   const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const filteredNewsletters = newsletters
     .filter(n => filter === 'all' ? true : n.status === filter)
@@ -40,14 +41,30 @@ export function NewsletterList({
       n.tags.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-  const handleDelete = (id: string) => {
-    if (deleteConfirm === id) {
-      onDelete(id);
-      setDeleteConfirm(null);
-      toast.success(t('manager.newsletterDeleted'));
-    } else {
+  const handleDelete = async (id: string) => {
+    if (deletingId) {
+      return;
+    }
+
+    if (deleteConfirm !== id) {
       setDeleteConfirm(id);
       setTimeout(() => setDeleteConfirm(null), 3000);
+      return;
+    }
+
+    setDeletingId(id);
+
+    try {
+      const deleted = await onDelete(id);
+
+      if (deleted) {
+        setDeleteConfirm(null);
+        toast.success(t('manager.newsletterDeleted'));
+      }
+    } catch {
+      // The delete callback handles user-facing error messages.
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -254,6 +271,7 @@ export function NewsletterList({
                     {canDeleteCurrent && (
                       <button
                         onClick={() => handleDelete(newsletter.id)}
+                        disabled={deletingId === newsletter.id}
                         className={`p-2 rounded-lg transition-colors ${
                           deleteConfirm === newsletter.id
                             ? 'text-red-600 bg-red-100'

@@ -112,6 +112,7 @@ class HtmlPptxViewer implements PptxViewerInstance {
   private counter: HTMLSpanElement;
   private slides: string[] = [];
   private currentIndex = 0;
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(container: HTMLElement, options: HtmlPptxViewerOptions = {}) {
     this.container = container;
@@ -124,12 +125,11 @@ class HtmlPptxViewer implements PptxViewerInstance {
     this.root.style.width = '100%';
 
     this.stage = document.createElement('div');
-    this.stage.style.minHeight = `${this.options.height ?? 540}px`;
     this.stage.style.border = '1px solid #E5E5E5';
     this.stage.style.borderRadius = '12px';
-    this.stage.style.overflow = 'auto';
+    this.stage.style.overflow = 'hidden';
     this.stage.style.background = '#F8FAFC';
-    this.stage.style.padding = '12px';
+    this.stage.style.padding = '0';
 
     const controls = document.createElement('div');
     controls.style.display = 'flex';
@@ -152,6 +152,13 @@ class HtmlPptxViewer implements PptxViewerInstance {
 
     this.container.innerHTML = '';
     this.container.appendChild(this.root);
+
+    this.resizeObserver = new ResizeObserver(() => {
+      if (this.slides.length > 0) {
+        this.rescaleCurrentSlide();
+      }
+    });
+    this.resizeObserver.observe(this.stage);
   }
 
   async load(source: PptxSource) {
@@ -192,6 +199,8 @@ class HtmlPptxViewer implements PptxViewerInstance {
   }
 
   destroy() {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.previousButton.removeEventListener('click', this.handlePrevious);
     this.nextButton.removeEventListener('click', this.handleNext);
     this.container.innerHTML = '';
@@ -229,10 +238,43 @@ class HtmlPptxViewer implements PptxViewerInstance {
 
   private renderCurrentSlide() {
     const slide = this.slides[this.currentIndex] ?? '';
-    this.stage.innerHTML = slide;
+
+    // Wrap slide in a container that scales to fit the stage width
+    const wrapper = document.createElement('div');
+    wrapper.style.width = '100%';
+    wrapper.style.position = 'relative';
+
+    const inner = document.createElement('div');
+    inner.innerHTML = slide;
+    inner.style.transformOrigin = 'top left';
+    inner.style.width = `${this.options.width ?? 960}px`;
+    wrapper.appendChild(inner);
+
+    this.stage.innerHTML = '';
+    this.stage.appendChild(wrapper);
+
+    // Scale the slide to fit the stage width
+    const stageWidth = this.stage.clientWidth;
+    const slideWidth = this.options.width ?? 960;
+    const scale = Math.min(1, stageWidth / slideWidth);
+    inner.style.transform = `scale(${scale})`;
+    wrapper.style.height = `${(this.options.height ?? 540) * scale}px`;
+
     this.counter.textContent = this.slides.length > 0 ? `${this.currentIndex + 1} / ${this.slides.length}` : '0 / 0';
     this.previousButton.disabled = this.currentIndex <= 0;
     this.nextButton.disabled = this.currentIndex >= this.slides.length - 1;
+  }
+
+  private rescaleCurrentSlide() {
+    const inner = this.stage.querySelector<HTMLElement>(':scope > div > div');
+    const wrapper = this.stage.querySelector<HTMLElement>(':scope > div');
+    if (!inner || !wrapper) return;
+
+    const stageWidth = this.stage.clientWidth;
+    const slideWidth = this.options.width ?? 960;
+    const scale = Math.min(1, stageWidth / slideWidth);
+    inner.style.transform = `scale(${scale})`;
+    wrapper.style.height = `${(this.options.height ?? 540) * scale}px`;
   }
 }
 

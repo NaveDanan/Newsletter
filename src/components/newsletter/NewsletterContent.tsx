@@ -18,6 +18,13 @@ export function NewsletterContent({ html, className, dir = 'auto' }: NewsletterC
   const { t } = useLocale();
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // Set innerHTML imperatively so React does not overwrite it on re-renders.
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.innerHTML = html;
+    }
+  }, [html]);
+
   useEffect(() => {
     const root = containerRef.current;
     if (!root) {
@@ -111,7 +118,6 @@ export function NewsletterContent({ html, className, dir = 'auto' }: NewsletterC
       ref={containerRef}
       className={className}
       dir={dir}
-      dangerouslySetInnerHTML={{ __html: html }}
     />
   );
 }

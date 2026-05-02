@@ -1,5 +1,5 @@
 import PocketBase from 'pocketbase';
-import { loadProjectEnv } from './pocketbase/load-env.mjs';
+import { loadProjectEnv, resolvePocketBaseUrl } from './pocketbase/load-env.mjs';
 
 const USER_ROLES = ['viewer', 'author', 'manager', 'general_manager', 'admin'];
 
@@ -69,7 +69,7 @@ async function syncRoleByEmail(pb, email, role) {
 
 async function main() {
   const env = loadProjectEnv();
-  const pocketbaseUrl = requireEnvValue(env, ['POCKETBASE_URL', 'VITE_POCKETBASE_URL']);
+  const pocketbaseUrl = resolvePocketBaseUrl(env);
   const superuserEmail = requireEnvValue(env, ['POCKETBASE_SUPERUSER_EMAIL']);
   const superuserPassword = requireEnvValue(env, ['POCKETBASE_SUPERUSER_PASSWORD']);
 

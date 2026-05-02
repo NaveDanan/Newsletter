@@ -1,5 +1,5 @@
 import PocketBase from 'pocketbase';
-import { loadProjectEnv } from './pocketbase/load-env.mjs';
+import { loadProjectEnv, resolvePocketBaseUrl } from './pocketbase/load-env.mjs';
 
 function requireEnvValue(env, keys) {
   for (const key of keys) {
@@ -61,7 +61,7 @@ async function main() {
     return;
   }
 
-  const pocketbaseUrl = requireEnvValue(env, ['POCKETBASE_URL', 'VITE_POCKETBASE_URL']);
+  const pocketbaseUrl = resolvePocketBaseUrl(env);
   const superuserEmail = requireEnvValue(env, ['POCKETBASE_SUPERUSER_EMAIL']);
   const superuserPassword = requireEnvValue(env, ['POCKETBASE_SUPERUSER_PASSWORD']);
 

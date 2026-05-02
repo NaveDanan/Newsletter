@@ -35,3 +35,39 @@ export function loadProjectEnv(cwd = process.cwd()) {
     ...process.env,
   };
 }
+
+function normalizeUrl(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim().replace(/\/+$/, '');
+}
+
+function resolveFromAppPublicUrl(value) {
+  const normalizedValue = normalizeUrl(value);
+  if (!normalizedValue) {
+    return '';
+  }
+
+  try {
+    const url = new URL(normalizedValue);
+    const isLocalHost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+
+    if (isLocalHost) {
+      return `${url.protocol}//${url.hostname}:8090`;
+    }
+
+    return url.origin;
+  } catch {
+    return '';
+  }
+}
+
+export function resolvePocketBaseUrl(env) {
+  return normalizeUrl(env.POCKETBASE_URL)
+    || normalizeUrl(env.VITE_POCKETBASE_URL)
+    || normalizeUrl(env.POCKETBASE_PUBLIC_URL)
+    || resolveFromAppPublicUrl(env.APP_PUBLIC_URL)
+    || 'http://127.0.0.1:8090';
+}

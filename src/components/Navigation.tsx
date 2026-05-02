@@ -11,13 +11,13 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { DropdownNavigation, type DropdownNavigationItem } from '@/components/ui/dropdown-navigation';
 import { ExpandingSearchDock } from '@/components/ui/expanding-search-dock-shadcnui';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useNavigationData } from '@/contexts/NavigationDataContext';
-import { DEFAULT_DROPDOWN_IDS } from '@/types/navigation-link';
+import { DEFAULT_DROPDOWN_IDS, SEED_DROPDOWNS } from '@/types/navigation-link';
 
 interface NavigationProps {
   onManagerClick: () => void;
@@ -28,6 +28,20 @@ interface NavigationProps {
   onSearchChange?: (query: string) => void;
   isAuthenticated: boolean;
   authName?: string;
+}
+
+function normalizeDropdownLabel(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function resolveBuiltinDropdownId(id: string, label: string): string | null {
+  if (Object.values(DEFAULT_DROPDOWN_IDS).includes(id as (typeof DEFAULT_DROPDOWN_IDS)[keyof typeof DEFAULT_DROPDOWN_IDS])) {
+    return id;
+  }
+
+  const normalizedLabel = normalizeDropdownLabel(label);
+  const seed = SEED_DROPDOWNS.find((entry) => normalizeDropdownLabel(entry.label) === normalizedLabel);
+  return seed?.id ?? null;
 }
 
 export function Navigation({
@@ -43,6 +57,63 @@ export function Navigation({
   const { t } = useLocale();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { dropdowns, links: navigationLinks } = useNavigationData();
+
+  const visibleDropdowns = useMemo(() => {
+    const items = dropdowns.filter((dd) => !dd.hidden);
+    const itemIds = new Set(items.map((dd) => dd.id));
+    const itemLabels = new Set(items.map((dd) => normalizeDropdownLabel(dd.label)));
+
+    for (const seed of SEED_DROPDOWNS) {
+      if (!itemIds.has(seed.id) && !itemLabels.has(normalizeDropdownLabel(seed.label))) {
+        items.push(seed);
+      }
+    }
+
+    return items.sort((a, b) => a.order - b.order);
+  }, [dropdowns]);
+
+  const fallbackDropdownId = visibleDropdowns.find((dd) => dd.id === DEFAULT_DROPDOWN_IDS.resources)?.id
+    ?? visibleDropdowns[0]?.id
+    ?? DEFAULT_DROPDOWN_IDS.resources;
+
+  const resolvedLinksByDropdownId = useMemo(() => {
+    const dropdownIds = new Set(visibleDropdowns.map((dd) => dd.id));
+    const builtinDropdownTargets = new Map<string, string>();
+    const groupedLinks = new Map<string, typeof navigationLinks>();
+
+    for (const dropdown of visibleDropdowns) {
+      groupedLinks.set(dropdown.id, []);
+
+      const builtinId = resolveBuiltinDropdownId(dropdown.id, dropdown.label);
+      if (builtinId && !builtinDropdownTargets.has(builtinId)) {
+        builtinDropdownTargets.set(builtinId, dropdown.id);
+      }
+    }
+
+    for (const link of navigationLinks) {
+      if (link.hidden) {
+        continue;
+      }
+
+      const resolvedDropdownId = dropdownIds.has(link.dropdownId)
+        ? link.dropdownId
+        : builtinDropdownTargets.get(link.dropdownId)
+          ?? fallbackDropdownId;
+      const bucket = groupedLinks.get(resolvedDropdownId);
+      if (!bucket) {
+        groupedLinks.set(resolvedDropdownId, [link]);
+        continue;
+      }
+
+      bucket.push(link);
+    }
+
+    for (const bucket of groupedLinks.values()) {
+      bucket.sort((a, b) => a.order - b.order);
+    }
+
+    return groupedLinks;
+  }, [fallbackDropdownId, navigationLinks, visibleDropdowns]);
 
   const accountMenuItem = isAuthenticated
     ? {
@@ -112,11 +183,8 @@ export function Navigation({
   };
 
   // Build dynamic dropdown items from managed dropdowns + links
-  const visibleDropdowns = dropdowns.filter((dd) => !dd.hidden);
   const dropdownNavItems: DropdownNavigationItem[] = visibleDropdowns.map((dd, idx) => {
-    const ddLinks = navigationLinks
-      .filter((l) => l.dropdownId === dd.id && !l.hidden)
-      .sort((a, b) => a.order - b.order);
+    const ddLinks = resolvedLinksByDropdownId.get(dd.id) ?? [];
 
     const managedItems = ddLinks.map((link) => ({
       label: link.name,
@@ -126,7 +194,7 @@ export function Navigation({
       imageAlt: link.name,
     }));
 
-    const builtin = builtinSubMenus[dd.id] ?? [];
+    const builtin = builtinSubMenus[resolveBuiltinDropdownId(dd.id, dd.label) ?? ''] ?? [];
     const subMenus = [
       ...(managedItems.length > 0 ? [{ title: t('navDropdown.resources.groupLinks'), items: managedItems }] : []),
       ...builtin,

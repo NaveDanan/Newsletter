@@ -7,12 +7,28 @@ routerAdd('POST', '/api/newsletter/subscribe', function (e) {
     throw new BadRequestError('A valid email address is required.');
   }
 
-  helpers.upsertSubscriber(e.app, email, {
+  var result = helpers.subscribeEmail(e.app, email, {
     locale: body.locale,
     source: body.source,
   });
 
-  return e.json(200, { status: 'ok' });
+  if (result.status === 'invalid_domain') {
+    throw new BadRequestError(helpers.getSubscribeErrorMessage('invalid_domain', body.locale));
+  }
+
+  return e.json(200, { status: result.status });
+}, $apis.bodyLimit(16384), $apis.skipSuccessActivityLog());
+
+routerAdd('POST', '/api/newsletter/unsubscribe', function (e) {
+  var helpers = require(__hooks + '/lib/newsletter-mail.js');
+  var body = e.requestInfo().body || {};
+  var result = helpers.unsubscribeSubscriber(e.app, body.subscriberId, body.email);
+
+  if (result.status === 'invalid_request') {
+    throw new BadRequestError('The unsubscribe link is invalid or has expired.');
+  }
+
+  return e.json(200, { status: result.status });
 }, $apis.bodyLimit(16384), $apis.skipSuccessActivityLog());
 
 routerAdd('POST', '/api/newsletter/migrate/inspect', function (e) {

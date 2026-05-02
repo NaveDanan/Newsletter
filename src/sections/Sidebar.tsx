@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ThumbsUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,14 +33,20 @@ export function Sidebar({ publishedCount }: SidebarProps) {
 
     try {
       setIsSubmitting(true);
-      await subscribeToNewsletter({
+      const result = await subscribeToNewsletter({
         email: trimmedEmail,
         locale,
         source: 'sidebar',
       });
 
       void refreshSubscriberCount();
-      toast.success(t('sidebar.subscribeSuccess'));
+      if (result === 'already_subscribed') {
+        toast.success(t('sidebar.alreadySubscribed'), {
+          icon: <ThumbsUp className="h-4 w-4" />,
+        });
+      } else {
+        toast.success(t('sidebar.subscribeSuccess'));
+      }
       setEmail('');
     } catch (error) {
       const message = error instanceof Error ? error.message : t('sidebar.subscribeFailed');

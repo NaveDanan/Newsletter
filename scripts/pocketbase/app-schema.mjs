@@ -187,6 +187,42 @@ export const NEWSLETTER_SUBSCRIBERS_SCHEMA = {
   deleteRule: '@request.auth.role = "admin"',
 };
 
+export const VALID_EMAIL_DOMAINS_SCHEMA = {
+  name: 'valid_emails_domains',
+  type: 'base',
+  fields: [
+    autodate('created', true, false),
+    autodate('updated', true, true),
+    text('domain', 255, { required: true }),
+  ],
+  indexes: [
+    'CREATE UNIQUE INDEX idx_valid_emails_domains_domain ON valid_emails_domains (LOWER(domain))',
+  ],
+  listRule: '@request.auth.role = "admin"',
+  viewRule: '@request.auth.role = "admin"',
+  createRule: '@request.auth.role = "admin"',
+  updateRule: '@request.auth.role = "admin"',
+  deleteRule: '@request.auth.role = "admin"',
+};
+
+export const NEWSLETTER_UNSUBSCRIBES_SCHEMA = {
+  name: 'newsletter_unsubscribes',
+  type: 'base',
+  fields: [
+    autodate('created', true, false),
+    autodate('updated', true, true),
+    email('email'),
+  ],
+  indexes: [
+    'CREATE UNIQUE INDEX idx_newsletter_unsubscribes_email ON newsletter_unsubscribes (LOWER(email))',
+  ],
+  listRule: '@request.auth.role = "admin"',
+  viewRule: '@request.auth.role = "admin"',
+  createRule: '@request.auth.role = "admin"',
+  updateRule: '@request.auth.role = "admin"',
+  deleteRule: '@request.auth.role = "admin"',
+};
+
 export const LINKS_SCHEMA = {
   name: 'links',
   type: 'base',
@@ -217,5 +253,7 @@ export const APP_COLLECTION_SCHEMAS = [
   NAVIGATION_LINKS_SCHEMA,
   NAV_DROPDOWNS_SCHEMA,
   NEWSLETTER_SUBSCRIBERS_SCHEMA,
+  VALID_EMAIL_DOMAINS_SCHEMA,
+  NEWSLETTER_UNSUBSCRIBES_SCHEMA,
   LINKS_SCHEMA,
 ];

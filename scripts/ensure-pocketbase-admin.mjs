@@ -1,5 +1,5 @@
 import PocketBase from 'pocketbase';
-import { loadProjectEnv } from './pocketbase/load-env.mjs';
+import { loadProjectEnv, resolvePocketBaseUrl } from './pocketbase/load-env.mjs';
 
 function requireEnvValue(env, keys, { optional = false } = {}) {
   for (const key of keys) {
@@ -22,7 +22,7 @@ function escapeFilterValue(value) {
 
 async function main() {
   const env = loadProjectEnv();
-  const pocketbaseUrl = requireEnvValue(env, ['POCKETBASE_URL', 'VITE_POCKETBASE_URL']);
+  const pocketbaseUrl = resolvePocketBaseUrl(env);
   const superuserEmail = requireEnvValue(env, ['POCKETBASE_SUPERUSER_EMAIL']);
   const superuserPassword = requireEnvValue(env, ['POCKETBASE_SUPERUSER_PASSWORD']);
   const adminEmail = requireEnvValue(env, ['POCKETBASE_ADMIN_EMAIL', 'VITE_ADMIN_EMAIL'], { optional: true }).toLowerCase();

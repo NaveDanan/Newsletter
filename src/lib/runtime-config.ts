@@ -25,7 +25,14 @@ export function getDefaultPocketBaseUrl(): string {
     return 'http://127.0.0.1:8090';
   }
 
-  return `${window.location.protocol}//${window.location.hostname}:8090`;
+  const { hostname, origin } = window.location;
+  const isLocalDevelopmentHost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+  if (isLocalDevelopmentHost) {
+    return `${window.location.protocol}//${hostname}:8090`;
+  }
+
+  return origin;
 }
 
 export function getPocketBaseUrl(): string {

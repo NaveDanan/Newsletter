@@ -1,6 +1,6 @@
 import PocketBase from 'pocketbase';
 import { APP_COLLECTION_SCHEMAS } from './pocketbase/app-schema.mjs';
-import { loadProjectEnv } from './pocketbase/load-env.mjs';
+import { loadProjectEnv, resolvePocketBaseUrl } from './pocketbase/load-env.mjs';
 
 function requireEnvValue(env, keys) {
   for (const key of keys) {
@@ -28,7 +28,7 @@ async function recreateCollection(pb, schema) {
 
 async function main() {
   const env = loadProjectEnv();
-  const pocketbaseUrl = requireEnvValue(env, ['POCKETBASE_URL', 'VITE_POCKETBASE_URL']);
+  const pocketbaseUrl = resolvePocketBaseUrl(env);
   const superuserEmail = requireEnvValue(env, ['POCKETBASE_SUPERUSER_EMAIL']);
   const superuserPassword = requireEnvValue(env, ['POCKETBASE_SUPERUSER_PASSWORD']);
 

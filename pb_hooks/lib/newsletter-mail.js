@@ -242,12 +242,65 @@ function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizeEmailDomain(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, '')
+    .replace(/\.+$/, '');
+}
+
+function getEmailDomain(value) {
+  var email = normalizeEmail(value);
+  var atIndex = email.lastIndexOf('@');
+
+  if (atIndex <= 0 || atIndex >= email.length - 1) {
+    return '';
+  }
+
+  return normalizeEmailDomain(email.slice(atIndex + 1));
+}
+
+function findFirstRecordByFilterOrNull(app, collectionName, filter, params) {
+  try {
+    return app.findFirstRecordByFilter(collectionName, filter, params || {});
+  } catch (error) {
+    return null;
+  }
+}
+
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 }
 
+function isAllowedEmailDomain(app, email) {
+  var domain = getEmailDomain(email);
+
+  if (!domain) {
+    return false;
+  }
+
+  return Boolean(findFirstRecordByFilterOrNull(app, 'valid_emails_domains', 'domain = {:domain}', {
+    domain: domain,
+  }));
+}
+
 function normalizeLocale(value) {
   return value === 'he' ? 'he' : 'en';
+}
+
+function getSubscribeErrorMessage(code, locale) {
+  var isHebrew = normalizeLocale(locale) === 'he';
+
+  if (code === 'invalid_domain') {
+    return isHebrew
+      ? 'כתובת האימייל הזו אינה מאושרת עדיין. בדקו אותה שוב ונסו להירשם מחדש.'
+      : 'This email address domain is not approved yet. Please check it again and try subscribing once more.';
+  }
+
+  return isHebrew
+    ? 'שמירת ההרשמה נכשלה'
+    : 'Failed to save your subscription';
 }
 
 function normalizeSource(value) {
@@ -270,6 +323,53 @@ function getRecordEmail(record) {
   return '';
 }
 
+function findSubscriberByEmail(app, email) {
+  return findFirstRecordByFilterOrNull(app, 'newsletter_subscribers', 'email = {:email}', {
+    email: normalizeEmail(email),
+  });
+}
+
+function findUnsubscribeByEmail(app, email) {
+  return findFirstRecordByFilterOrNull(app, 'newsletter_unsubscribes', 'email = {:email}', {
+    email: normalizeEmail(email),
+  });
+}
+
+function isEmailSuppressed(app, email) {
+  return Boolean(findUnsubscribeByEmail(app, email));
+}
+
+function suppressEmail(app, email) {
+  email = normalizeEmail(email);
+
+  if (!isValidEmail(email)) {
+    return null;
+  }
+
+  var suppression = findUnsubscribeByEmail(app, email);
+
+  if (!suppression) {
+    var collection = app.findCollectionByNameOrId('newsletter_unsubscribes');
+    suppression = new Record(collection);
+    suppression.set('email', email);
+  }
+
+  app.save(suppression);
+
+  return suppression;
+}
+
+function removeEmailSuppression(app, email) {
+  var suppression = findUnsubscribeByEmail(app, email);
+
+  if (!suppression) {
+    return false;
+  }
+
+  app.delete(suppression);
+  return true;
+}
+
 function upsertSubscriber(app, email, options) {
   email = normalizeEmail(email);
   options = options || {};
@@ -279,14 +379,7 @@ function upsertSubscriber(app, email, options) {
   }
 
   var subscriber = null;
-
-  try {
-    subscriber = app.findFirstRecordByFilter('newsletter_subscribers', 'email = {:email}', {
-      email: email,
-    });
-  } catch (error) {
-    subscriber = null;
-  }
+  subscriber = findSubscriberByEmail(app, email);
 
   if (!subscriber) {
     var collection = app.findCollectionByNameOrId('newsletter_subscribers');
@@ -303,8 +396,48 @@ function upsertSubscriber(app, email, options) {
   return subscriber;
 }
 
+function subscribeEmail(app, email, options) {
+  email = normalizeEmail(email);
+
+  if (!isValidEmail(email)) {
+    return {
+      status: 'invalid_email',
+      subscriber: null,
+    };
+  }
+
+  var existingSubscriber = findSubscriberByEmail(app, email);
+
+  if (existingSubscriber) {
+    return {
+      status: 'already_subscribed',
+      subscriber: upsertSubscriber(app, email, options),
+    };
+  }
+
+  if (!isAllowedEmailDomain(app, email)) {
+    return {
+      status: 'invalid_domain',
+      subscriber: null,
+    };
+  }
+
+  removeEmailSuppression(app, email);
+
+  return {
+    status: 'subscribed',
+    subscriber: upsertSubscriber(app, email, options),
+  };
+}
+
 function upsertSubscriberForUser(app, user) {
-  return upsertSubscriber(app, getRecordEmail(user), {
+  var email = getRecordEmail(user);
+
+  if (!email || isEmailSuppressed(app, email)) {
+    return null;
+  }
+
+  return upsertSubscriber(app, email, {
     locale: 'en',
     source: 'registered_account',
   });
@@ -345,6 +478,39 @@ function buildPasswordResetUrl(token) {
   return baseUrl + '/reset-password/' + encodeURIComponent(token);
 }
 
+function buildUnsubscribeUrl(subscriber) {
+  var baseUrl = getFrontendPublicUrl();
+  var subscriberId = subscriber && subscriber.id ? String(subscriber.id) : '';
+  var email = subscriber ? normalizeEmail(subscriber.getString('email')) : '';
+  var locale = subscriber ? normalizeLocale(subscriber.getString('locale')) : 'en';
+
+  if (!baseUrl || !subscriberId || !email) {
+    return '';
+  }
+
+  return baseUrl
+    + '/unsubscribe?subscriber=' + encodeURIComponent(subscriberId)
+    + '&email=' + encodeURIComponent(email)
+    + '&locale=' + encodeURIComponent(locale);
+}
+
+function buildUnsubscribeFooter(locale, unsubscribeUrl) {
+  var unsubscribeLabel = locale === 'he' ? 'הסרה מהרשימה' : 'Unsubscribe';
+  var unsubscribeCopy = locale === 'he'
+    ? 'אם אינכם רוצים לקבל עדכוני ניוזלטר נוספים, אפשר להסיר את עצמכם כאן.'
+    : 'If you no longer want newsletter updates, you can unsubscribe here.';
+
+  if (!unsubscribeUrl) {
+    return '<p style="margin:8px 0 0;color:#A3A3A3;font-size:12px;line-height:1.6">' + unsubscribeCopy + '</p>';
+  }
+
+  return ''
+    + '<p style="margin:8px 0 0;color:#A3A3A3;font-size:12px;line-height:1.6">'
+    + unsubscribeCopy
+    + ' <a href="' + escapeHtml(unsubscribeUrl) + '" style="color:#D93A3A;text-decoration:underline;font-weight:600">' + unsubscribeLabel + '</a>'
+    + '</p>';
+}
+
 function buildNewsletterEmail(app, record, subscriber) {
   var locale = normalizeLocale(subscriber.getString('locale'));
   var appName = getAppName(app);
@@ -356,6 +522,7 @@ function buildNewsletterEmail(app, record, subscriber) {
   var excerptSource = stripHtml(record.getString('excerpt') || record.getString('content'));
   var excerpt = escapeHtml(excerptSource.slice(0, 320));
   var articleUrl = buildArticleUrl(record);
+  var unsubscribeUrl = buildUnsubscribeUrl(subscriber);
   var ctaLabel = locale === 'he' ? 'לקריאת הניוזלטר' : 'Read the newsletter';
   var intro = locale === 'he'
     ? 'ניוזלטר חדש פורסם באתר.'
@@ -377,6 +544,7 @@ function buildNewsletterEmail(app, record, subscriber) {
       + '<p style="margin:0;color:#737373;font-size:14px">'
       + (locale === 'he' ? 'קיבלתם את ההודעה כי נרשמתם לעדכוני הניוזלטר.' : 'You received this email because you subscribed to newsletter updates.')
       + '</p>'
+      + buildUnsubscribeFooter(locale, unsubscribeUrl)
       + '</div>',
   };
 }
@@ -414,6 +582,7 @@ function buildNewsletterUpdateEmail(app, record, subscriber) {
   var calloutStyle = textAlign === 'center'
     ? 'padding-top:18px;border-top:4px solid #D93A3A;text-align:center'
     : 'padding-' + accentSide + ':18px;border-' + accentSide + ':4px solid #D93A3A;text-align:' + textAlign;
+  var unsubscribeUrl = buildUnsubscribeUrl(subscriber);
 
   return {
     subject: subject,
@@ -439,8 +608,47 @@ function buildNewsletterUpdateEmail(app, record, subscriber) {
         : '')
       + '<div style="height:1px;background:#E5E5E5;line-height:1px;font-size:1px">&nbsp;</div>'
       + '<p style="margin:18px 0 0;color:#737373;font-size:13px;line-height:1.6">' + footerText + '</p>'
+      + buildUnsubscribeFooter(locale, unsubscribeUrl)
       + '</div>'
       + '</div>',
+  };
+}
+
+function unsubscribeSubscriber(app, subscriberId, email) {
+  var normalizedSubscriberId = String(subscriberId || '').trim();
+  var normalizedEmail = normalizeEmail(email);
+  var subscriber = null;
+
+  if (!normalizedSubscriberId) {
+    return { status: 'invalid_request' };
+  }
+
+  try {
+    subscriber = app.findRecordById('newsletter_subscribers', normalizedSubscriberId);
+  } catch (error) {
+    subscriber = null;
+  }
+
+  if (!subscriber) {
+    if (normalizedEmail && isEmailSuppressed(app, normalizedEmail)) {
+      return { status: 'already_unsubscribed' };
+    }
+
+    return { status: 'invalid_request' };
+  }
+
+  var subscriberEmail = normalizeEmail(subscriber.getString('email'));
+
+  if (normalizedEmail && subscriberEmail !== normalizedEmail) {
+    return { status: 'invalid_request' };
+  }
+
+  app.delete(subscriber);
+  suppressEmail(app, subscriberEmail);
+
+  return {
+    status: 'unsubscribed',
+    email: subscriberEmail,
   };
 }
 
@@ -528,6 +736,7 @@ module.exports = {
   buildPasswordResetEmail: buildPasswordResetEmail,
   buildPasswordResetUrl: buildPasswordResetUrl,
   getFrontendPublicUrl: getFrontendPublicUrl,
+  getSubscribeErrorMessage: getSubscribeErrorMessage,
   isValidEmail: isValidEmail,
   normalizeEmail: normalizeEmail,
   normalizeLocale: normalizeLocale,
@@ -535,7 +744,9 @@ module.exports = {
   sendMailWithInsecureTlsVerification: sendMailWithInsecureTlsVerification,
   sendNewsletterNotifications: sendNewsletterNotifications,
   shouldSkipSmtpTlsVerification: shouldSkipSmtpTlsVerification,
+  subscribeEmail: subscribeEmail,
   syncRegisteredUsersAsSubscribers: syncRegisteredUsersAsSubscribers,
+  unsubscribeSubscriber: unsubscribeSubscriber,
   upsertSubscriber: upsertSubscriber,
   upsertSubscriberForUser: upsertSubscriberForUser,
 };

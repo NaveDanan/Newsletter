@@ -7,6 +7,7 @@ import { Sidebar } from './sections/Sidebar';
 import { ManagerDashboard, type Tab as ManagerTab } from './sections/ManagerDashboard';
 import { GanttEditorPage } from './sections/manager/GanttEditorPage';
 import { NewsletterViewer } from './sections/NewsletterViewer';
+import { UnsubscribePage } from './sections/UnsubscribePage';
 import { PasswordResetPage } from './components/auth/PasswordResetPage';
 import { SignIn } from './components/auth/SignIn';
 import { SSOCallback } from './components/auth/SSOCallback';
@@ -21,7 +22,7 @@ import { toast } from 'sonner';
 import type { Newsletter } from './types/newsletter';
 import './App.css';
 
-export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'sso-callback' | 'gantt-editor' | 'migrate';
+export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'sso-callback' | 'gantt-editor' | 'migrate' | 'unsubscribe';
 
 const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet', 'links'];
 
@@ -149,6 +150,10 @@ function resolveRoute(pathname: string): RouteState {
 
   if (normalizedPathname === '/sso-callback') {
     return { view: 'sso-callback', pathname: '/sso-callback' };
+  }
+
+  if (normalizedPathname === '/unsubscribe') {
+    return { view: 'unsubscribe', pathname: '/unsubscribe' };
   }
 
   if (normalizedPathname.startsWith('/article/')) {
@@ -371,7 +376,7 @@ function App() {
       return;
     }
 
-    if (currentRoute.view === 'signin' || currentRoute.view === 'reset-password' || currentRoute.view === 'sso-callback' || currentRoute.view === 'migrate') {
+    if (currentRoute.view === 'signin' || currentRoute.view === 'reset-password' || currentRoute.view === 'sso-callback' || currentRoute.view === 'migrate' || currentRoute.view === 'unsubscribe') {
       appReadyRef.current = true;
       bootLogger.markReady('app', 'Standalone route is ready', {
         pathname: currentRoute.pathname,
@@ -608,6 +613,15 @@ function App() {
           onFinish={handleAuthSuccess}
           onRetry={() => navigateTo('/sign-in', { replace: true })}
         />
+      </div>
+    );
+  }
+
+  if (currentRoute.view === 'unsubscribe') {
+    return (
+      <div className="min-h-screen bg-white">
+        <Toaster position={toasterPosition} richColors />
+        <UnsubscribePage onBack={handleHomeClick} />
       </div>
     );
   }

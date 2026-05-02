@@ -1,7 +1,7 @@
 import PocketBase from 'pocketbase';
 import { loadProjectEnv } from './pocketbase/load-env.mjs';
 
-const USER_ROLES = new Set(['viewer', 'author', 'manager', 'admin']);
+const USER_ROLES = new Set(['viewer', 'author', 'manager', 'general_manager', 'admin']);
 
 function escapeFilterValue(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -23,7 +23,7 @@ async function main() {
   const role = process.argv[3]?.trim().toLowerCase();
 
   if (!email || !role) {
-    throw new Error('Usage: node scripts/set-pocketbase-user-role.mjs <email> <viewer|author|manager|admin>');
+    throw new Error('Usage: node scripts/set-pocketbase-user-role.mjs <email> <viewer|author|manager|general_manager|admin>');
   }
 
   if (!USER_ROLES.has(role)) {

@@ -5,6 +5,23 @@ import { MediaEmbedView } from './MediaEmbedView';
 export type MediaEmbedType = 'video' | 'audio' | 'pdf' | 'pptx';
 export type MediaEmbedTextWrap = 'break' | 'left' | 'right';
 
+export function normalizePreviewUrls(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((url): url is string => typeof url === 'string' && url.trim().length > 0);
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return normalizePreviewUrls(parsed);
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
 function normalizeMediaOffset(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -31,7 +48,7 @@ export function getDefaultMediaHeight(mediaType: MediaEmbedType) {
 }
 
 export function isInteractiveMediaType(mediaType: MediaEmbedType) {
-  return mediaType === 'video' || mediaType === 'pdf';
+  return mediaType === 'video' || mediaType === 'pdf' || mediaType === 'pptx';
 }
 
 declare module '@tiptap/core' {
@@ -46,6 +63,9 @@ declare module '@tiptap/core' {
         textWrap?: MediaEmbedTextWrap;
         offsetX?: number;
         offsetY?: number;
+        previewUrls?: string[];
+        previewStatus?: 'ready' | 'failed';
+        previewError?: string;
       }) => ReturnType;
     };
   }
@@ -101,6 +121,9 @@ export const MediaEmbed = Node.create({
       textWrap: { default: 'break' as MediaEmbedTextWrap },
       offsetX: { default: 0 },
       offsetY: { default: 0 },
+      previewUrls: { default: [] },
+      previewStatus: { default: null },
+      previewError: { default: null },
     };
   },
 
@@ -120,6 +143,9 @@ export const MediaEmbed = Node.create({
             textWrap: el.getAttribute('data-media-text-wrap') || 'break',
             offsetX: normalizeMediaOffset(el.getAttribute('data-media-offset-x')),
             offsetY: normalizeMediaOffset(el.getAttribute('data-media-offset-y')),
+            previewUrls: normalizePreviewUrls(el.getAttribute('data-media-preview-urls')),
+            previewStatus: el.getAttribute('data-media-preview-status'),
+            previewError: el.getAttribute('data-media-preview-error'),
           };
         },
       },
@@ -135,6 +161,9 @@ export const MediaEmbed = Node.create({
     const textWrap = (HTMLAttributes.textWrap || 'break') as MediaEmbedTextWrap;
     const offsetX = normalizeMediaOffset(HTMLAttributes.offsetX);
     const offsetY = normalizeMediaOffset(HTMLAttributes.offsetY);
+    const previewUrls = normalizePreviewUrls(HTMLAttributes.previewUrls);
+    const previewStatus = typeof HTMLAttributes.previewStatus === 'string' ? HTMLAttributes.previewStatus : null;
+    const previewError = typeof HTMLAttributes.previewError === 'string' ? HTMLAttributes.previewError : null;
 
     if (!src) return ['div', {}];
 
@@ -174,6 +203,9 @@ export const MediaEmbed = Node.create({
     };
     if (title) wrapperAttrs['data-media-title'] = title;
     if (height) wrapperAttrs['data-media-height'] = height;
+    if (previewUrls.length > 0) wrapperAttrs['data-media-preview-urls'] = JSON.stringify(previewUrls);
+    if (previewStatus) wrapperAttrs['data-media-preview-status'] = previewStatus;
+    if (previewError) wrapperAttrs['data-media-preview-error'] = previewError;
 
     const mediaStyleParts = ['width:100%', 'display:block'];
     if (mediaType === 'video') {
@@ -193,6 +225,56 @@ export const MediaEmbed = Node.create({
     }
     const mediaStyle = mediaStyleParts.join(';');
 
+    if (mediaType === 'pptx' && previewUrls.length > 0) {
+      return [
+        'div',
+        wrapperAttrs,
+        [
+          'div',
+          {
+            'data-pptx-preview-viewer': 'true',
+            style: 'overflow:hidden;border:1px solid #E5E5E5;border-radius:12px;background:#FFFFFF;',
+          },
+          [
+            'div',
+            {
+              'data-pptx-preview-frame': 'true',
+              style: mediaStyle + ';background:#FFFFFF;display:flex;align-items:center;justify-content:center;',
+            },
+            [
+              'img',
+              {
+                src: previewUrls[0],
+                alt: title || 'PowerPoint slide',
+                'data-pptx-preview-image': 'true',
+                style: 'display:block;width:100%;height:100%;object-fit:contain;background:#FFFFFF;',
+              },
+            ],
+          ],
+          [
+            'div',
+            {
+              'data-pptx-preview-controls': 'true',
+              style: 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 8px;border-top:1px solid #F0F0F0;',
+            },
+            [
+              'div',
+              { style: 'display:flex;align-items:center;gap:8px;' },
+              ['button', { type: 'button', 'data-pptx-preview-prev': 'true', style: 'border:1px solid #E5E5E5;border-radius:6px;background:transparent;color:#525252;padding:2px 8px;font-size:12px;font-weight:500;cursor:pointer;' }, 'Prev'],
+              ['span', { 'data-pptx-preview-counter': 'true', style: 'font-size:13px;font-weight:500;color:#525252;' }, `1 / ${previewUrls.length}`],
+              ['button', { type: 'button', 'data-pptx-preview-next': 'true', style: 'border:1px solid #E5E5E5;border-radius:6px;background:transparent;color:#525252;padding:2px 8px;font-size:12px;font-weight:500;cursor:pointer;' }, 'Next'],
+            ],
+            [
+              'div',
+              { style: 'display:flex;align-items:center;gap:8px;' },
+              ['a', { href: src, target: '_blank', rel: 'noreferrer', 'data-pptx-download': 'true', style: 'color:#525252;font-size:12px;font-weight:500;text-decoration:none;' }, 'Download'],
+              ['button', { type: 'button', 'data-pptx-preview-fullscreen': 'true', style: 'border:1px solid #E5E5E5;border-radius:6px;background:transparent;color:#525252;padding:2px 8px;font-size:12px;font-weight:500;cursor:pointer;' }, 'Fullscreen'],
+            ],
+          ],
+        ],
+      ];
+    }
+
     if (mediaType === 'pptx') {
       return [
         'div',
@@ -200,36 +282,13 @@ export const MediaEmbed = Node.create({
         [
           'div',
           {
-            style: 'overflow:hidden;border:1px solid #E5E5E5;border-radius:16px;background:#FFFFFF;',
+            style: 'overflow:hidden;border:1px solid #E5E5E5;border-radius:12px;background:#FFFFFF;',
           },
           [
             'div',
             {
-              style: 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #E5E5E5;background:#FAFAFA;',
-            },
-            [
-              'div',
-              {
-                style: 'display:flex;min-width:0;align-items:center;gap:8px;color:#525252;font-size:14px;font-weight:600;',
-              },
-              title ?? 'PowerPoint presentation',
-            ],
-            [
-              'button',
-              {
-                type: 'button',
-                'data-pptx-fullscreen': 'true',
-                disabled: 'true',
-                style: 'border:1px solid #D4D4D4;border-radius:999px;background:#FFFFFF;color:#171717;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;',
-              },
-              'Fullscreen',
-            ],
-          ],
-          [
-            'div',
-            {
               'data-pptx-status': 'true',
-              style: 'padding:16px;color:#737373;font-size:14px;',
+              style: 'padding:16px;text-align:center;color:#737373;font-size:14px;',
             },
             'Loading presentation...',
           ],
@@ -238,13 +297,14 @@ export const MediaEmbed = Node.create({
             {
               'data-pptx-viewer-host': 'true',
               hidden: 'true',
-              style: `${mediaStyle};background:#FFFFFF;`,
+              style: 'width:100%;height:auto;min-height:0;background:#FFFFFF;',
             },
           ],
           [
             'div',
             {
-              style: 'padding:0 16px 16px;',
+              'data-pptx-actions-source': 'true',
+              style: 'display:none;',
             },
             [
               'a',
@@ -253,9 +313,19 @@ export const MediaEmbed = Node.create({
                 target: '_blank',
                 rel: 'noreferrer',
                 'data-pptx-download': 'true',
-                style: 'color:#D93A3A;font-size:13px;font-weight:600;text-decoration:none;',
+                style: 'color:#525252;font-size:12px;font-weight:500;text-decoration:none;',
               },
-              'Download presentation',
+              'Download',
+            ],
+            [
+              'button',
+              {
+                type: 'button',
+                'data-pptx-fullscreen': 'true',
+                disabled: 'true',
+                style: 'border:1px solid #E5E5E5;border-radius:6px;background:transparent;color:#525252;padding:4px 10px;font-size:12px;font-weight:500;cursor:pointer;',
+              },
+              'Fullscreen',
             ],
           ],
         ],

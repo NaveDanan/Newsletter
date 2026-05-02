@@ -83,6 +83,8 @@ Your tenant's OpenID Connect endpoints follow this pattern (replace `{tenant-id}
 
 ## Step 5 — Configure PocketBase
 
+For Kubernetes deployments, you can configure the same OIDC provider through Helm values instead of the PocketBase admin panel. Set `env.pocketbaseSsoOidcEnabled: true`, fill the OIDC endpoint/client values, and provide `POCKETBASE_SSO_OIDC_CLIENT_SECRET` in the chart secret. See `helm/newsletter/values.production.example.yaml`.
+
 ### 5.1 — Open the Users Collection Settings
 
 1. Log in to the PocketBase admin panel at `http://localhost:8090/_/` (or your production URL).

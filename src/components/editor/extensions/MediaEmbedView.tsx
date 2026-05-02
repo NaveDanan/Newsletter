@@ -5,7 +5,7 @@ import type { IconSvgElement } from '@hugeicons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { createPptxViewer, type PptxViewerInstance } from '@/lib/pptx-viewer';
-import { buildEmbedSrc, getDefaultMediaHeight, isIframeEmbed, isInteractiveMediaType, normalizeMediaDimension, type MediaEmbedTextWrap, type MediaEmbedType } from './MediaEmbed';
+import { buildEmbedSrc, getDefaultMediaHeight, isIframeEmbed, isInteractiveMediaType, normalizeMediaDimension, normalizePreviewUrls, type MediaEmbedTextWrap, type MediaEmbedType } from './MediaEmbed';
 
 const MEDIA_LABELS: Record<MediaEmbedType, string> = {
   video: 'Video',
@@ -54,6 +54,9 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
   const widthAttr = normalizeMediaDimension(node.attrs.width, '100%') ?? '100%';
   const heightAttr = normalizeMediaDimension(node.attrs.height, getDefaultMediaHeight(mediaType));
   const textWrapAttr = (node.attrs.textWrap || 'break') as MediaEmbedTextWrap;
+  const previewUrls = normalizePreviewUrls(node.attrs.previewUrls);
+  const previewStatus = node.attrs.previewStatus as 'ready' | 'failed' | null;
+  const previewError = typeof node.attrs.previewError === 'string' ? node.attrs.previewError : null;
   const pptxHostRef = useRef<HTMLDivElement | null>(null);
   const pptxViewerRef = useRef<PptxViewerInstance | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -71,6 +74,7 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
   const [isResizing, setIsResizing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showControls, setShowControls] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
   const widthRef = useRef(widthAttr);
   const heightRef = useRef(heightAttr);
   const textWrapRef = useRef<MediaEmbedTextWrap>(textWrapAttr);
@@ -84,6 +88,7 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
   const Icon = MEDIA_ICONS[mediaType];
   const label = MEDIA_LABELS[mediaType];
   const interactiveMedia = isInteractiveMediaType(mediaType);
+  const activeSlide = Math.min(currentSlide, Math.max(0, previewUrls.length - 1));
 
   useEffect(() => {
     const nextWidth = normalizeMediaDimension(node.attrs.width, '100%') ?? '100%';
@@ -147,6 +152,9 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
     if (mediaType !== 'pptx' || !pptxHostRef.current) {
       return;
     }
+    if (previewUrls.length > 0) {
+      return;
+    }
 
     let cancelled = false;
     setPptxError(null);
@@ -168,7 +176,7 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
       pptxViewerRef.current?.destroy();
       pptxViewerRef.current = null;
     };
-  }, [mediaType, src, t]);
+  }, [mediaType, previewUrls.length, src, t]);
 
   const handleWrapChange = useCallback((nextWrap: MediaEmbedTextWrap) => {
     textWrapRef.current = nextWrap;
@@ -309,6 +317,20 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
     commitAttributes({ offsetX: 0, offsetY: 0 });
   }, [commitAttributes]);
 
+  const handlePptxPreviewFullscreen = useCallback(() => {
+    const target = mediaFrameRef.current;
+    if (!target) {
+      return;
+    }
+
+    if (document.fullscreenElement === target) {
+      void document.exitFullscreen();
+      return;
+    }
+
+    void target.requestFullscreen();
+  }, []);
+
   if (!src) {
     return null;
   }
@@ -408,7 +430,24 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
             </div>
 
             <div ref={mediaFrameRef} className="bg-white" style={frameStyle}>
-              {mediaType === 'video' && !useIframe ? (
+              {mediaType === 'pptx' ? (
+                previewUrls.length > 0 ? (
+                  <div className="flex h-full w-full items-center justify-center bg-white">
+                    <img
+                      src={previewUrls[activeSlide]}
+                      alt={title ?? `PowerPoint slide ${activeSlide + 1}`}
+                      className="block h-full w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="h-full w-full overflow-hidden bg-white">
+                    {pptxError ? (
+                      <p className="px-3 py-2 text-sm text-[#B91C1C]">{pptxError}</p>
+                    ) : null}
+                    <div ref={pptxHostRef} className="min-h-full w-full overflow-hidden" />
+                  </div>
+                )
+              ) : mediaType === 'video' && !useIframe ? (
                 <video src={src} controls className="h-full w-full" style={{ display: 'block', objectFit: 'contain' }} />
               ) : (
                 <iframe
@@ -420,6 +459,54 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
                 />
               )}
             </div>
+            {mediaType === 'pptx' ? (
+              <div className="flex items-center justify-between gap-2 border-t border-[#F0F0F0] px-2 py-1">
+                {previewUrls.length > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentSlide(Math.max(0, activeSlide - 1))}
+                      disabled={activeSlide <= 0}
+                      className="rounded-md border border-[#E5E5E5] bg-transparent px-2 py-1 text-xs font-medium text-[#525252] disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-xs font-medium text-[#525252]">
+                      {activeSlide + 1} / {previewUrls.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentSlide(Math.min(previewUrls.length - 1, activeSlide + 1))}
+                      disabled={activeSlide >= previewUrls.length - 1}
+                      className="rounded-md border border-[#E5E5E5] bg-transparent px-2 py-1 text-xs font-medium text-[#525252] disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      Next
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-[#B91C1C]">
+                    {previewStatus === 'failed' ? (previewError ?? t('editor.failedPresentation')) : t('editor.loadingPresentation')}
+                  </span>
+                )}
+                <div className="flex items-center gap-2">
+                  <a
+                    href={src}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-medium text-[#525252] hover:text-[#D93A3A]"
+                  >
+                    {t('editor.downloadPresentation')}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={previewUrls.length > 0 ? handlePptxPreviewFullscreen : () => void pptxViewerRef.current?.toggleFullscreen()}
+                    className="rounded-md border border-[#E5E5E5] bg-transparent px-2.5 py-1 text-xs font-medium text-[#525252] transition-colors hover:border-[#D93A3A] hover:text-[#D93A3A]"
+                  >
+                    {t('editor.fullscreenLabel')}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </NodeViewWrapper>
@@ -454,36 +541,10 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
 
         {/* Media content */}
         <div className="bg-white">
-          {mediaType === 'pptx' ? (
-            <div className="space-y-3 p-4">
-              <div className="flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={() => void pptxViewerRef.current?.toggleFullscreen()}
-                  className="rounded-full border border-[#D4D4D4] px-3 py-1.5 text-xs font-semibold text-[#171717] transition-colors hover:border-[#D93A3A] hover:text-[#D93A3A]"
-                >
-                  {t('editor.fullscreenLabel')}
-                </button>
-              </div>
-              {pptxError ? (
-                <p className="px-1 text-sm text-[#B91C1C]">{pptxError}</p>
-              ) : null}
-              <div ref={pptxHostRef} className="min-h-[500px] w-full overflow-hidden rounded-lg border border-[#E5E5E5]" />
-              <a
-                href={src}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex px-1 text-sm font-semibold text-[#D93A3A] hover:text-[#B91C1C]"
-              >
-                {t('editor.downloadPresentation')}
-              </a>
-            </div>
-          ) : mediaType === 'audio' ? (
+          {mediaType === 'audio' ? (
             <div className="p-4">
               <audio src={src} controls className="w-full" />
             </div>
-          ) : mediaType === 'video' && !useIframe ? (
-            <video src={src} controls className="max-h-96 w-full" />
           ) : (
             <iframe
               src={embedSrc}

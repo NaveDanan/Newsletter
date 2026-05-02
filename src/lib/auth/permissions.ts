@@ -2,7 +2,7 @@ import type { UserRole } from '@/lib/pocketbase/client';
 import type { Newsletter } from '@/types/newsletter';
 
 export function hasManagerAccess(role: UserRole | null | undefined): boolean {
-  return role === 'author' || role === 'manager' || role === 'admin';
+  return role === 'author' || role === 'manager' || role === 'general_manager' || role === 'admin';
 }
 
 export function canAccessManagerTab(role: UserRole | null | undefined, tab: string): boolean {
@@ -14,7 +14,7 @@ export function canAccessManagerTab(role: UserRole | null | undefined, tab: stri
     return role === 'admin';
   }
 
-  return role === 'manager' || role === 'admin';
+  return role === 'manager' || role === 'general_manager' || role === 'admin';
 }
 
 export function canCreateNewsletter(role: UserRole | null | undefined): boolean {
@@ -30,7 +30,7 @@ export function canEditNewsletter(
     return true;
   }
 
-  if (role !== 'author' && role !== 'manager') {
+  if (role !== 'author' && role !== 'manager' && role !== 'general_manager') {
     return false;
   }
 

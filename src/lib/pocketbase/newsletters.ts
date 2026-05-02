@@ -1,9 +1,14 @@
 import type { RecordModel } from 'pocketbase';
 import { getPocketBase } from './client';
 import { extractExcerpt, calculateReadTime } from '../newsletters';
-import type { Newsletter, NewsletterComment, NewsletterFormData } from '../../types/newsletter';
+import { inferNewsletterTextAlignment, normalizeNewsletterTextAlignment } from '../newsletter-alignment';
+import type { Newsletter, NewsletterComment, NewsletterFormData, PresentationPreview } from '../../types/newsletter';
 
 export const NEWSLETTERS_COLLECTION = 'newsletters';
+
+interface NewsletterUpdateEmailResponse {
+  recipientCount?: number;
+}
 
 // ---------------------------------------------------------------------------
 // Mapping
@@ -36,6 +41,46 @@ function getRecordFileUrl(pb: ReturnType<typeof getPocketBase>, record: RecordMo
   return files.getUrl ? files.getUrl(record, fileName) : '';
 }
 
+function parsePresentationPreviewManifest(raw: unknown): { presentations?: unknown[] } {
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw as { presentations?: unknown[] };
+
+  try {
+    const parsed = JSON.parse(String(raw)) as unknown;
+    return parsed && typeof parsed === 'object' ? parsed as { presentations?: unknown[] } : {};
+  } catch {
+    return {};
+  }
+}
+
+function mapPresentationPreviews(pb: ReturnType<typeof getPocketBase>, record: RecordModel): PresentationPreview[] {
+  const manifest = parsePresentationPreviewManifest(record['presentationPreviewManifest']);
+  const presentations = Array.isArray(manifest.presentations) ? manifest.presentations : [];
+
+  return presentations.map((item): PresentationPreview | null => {
+    if (!item || typeof item !== 'object') return null;
+    const value = item as Record<string, unknown>;
+    const sourceFileName = typeof value.sourceFileName === 'string' ? value.sourceFileName : '';
+    if (!sourceFileName) return null;
+
+    const previewFiles = Array.isArray(value.previewFiles)
+      ? value.previewFiles.filter((fileName): fileName is string => typeof fileName === 'string' && fileName.length > 0)
+      : [];
+
+    return {
+      sourceFileName,
+      sourceUrl: getRecordFileUrl(pb, record, sourceFileName),
+      title: typeof value.title === 'string' ? value.title : undefined,
+      status: value.status === 'failed' ? 'failed' : 'ready',
+      slideCount: typeof value.slideCount === 'number' ? value.slideCount : previewFiles.length,
+      previewFiles,
+      previewUrls: previewFiles.map((fileName) => getRecordFileUrl(pb, record, fileName)),
+      error: typeof value.error === 'string' ? value.error : undefined,
+      createdAt: typeof value.createdAt === 'string' ? value.createdAt : undefined,
+    };
+  }).filter((preview): preview is PresentationPreview => preview !== null);
+}
+
 function isClientResponseError(error: unknown): error is { status?: number; response?: { data?: Record<string, unknown> } } {
   return Boolean(error && typeof error === 'object');
 }
@@ -49,6 +94,7 @@ function buildNewsletterCorePayload(data: NewsletterFormData) {
     author: data.author,
     readTime: calculateReadTime(data.content),
     coverImage: data.coverImage,
+    textAlignment: inferNewsletterTextAlignment(data.content),
     tags: data.tags,
     status: data.status,
   };
@@ -69,6 +115,7 @@ function buildNewsletterCreatePayload(
     comments: 0,
     shares: 0,
     likedByUserIds: [],
+    bookmarkedByUserIds: [],
     commentItems: [],
   };
 }
@@ -78,11 +125,13 @@ function stripUnsupportedNewsletterFields(payload: Record<string, unknown>) {
   delete nextPayload.authorAvatar;
   delete nextPayload.createdById;
   delete nextPayload.likedByUserIds;
+  delete nextPayload.bookmarkedByUserIds;
   delete nextPayload.commentItems;
   delete nextPayload.publishedAt;
   delete nextPayload.likes;
   delete nextPayload.comments;
   delete nextPayload.shares;
+  delete nextPayload.textAlignment;
   return nextPayload;
 }
 
@@ -115,6 +164,7 @@ export function mapPBRecordToNewsletter(record: RecordModel): Newsletter {
   const presentationFiles = Array.isArray(record['presentationFiles'])
     ? (record['presentationFiles'] as string[]).map((fileName) => getRecordFileUrl(pb, record, fileName))
     : [];
+  const presentationPreviews = mapPresentationPreviews(pb, record);
   return {
     id: record.id,
     title: typeof record['title'] === 'string' ? record['title'] : '',
@@ -127,13 +177,16 @@ export function mapPBRecordToNewsletter(record: RecordModel): Newsletter {
     publishedAt: typeof record['publishedAt'] === 'string' && record['publishedAt'] ? record['publishedAt'] : record.created.slice(0, 10),
     readTime: calculateReadTime(content),
     coverImage: typeof record['coverImage'] === 'string' ? record['coverImage'] : '',
+    textAlignment: normalizeNewsletterTextAlignment(record['textAlignment']) ?? inferNewsletterTextAlignment(content),
     likes: typeof record['likes'] === 'number' ? record['likes'] : 0,
     comments: typeof record['comments'] === 'number' ? record['comments'] : commentItems.length,
     shares: typeof record['shares'] === 'number' ? record['shares'] : 0,
     tags: Array.isArray(record['tags']) ? (record['tags'] as string[]) : [],
     status: record['status'] === 'draft' ? 'draft' : 'published',
     presentationFiles,
+    presentationPreviews,
     likedByUserIds: Array.isArray(record['likedByUserIds']) ? (record['likedByUserIds'] as string[]) : [],
+    bookmarkedByUserIds: Array.isArray(record['bookmarkedByUserIds']) ? (record['bookmarkedByUserIds'] as string[]) : [],
     commentItems,
   };
 }
@@ -210,25 +263,55 @@ export async function removeNewsletter(id: string): Promise<void> {
   await pb.collection(NEWSLETTERS_COLLECTION).delete(id);
 }
 
+export async function sendNewsletterUpdateEmail(id: string): Promise<number> {
+  const pb = getPocketBase();
+  const result = await pb.send<NewsletterUpdateEmailResponse>('/api/newsletter/send-update', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      newsletterId: id,
+    }),
+  });
+
+  return typeof result?.recipientCount === 'number' ? result.recipientCount : 0;
+}
+
 export async function uploadNewsletterPresentation(
   id: string,
   file: File,
-): Promise<{ newsletter: Newsletter; url: string; fileName: string }> {
+): Promise<{ newsletter: Newsletter; url: string; fileName: string; previewUrls: string[]; previewStatus: 'ready' | 'failed'; previewError?: string }> {
   const pb = getPocketBase();
   const payload = new FormData();
-  payload.append('presentationFiles+', file);
+  payload.append('newsletterId', id);
+  payload.append('presentationFile', file);
 
-  const record = await pb.collection(NEWSLETTERS_COLLECTION).update(id, payload);
-  const fileNames = Array.isArray(record['presentationFiles']) ? (record['presentationFiles'] as string[]) : [];
-  const fileName = fileNames.at(-1);
+  const upload = await pb.send<{
+    status?: 'ready' | 'failed';
+    fileName?: string;
+    error?: string;
+  }>('/api/newsletter/presentation-upload', {
+    method: 'POST',
+    body: payload,
+    requestKey: null,
+  });
+  const record = await pb.collection(NEWSLETTERS_COLLECTION).getOne(id, { requestKey: null });
+  const fileName = upload.fileName;
 
   if (!fileName) {
     throw new Error('Uploaded presentation file was not returned by PocketBase');
   }
 
+  const newsletter = mapPBRecordToNewsletter(record);
+  const preview = newsletter.presentationPreviews?.find((item) => item.sourceFileName === fileName);
+
   return {
-    newsletter: mapPBRecordToNewsletter(record),
+    newsletter,
     url: getRecordFileUrl(pb, record, fileName),
     fileName,
+    previewUrls: preview?.previewUrls ?? [],
+    previewStatus: upload.status === 'failed' ? 'failed' : 'ready',
+    previewError: upload.error,
   };
 }

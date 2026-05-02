@@ -1,7 +1,7 @@
 import PocketBase from 'pocketbase';
 import { loadProjectEnv } from './pocketbase/load-env.mjs';
 
-const USER_ROLES = ['viewer', 'author', 'manager', 'admin'];
+const USER_ROLES = ['viewer', 'author', 'manager', 'general_manager', 'admin'];
 
 function escapeFilterValue(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');

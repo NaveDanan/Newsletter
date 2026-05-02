@@ -26,6 +26,8 @@ export function mapPBRecordToProject(record: RecordModel): Project {
     status: (record['status'] as ProjectStatus) ?? 'pending',
     isVisibleInGantt: typeof record['isVisibleInGantt'] === 'boolean' ? record['isVisibleInGantt'] : true,
     gantt,
+    createdBy: typeof record['createdBy'] === 'string' ? record['createdBy'] : '',
+    allowedUserIds: Array.isArray(record['allowedUserIds']) ? record['allowedUserIds'] as string[] : [],
   };
 }
 
@@ -53,6 +55,8 @@ export async function createProject(
     status: 'pending',
     isVisibleInGantt: true,
     gantt: gantt ?? { tasks: [], resources: [], roles: [], zoom: 'week', lastEditedAt: null },
+    createdBy: pb.authStore.record?.id ?? '',
+    allowedUserIds: [],
   });
   return mapPBRecordToProject(record);
 }

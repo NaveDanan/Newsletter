@@ -43,7 +43,7 @@ interface NewsletterEditorProps {
   onSave: (data: NewsletterFormData) => void;
   onUpdate?: (id: string, data: Partial<NewsletterFormData>) => void;
   onAutoSave?: (id: string | null, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
-  onUploadPresentation?: (id: string, file: File) => Promise<{ newsletter: Newsletter; url: string; fileName: string } | null> | { newsletter: Newsletter; url: string; fileName: string } | null;
+  onUploadPresentation?: (id: string, file: File) => Promise<{ newsletter: Newsletter; url: string; fileName: string; previewUrls?: string[]; previewStatus?: 'ready' | 'failed'; previewError?: string } | null> | { newsletter: Newsletter; url: string; fileName: string; previewUrls?: string[]; previewStatus?: 'ready' | 'failed'; previewError?: string } | null;
   onCancel: () => void;
   isEditing?: boolean;
 }
@@ -191,6 +191,9 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
     return {
       src: uploaded.url,
       title: file.name,
+      previewUrls: uploaded.previewUrls ?? [],
+      previewStatus: uploaded.previewStatus,
+      previewError: uploaded.previewError,
     };
   }, [autoSaveDraftId, getCurrentFormData, onAutoSave, onUploadPresentation, t]);
 

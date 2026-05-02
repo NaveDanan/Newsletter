@@ -11,6 +11,7 @@ credentials:
   existingSecret: newsletter-pocketbase-env
   smtpUsername: ""
   smtpPassword: ""
+  ssoOidcClientSecret: ""
 
 env:
   appPublicUrl: https://newsletter.example.com
@@ -23,7 +24,16 @@ env:
   pocketbaseSmtpPort: 587
   pocketbaseSmtpAuthMethod: PLAIN
   pocketbaseSmtpTls: false
+  pocketbaseSmtpInsecureSkipVerify: false
   pocketbaseSmtpLocalName: ""
+  pocketbaseSsoOidcEnabled: true
+  pocketbaseSsoOidcProviderName: oidc
+  pocketbaseSsoOidcDisplayName: Company SSO
+  pocketbaseSsoOidcClientId: your-entra-application-client-id
+  pocketbaseSsoOidcAuthUrl: https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/authorize
+  pocketbaseSsoOidcTokenUrl: https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/token
+  pocketbaseSsoOidcUserInfoUrl: https://graph.microsoft.com/oidc/userinfo
+  pocketbaseSsoOidcPkce: true
   pocketbaseRecreateCollections: false
   newsletterTelemetry: false
 
@@ -38,6 +48,9 @@ ingress:
     className: nginx
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/proxy-body-size: "110m"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     host: newsletter.example.com
     path: /
     pathType: Prefix
@@ -50,6 +63,9 @@ ingress:
     className: nginx
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/proxy-body-size: "110m"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     host: pb.example.com
     path: /
     pathType: Prefix

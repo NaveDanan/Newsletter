@@ -1,4 +1,5 @@
 import { readStoredValue } from './localStorage';
+import { inferNewsletterTextAlignment, normalizeNewsletterTextAlignment } from './newsletter-alignment';
 import type { Newsletter, NewsletterComment } from '../types/newsletter';
 
 export const NEWSLETTER_STORAGE_KEY = 'pulse_ai_newsletters';
@@ -32,6 +33,7 @@ function normalizeNewsletter(newsletter: Newsletter): Newsletter {
     ...newsletter,
     excerpt: extractExcerpt(newsletter.content),
     readTime: calculateReadTime(newsletter.content),
+    textAlignment: normalizeNewsletterTextAlignment(newsletter.textAlignment) ?? inferNewsletterTextAlignment(newsletter.content),
     likes: Math.max(0, newsletter.likes ?? 0),
     comments: Math.max(0, newsletter.comments ?? commentItems.length),
     shares: Math.max(0, newsletter.shares ?? 0),
@@ -86,12 +88,14 @@ export const initialNewsletters: Newsletter[] = [
     publishedAt: '2025-05-16',
     readTime: '5 min read',
     coverImage: '/feature_lab_image.jpg',
+    textAlignment: 'left',
     likes: 141,
     comments: 2238,
     shares: 225,
     tags: ['Workflow', 'Productivity', 'AI Tools'],
     status: 'published',
     likedByUserIds: [],
+    bookmarkedByUserIds: [],
     commentItems: [],
   },
   {
@@ -124,12 +128,14 @@ Avoid:
     publishedAt: '2025-05-28',
     readTime: '4 min read',
     coverImage: '/cta_city_bg.jpg',
+    textAlignment: 'left',
     likes: 116,
     comments: 1175,
     shares: 113,
     tags: ['Prompts', 'Writing', 'Content'],
     status: 'published',
     likedByUserIds: [],
+    bookmarkedByUserIds: [],
     commentItems: [],
   },
   {
@@ -157,12 +163,14 @@ Avoid:
     publishedAt: '2025-04-30',
     readTime: '7 min read',
     coverImage: '/hero_city_bg.jpg',
+    textAlignment: 'left',
     likes: 9,
     comments: 241,
     shares: 34,
     tags: ['Features', 'Work', 'Productivity'],
     status: 'published',
     likedByUserIds: [],
+    bookmarkedByUserIds: [],
     commentItems: [],
   },
 ];

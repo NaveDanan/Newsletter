@@ -57,6 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     bootLogger.once('auth:provider-effect-start', () => {
       bootLogger.step('auth', 'Auth provider initialization started');
     });
@@ -70,14 +72,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userId: String(authModel.id ?? ''),
         role: normalizeUserRole(authModel.role),
       });
+
+      void pb.collection('users').authRefresh<Record<string, unknown>>()
+        .then((authData) => {
+          if (!isMounted) {
+            return;
+          }
+
+          const refreshedModel = authData.record as Record<string, unknown> | null;
+          if (!refreshedModel) {
+            pb.authStore.clear();
+            return;
+          }
+
+          const refreshedAvatarFile = typeof refreshedModel.avatar === 'string' ? refreshedModel.avatar : '';
+          const refreshedAvatar = refreshedAvatarFile ? getRecordFileUrl(pb, refreshedModel, refreshedAvatarFile) : undefined;
+          setUser(mapAuthUser(refreshedModel, refreshedAvatar));
+          bootLogger.step('auth', 'Validated restored PocketBase auth state', {
+            userId: String(refreshedModel.id ?? ''),
+            role: normalizeUserRole(refreshedModel.role),
+          });
+        })
+        .catch((error) => {
+          if (!isMounted) {
+            return;
+          }
+
+          pb.authStore.clear();
+          bootLogger.warn('auth', 'Cleared stale PocketBase auth state after refresh failed', normalizeBootError(error));
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        });
     } else {
       bootLogger.step('auth', 'No authenticated user was restored from PocketBase auth store');
+      setIsLoading(false);
     }
 
-    setIsLoading(false);
-    bootLogger.step('auth', 'Auth provider finished initial state hydration', {
-      isAuthenticated: Boolean(authModel && pb.authStore.isValid),
-    });
+    if (!authModel || !pb.authStore.isValid) {
+      bootLogger.step('auth', 'Auth provider finished initial state hydration', {
+        isAuthenticated: false,
+      });
+    }
 
     const unsubscribe = pb.authStore.onChange((token, model) => {
       if (token && model) {
@@ -89,14 +127,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           userId: String(authModelRecord.id ?? ''),
           role: normalizeUserRole(authModelRecord.role),
         });
+        setIsLoading(false);
         return;
       }
 
       setUser(null);
+      setIsLoading(false);
       bootLogger.step('auth', 'PocketBase auth store emitted sign-out state');
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [pb]);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -168,11 +211,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initiateSSO = useCallback(async (provider: SSOProvider) => {
     try {
       bootLogger.step('auth', 'SSO login started', { provider });
+      type OAuthProviderInfo = {
+        name: string;
+        state: string;
+        authURL?: string;
+        authUrl?: string;
+        codeVerifier: string;
+      };
       const authMethods = await pb.collection('users').listAuthMethods();
-      const providers = (authMethods as { authProviders?: Array<Record<string, string>> }).authProviders || [];
+      const authMethodsPayload = authMethods as unknown as {
+        authProviders?: OAuthProviderInfo[] | null;
+        oauth2?: {
+          providers?: OAuthProviderInfo[];
+        };
+      };
+      const providers = authMethodsPayload.oauth2?.providers || authMethodsPayload.authProviders || [];
       const oauthProvider = providers.find((entry) => entry.name === provider);
+      const authUrl = oauthProvider?.authURL || oauthProvider?.authUrl;
 
-      if (!oauthProvider) {
+      if (!oauthProvider || !authUrl) {
         toast.error(`${provider} login is not configured`);
         return;
       }
@@ -184,7 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       bootLogger.step('auth', 'Redirecting browser to SSO provider', {
         provider,
       });
-      window.location.href = oauthProvider.authUrl + getSSOCallbackUrl();
+      window.location.href = authUrl + getSSOCallbackUrl();
     } catch (error) {
       console.error('SSO initiation error:', error);
       bootLogger.error('auth', 'SSO initiation failed', normalizeBootError(error));

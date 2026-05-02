@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Add01Icon, CheckmarkCircle02Icon, Clock01Icon, Delete02Icon, Edit02Icon, FileAttachmentIcon, Search01Icon, ViewIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, CheckmarkCircle02Icon, Clock01Icon, Delete02Icon, Edit02Icon, FileAttachmentIcon, Loading02Icon, Mail01Icon, Search01Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -11,10 +11,12 @@ interface NewsletterListProps {
   onCreate: () => void;
   onEdit: (newsletter: Newsletter) => void;
   onDelete: (id: string) => Promise<boolean> | boolean;
+  onSendUpdate: (id: string) => Promise<number | null> | number | null;
   onView: (newsletter: Newsletter) => void;
   canCreate: boolean;
   canEdit: (newsletter: Newsletter) => boolean;
   canDelete: () => boolean;
+  canSendUpdate: () => boolean;
 }
 
 export function NewsletterList({ 
@@ -22,16 +24,19 @@ export function NewsletterList({
   onCreate, 
   onEdit, 
   onDelete,
+  onSendUpdate,
   onView,
   canCreate,
   canEdit,
   canDelete,
+  canSendUpdate,
 }: NewsletterListProps) {
   const { formatNumber, isRTL, t } = useLocale();
   const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sendingUpdateId, setSendingUpdateId] = useState<string | null>(null);
 
   const filteredNewsletters = newsletters
     .filter(n => filter === 'all' ? true : n.status === filter)
@@ -65,6 +70,28 @@ export function NewsletterList({
       // The delete callback handles user-facing error messages.
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleSendUpdate = async (newsletter: Newsletter) => {
+    if (sendingUpdateId || newsletter.status !== 'published') {
+      return;
+    }
+
+    setSendingUpdateId(newsletter.id);
+
+    try {
+      const recipientCount = await onSendUpdate(newsletter.id);
+
+      if (typeof recipientCount === 'number') {
+        toast.success(t('manager.newsletterUpdateSent', {
+          count: formatNumber(recipientCount),
+        }));
+      }
+    } catch {
+      // The send callback handles user-facing error messages.
+    } finally {
+      setSendingUpdateId(null);
     }
   };
 
@@ -166,6 +193,8 @@ export function NewsletterList({
             {filteredNewsletters.map((newsletter) => {
               const canEditCurrent = canEdit(newsletter);
               const canDeleteCurrent = canDelete();
+              const canSendUpdateCurrent = canSendUpdate() && newsletter.status === 'published';
+              const isSendingUpdate = sendingUpdateId === newsletter.id;
 
               return (
                 <div
@@ -266,6 +295,19 @@ export function NewsletterList({
                         title={t('manager.edit')}
                       >
                         <HugeiconsIcon icon={Edit02Icon} className="w-4 h-4" />
+                      </button>
+                    )}
+                    {canSendUpdateCurrent && (
+                      <button
+                        onClick={() => handleSendUpdate(newsletter)}
+                        disabled={Boolean(sendingUpdateId)}
+                        className="p-2 text-[#737373] hover:text-[#D93A3A] hover:bg-red-50 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-60"
+                        title={t('manager.sendUpdateEmail')}
+                      >
+                        <HugeiconsIcon
+                          icon={isSendingUpdate ? Loading02Icon : Mail01Icon}
+                          className={cn('w-4 h-4', isSendingUpdate && 'animate-spin')}
+                        />
                       </button>
                     )}
                     {canDeleteCurrent && (

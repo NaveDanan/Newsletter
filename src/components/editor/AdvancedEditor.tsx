@@ -33,6 +33,7 @@ import { HeadingSelector } from './toolbar/HeadingSelector';
 import { ExportMenu } from './toolbar/ExportMenu';
 import { FindReplaceDialog } from './FindReplaceDialog';
 import { StatusBar } from './StatusBar';
+import { UploadLoadingDialog } from '../upload/UploadLoadingDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,7 +46,7 @@ interface AdvancedEditorProps {
   onChange: (content: string) => void;
   placeholder?: string;
   title?: string;
-  onUploadPresentation?: (file: File) => Promise<{ src: string; title?: string } | null>;
+  onUploadPresentation?: (file: File) => Promise<{ src: string; title?: string; previewUrls?: string[]; previewStatus?: 'ready' | 'failed'; previewError?: string } | null>;
 }
 
 export interface AdvancedEditorHandle {
@@ -84,6 +85,22 @@ function ToolbarDivider() {
   return <div className="mx-1 h-5 w-px bg-[#E5E5E5]" />;
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result;
+      if (typeof result === 'string') {
+        resolve(result);
+        return;
+      }
+      reject(new Error('File read returned an empty result.'));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorProps>(function AdvancedEditor({
   content,
   onChange,
@@ -95,6 +112,11 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
   const [isDragging, setIsDragging] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFindReplace, setShowFindReplace] = useState(false);
+  const [uploadDialog, setUploadDialog] = useState<{
+    title: string;
+    description: string;
+    fileName?: string;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaFileInputRef = useRef<HTMLInputElement>(null);
   const mediaFileTypeRef = useRef<MediaEmbedType>('video');
@@ -165,7 +187,7 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
   }, [content, editor]);
 
   // Process and upload image file
-  const processImageFile = useCallback((file: File) => {
+  const processImageFile = useCallback(async (file: File) => {
     if (!editor) {
       return;
     }
@@ -179,22 +201,27 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (result) {
-        editor.chain().focus().setResizableImage({
-          src: result,
-          alt: file.name,
-          width: '100%',
-          height: 'auto',
-          textWrap: 'break',
-        }).run();
-        toast.success(t('editor.imageInserted'));
-      }
-    };
-    reader.onerror = () => toast.error(t('editor.imageReadFailed'));
-    reader.readAsDataURL(file);
+    setUploadDialog({
+      title: t('editor.uploadingImage'),
+      description: t('editor.uploadingFileDescription'),
+      fileName: file.name,
+    });
+
+    try {
+      const result = await readFileAsDataUrl(file);
+      editor.chain().focus().setResizableImage({
+        src: result,
+        alt: file.name,
+        width: '100%',
+        height: 'auto',
+        textWrap: 'break',
+      }).run();
+      toast.success(t('editor.imageInserted'));
+    } catch {
+      toast.error(t('editor.imageReadFailed'));
+    } finally {
+      setUploadDialog(null);
+    }
   }, [editor, t]);
 
   const addImageByUrl = useCallback(() => {
@@ -220,7 +247,9 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      Array.from(files).forEach(processImageFile);
+      Array.from(files).forEach((file) => {
+        void processImageFile(file);
+      });
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [processImageFile]);
@@ -239,7 +268,9 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
     e.preventDefault();
     setIsDragging(false);
     Array.from(e.dataTransfer.files).forEach(file => {
-      if (file.type.startsWith('image/')) processImageFile(file);
+      if (file.type.startsWith('image/')) {
+        void processImageFile(file);
+      }
     });
   }, [processImageFile]);
 
@@ -249,7 +280,7 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
         const file = item.getAsFile();
         if (file) {
           e.preventDefault();
-          processImageFile(file);
+          void processImageFile(file);
         }
       }
     });
@@ -294,9 +325,13 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
       video: ['video/'],
       audio: ['audio/'],
       pdf: ['application/pdf'],
-      pptx: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+      pptx: [
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/vnd.ms-powerpoint',
+      ],
     };
-    const isPptxFile = mediaType === 'pptx' && file.name.toLowerCase().endsWith('.pptx');
+    const lowerFileName = file.name.toLowerCase();
+    const isPptxFile = mediaType === 'pptx' && (lowerFileName.endsWith('.pptx') || lowerFileName.endsWith('.ppt'));
     const isValidType = isPptxFile || allowedTypes[mediaType].some((prefix) => file.type.startsWith(prefix));
     if (!isValidType) {
       toast.error(mediaType === 'pptx' ? t('editor.onlyPptxFiles') : t('editor.invalidMediaType'));
@@ -307,36 +342,48 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
       return;
     }
 
+    setUploadDialog({
+      title: mediaType === 'pptx' ? t('editor.uploadingPresentation') : t('editor.uploadingMedia'),
+      description: mediaType === 'pptx' ? t('editor.uploadingPresentationDescription') : t('editor.uploadingFileDescription'),
+      fileName: file.name,
+    });
+
     if (mediaType === 'pptx') {
-      if (!onUploadPresentation) {
-        toast.error(t('editor.presentationUploadUnavailable'));
-        return;
-      }
+      try {
+        if (!onUploadPresentation) {
+          toast.error(t('editor.presentationUploadUnavailable'));
+          return;
+        }
 
-      const uploaded = await onUploadPresentation(file);
-      if (!uploaded) {
-        return;
-      }
+        const uploaded = await onUploadPresentation(file);
+        if (!uploaded) {
+          return;
+        }
 
-      editor.chain().focus().insertMediaEmbed({
-        src: uploaded.src,
-        mediaType,
-        title: uploaded.title ?? file.name,
-      }).run();
-      toast.success(t('editor.mediaInserted'));
+        editor.chain().focus().insertMediaEmbed({
+          src: uploaded.src,
+          mediaType,
+          title: uploaded.title ?? file.name,
+          previewUrls: uploaded.previewUrls ?? [],
+          previewStatus: uploaded.previewStatus,
+          previewError: uploaded.previewError,
+        }).run();
+        toast.success(t('editor.mediaInserted'));
+      } finally {
+        setUploadDialog(null);
+      }
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (result) {
-        editor.chain().focus().insertMediaEmbed({ src: result, mediaType, title: file.name }).run();
-        toast.success(t('editor.mediaInserted'));
-      }
-    };
-    reader.onerror = () => toast.error(t('editor.mediaReadFailed'));
-    reader.readAsDataURL(file);
+    try {
+      const result = await readFileAsDataUrl(file);
+      editor.chain().focus().insertMediaEmbed({ src: result, mediaType, title: file.name }).run();
+      toast.success(t('editor.mediaInserted'));
+    } catch {
+      toast.error(t('editor.mediaReadFailed'));
+    } finally {
+      setUploadDialog(null);
+    }
   }, [editor, onUploadPresentation, t]);
 
   const openMediaFilePicker = useCallback((mediaType: MediaEmbedType, accept: string) => {
@@ -384,6 +431,12 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
         editor={editor} 
         isOpen={showFindReplace} 
         onClose={() => setShowFindReplace(false)} 
+      />
+      <UploadLoadingDialog
+        open={Boolean(uploadDialog)}
+        title={uploadDialog?.title ?? ''}
+        description={uploadDialog?.description ?? ''}
+        fileName={uploadDialog?.fileName}
       />
 
       {/* Main Toolbar */}
@@ -596,7 +649,7 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
               </DropdownMenuItem>
               {/* PowerPoint */}
               <DropdownMenuItem
-                onClick={() => openMediaFilePicker('pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx')}
+                onClick={() => openMediaFilePicker('pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint,.pptx,.ppt')}
                 className="gap-3 rounded-md px-3 py-2 text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
               >
                 <HugeiconsIcon icon={Presentation01Icon} className="h-4 w-4 text-[#737373]" />

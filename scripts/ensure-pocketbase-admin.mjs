@@ -25,11 +25,11 @@ async function main() {
   const pocketbaseUrl = requireEnvValue(env, ['POCKETBASE_URL', 'VITE_POCKETBASE_URL']);
   const superuserEmail = requireEnvValue(env, ['POCKETBASE_SUPERUSER_EMAIL']);
   const superuserPassword = requireEnvValue(env, ['POCKETBASE_SUPERUSER_PASSWORD']);
-  const adminEmail = requireEnvValue(env, ['POCKETBASE_ADMIN_EMAIL'], { optional: true }).toLowerCase();
-  const adminPassword = requireEnvValue(env, ['POCKETBASE_ADMIN_PASSWORD'], { optional: true });
+  const adminEmail = requireEnvValue(env, ['POCKETBASE_ADMIN_EMAIL', 'VITE_ADMIN_EMAIL'], { optional: true }).toLowerCase();
+  const adminPassword = requireEnvValue(env, ['POCKETBASE_ADMIN_PASSWORD', 'VITE_ADMIN_PASSWORD'], { optional: true });
 
   if (!adminEmail || !adminPassword) {
-    console.log('Skipping app admin bootstrap because POCKETBASE_ADMIN_EMAIL/POCKETBASE_ADMIN_PASSWORD are not configured.');
+    console.log('Skipping app admin bootstrap because POCKETBASE_ADMIN_* or VITE_ADMIN_* credentials are not configured.');
     return;
   }
 

@@ -7,7 +7,7 @@ const AUTH_STORAGE_KEY = 'pb_auth';
 
 let pb: PocketBase | null = null;
 
-export const USER_ROLES = ['viewer', 'author', 'manager', 'admin'] as const;
+export const USER_ROLES = ['viewer', 'author', 'manager', 'general_manager', 'admin'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export function normalizeUserRole(value: unknown): UserRole {

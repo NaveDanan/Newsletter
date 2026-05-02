@@ -3,10 +3,16 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useSubscriberCount } from '@/hooks/useSubscriberCount';
 import { subscribeToNewsletter } from '@/lib/pocketbase/subscribers';
 
-export function Sidebar() {
-  const { locale, t } = useLocale();
+interface SidebarProps {
+  publishedCount: number;
+}
+
+export function Sidebar({ publishedCount }: SidebarProps) {
+  const { formatNumber, locale, t } = useLocale();
+  const { subscriberCount, refreshSubscriberCount } = useSubscriberCount();
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -32,6 +38,7 @@ export function Sidebar() {
         source: 'sidebar',
       });
 
+      void refreshSubscriberCount();
       toast.success(t('sidebar.subscribeSuccess'));
       setEmail('');
     } catch (error) {
@@ -80,16 +87,12 @@ export function Sidebar() {
         <h3 className="font-bold text-[#171717] mb-4">{t('sidebar.community')}</h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
+            <span className="text-sm text-[#737373]">{t('sidebar.published')}</span>
+            <span className="font-semibold text-[#171717]">{formatNumber(publishedCount)}</span>
+          </div>
+          <div className="flex items-center justify-between">
             <span className="text-sm text-[#737373]">{t('sidebar.subscribers')}</span>
-            <span className="font-semibold text-[#171717]">12,450</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-[#737373]">{t('sidebar.openRate')}</span>
-            <span className="font-semibold text-[#D93A3A]">38.5%</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-[#737373]">{t('sidebar.weeklyGrowth')}</span>
-            <span className="font-semibold text-green-600">+15%</span>
+            <span className="font-semibold text-[#171717]">{subscriberCount === null ? '...' : formatNumber(subscriberCount)}</span>
           </div>
         </div>
       </div>

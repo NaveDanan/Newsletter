@@ -1,8 +1,9 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { AnalyticsUpIcon, BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Logout01Icon, Mail01Icon, Menu01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
+import { BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Logout01Icon, Menu01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
 import { useRef, useState } from 'react';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useSubscriberCount } from '@/hooks/useSubscriberCount';
 import { cn } from '@/lib/utils';
 import { ProjectView } from './manager/ProjectView';
 import { GoalsView } from './manager/GoalsView';
@@ -46,8 +47,9 @@ interface ManagerDashboardProps {
   addNewsletter: (data: NewsletterFormData) => Promise<Newsletter | null> | Newsletter | null;
   upsertDraftNewsletter: (id: string | null, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
   updateNewsletter: (id: string, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
-  uploadPresentation: (id: string, file: File) => Promise<{ newsletter: Newsletter; url: string; fileName: string } | null> | { newsletter: Newsletter; url: string; fileName: string } | null;
+  uploadPresentation: (id: string, file: File) => Promise<{ newsletter: Newsletter; url: string; fileName: string; previewUrls?: string[]; previewStatus?: 'ready' | 'failed'; previewError?: string } | null> | { newsletter: Newsletter; url: string; fileName: string; previewUrls?: string[]; previewStatus?: 'ready' | 'failed'; previewError?: string } | null;
   deleteNewsletter: (id: string) => Promise<boolean> | boolean;
+  sendNewsletterUpdate: (id: string) => Promise<number | null> | number | null;
   onToggleNewsletterLike: (newsletterId: string) => void;
   onAddNewsletterComment: (newsletterId: string, body: string) => Promise<NewsletterComment | null> | NewsletterComment | null;
   onToggleCommentLike: (newsletterId: string, commentId: string) => void;
@@ -67,12 +69,14 @@ export function ManagerDashboard({
   updateNewsletter,
   uploadPresentation,
   deleteNewsletter,
+  sendNewsletterUpdate,
   onToggleNewsletterLike,
   onAddNewsletterComment,
   onToggleCommentLike,
 }: ManagerDashboardProps) {
   const { formatNumber, isRTL, t } = useLocale();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const { subscriberCount } = useSubscriberCount();
   const [editingNewsletter, setEditingNewsletter] = useState<Newsletter | null>(null);
   const [viewingNewsletter, setViewingNewsletter] = useState<Newsletter | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -82,6 +86,7 @@ export function ManagerDashboard({
   const activeViewingNewsletter = viewingNewsletter
     ? newsletters.find((newsletter) => newsletter.id === viewingNewsletter.id) ?? null
     : null;
+  const publishedNewsletterCount = newsletters.filter((newsletter) => newsletter.status === 'published').length;
 
   const tabs = [
     { id: 'newsletters' as Tab, label: t('manager.newsletters'), icon: FileAttachmentIcon },
@@ -154,6 +159,10 @@ export function ManagerDashboard({
 
   const handleDeleteNewsletter = (id: string) => {
     return deleteNewsletter(id);
+  };
+
+  const handleSendNewsletterUpdate = (id: string) => {
+    return sendNewsletterUpdate(id);
   };
 
   const handleBackToList = () => {
@@ -234,10 +243,12 @@ export function ManagerDashboard({
             onCreate={handleCreateNewsletter}
             onEdit={handleEditNewsletter}
             onDelete={handleDeleteNewsletter}
+            onSendUpdate={handleSendNewsletterUpdate}
             onView={handleViewNewsletter}
             canCreate={canCreateNewsletter(currentUserRole)}
             canEdit={(newsletter) => canEditNewsletter(currentUserRole, currentUser?.id, newsletter)}
             canDelete={() => canDeleteNewsletter(currentUserRole)}
+            canSendUpdate={() => currentUserRole === 'admin'}
           />
         );
       }
@@ -248,10 +259,12 @@ export function ManagerDashboard({
           onCreate={handleCreateNewsletter}
           onEdit={handleEditNewsletter}
           onDelete={handleDeleteNewsletter}
+          onSendUpdate={handleSendNewsletterUpdate}
           onView={handleViewNewsletter}
           canCreate={canCreateNewsletter(currentUserRole)}
           canEdit={(newsletter) => canEditNewsletter(currentUserRole, currentUser?.id, newsletter)}
           canDelete={() => canDeleteNewsletter(currentUserRole)}
+          canSendUpdate={() => currentUserRole === 'admin'}
         />
       );
     }
@@ -391,30 +404,16 @@ export function ManagerDashboard({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[#737373]">
                   <HugeiconsIcon icon={FileAttachmentIcon} className="w-4 h-4" />
-                  <span className="text-sm">{t('manager.newsletters')}</span>
+                  <span className="text-sm">{t('manager.published')}</span>
                 </div>
-                <span className="font-semibold text-[#171717]">{formatNumber(newsletters.length)}</span>
+                <span className="font-semibold text-[#171717]">{formatNumber(publishedNewsletterCount)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[#737373]">
                   <HugeiconsIcon icon={UserGroupIcon} className="w-4 h-4" />
                   <span className="text-sm">{t('manager.subscribers')}</span>
                 </div>
-                <span className="font-semibold text-[#171717]">12,450</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[#737373]">
-                  <HugeiconsIcon icon={Mail01Icon} className="w-4 h-4" />
-                  <span className="text-sm">{t('manager.openRate')}</span>
-                </div>
-                <span className="font-semibold text-[#D93A3A]">38.5%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[#737373]">
-                  <HugeiconsIcon icon={AnalyticsUpIcon} className="w-4 h-4" />
-                  <span className="text-sm">{t('manager.growth')}</span>
-                </div>
-                <span className="font-semibold text-green-600">+15%</span>
+                <span className="font-semibold text-[#171717]">{subscriberCount === null ? '...' : formatNumber(subscriberCount)}</span>
               </div>
             </div>
           </div>

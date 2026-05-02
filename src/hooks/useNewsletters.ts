@@ -8,6 +8,7 @@ import {
   createNewsletter,
   patchNewsletter,
   removeNewsletter,
+  sendNewsletterUpdateEmail,
   uploadNewsletterPresentation,
 } from '@/lib/pocketbase/newsletters';
 import type { PocketBaseUser, UserRole } from '@/lib/pocketbase/client';
@@ -16,13 +17,14 @@ import type { Newsletter, NewsletterComment, NewsletterFormData } from '../types
 interface UseNewslettersOptions {
   currentUser: PocketBaseUser | null;
   currentUserRole: UserRole | null;
+  enabled?: boolean;
 }
 
 function createClientId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersOptions) {
+export function useNewsletters({ currentUser, currentUserRole, enabled = true }: UseNewslettersOptions) {
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +33,13 @@ export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersO
   // Initial fetch from PocketBase
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      setError(null);
+      setNewsletters([]);
+      return;
+    }
+
     let cancelled = false;
 
     setIsLoading(true);
@@ -66,7 +75,7 @@ export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersO
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   // ---------------------------------------------------------------------------
   // Add (publish immediately)
@@ -182,6 +191,25 @@ export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersO
       return false;
     }
   }, [currentUserRole]);
+
+  const sendNewsletterUpdate = useCallback(async (id: string): Promise<number | null> => {
+    if (currentUserRole !== 'admin') {
+      return null;
+    }
+
+    const existing = newsletters.find((newsletter) => newsletter.id === id);
+    if (!existing || existing.status !== 'published') {
+      return null;
+    }
+
+    try {
+      return await sendNewsletterUpdateEmail(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send newsletter email';
+      toast.error(message);
+      return null;
+    }
+  }, [currentUserRole, newsletters]);
 
   // ---------------------------------------------------------------------------
   // Getters
@@ -326,11 +354,49 @@ export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersO
       )));
       return uploaded;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to upload PowerPoint file';
+      const status = typeof err === 'object' && err !== null && 'status' in err ? Number((err as { status?: unknown }).status) : 0;
+      const rawMessage = err instanceof Error ? err.message : 'Failed to upload PowerPoint file';
+      const message = status === 413
+        ? 'PowerPoint files must be 100 MB or smaller. If the file is smaller, check the ingress body-size limit.'
+        : /only powerpoint|only.*pptx/i.test(rawMessage)
+          ? 'Only PowerPoint .pptx files are supported.'
+          : /conversion|preview|soffice|pdftoppm|libreoffice/i.test(rawMessage)
+            ? `The PowerPoint was uploaded, but slide preview generation failed: ${rawMessage}`
+            : rawMessage;
       toast.error(message);
       return null;
     }
   }, [currentUser?.id, currentUserRole, newsletters]);
+
+  // ---------------------------------------------------------------------------
+  // Bookmark toggle (optimistic)
+  // ---------------------------------------------------------------------------
+  const toggleBookmark = useCallback(async (id: string): Promise<Newsletter | null> => {
+    if (!currentUser?.id) return null;
+
+    const existing = newsletters.find((n) => n.id === id);
+    if (!existing) return null;
+
+    const hasBookmarked = existing.bookmarkedByUserIds.includes(currentUser.id);
+    const bookmarkedByUserIds = hasBookmarked
+      ? existing.bookmarkedByUserIds.filter((uid) => uid !== currentUser.id)
+      : [...existing.bookmarkedByUserIds, currentUser.id];
+
+    // Optimistic
+    const optimistic: Newsletter = { ...existing, bookmarkedByUserIds };
+    setNewsletters((prev) => prev.map((n) => (n.id === id ? optimistic : n)));
+
+    try {
+      const updated = await patchNewsletter(id, { bookmarkedByUserIds });
+      setNewsletters((prev) => prev.map((n) => (n.id === id ? updated : n)));
+      return updated;
+    } catch (err) {
+      // Revert
+      setNewsletters((prev) => prev.map((n) => (n.id === id ? existing : n)));
+      console.error('toggleBookmark error:', err);
+      return null;
+    }
+  }, [currentUser?.id, newsletters]);
 
   return {
     newsletters,
@@ -341,12 +407,14 @@ export function useNewsletters({ currentUser, currentUserRole }: UseNewslettersO
     upsertDraftNewsletter,
     updateNewsletter,
     deleteNewsletter,
+    sendNewsletterUpdate,
     getNewsletter,
     getPublishedNewsletters,
     getDraftNewsletters,
     toggleNewsletterLike,
     addNewsletterComment,
     toggleCommentLike,
+    toggleBookmark,
     uploadPresentation,
   };
 }

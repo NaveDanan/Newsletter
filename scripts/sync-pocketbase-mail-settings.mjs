@@ -105,6 +105,7 @@ async function main() {
   const smtpAuthMethod = readOptionalValue(env, 'POCKETBASE_SMTP_AUTH_METHOD');
   const smtpTls = readOptionalBoolean(env, 'POCKETBASE_SMTP_TLS');
   const smtpLocalName = readOptionalValue(env, 'POCKETBASE_SMTP_LOCAL_NAME');
+  const smtpInsecureSkipVerify = readOptionalBoolean(env, 'POCKETBASE_SMTP_INSECURE_SKIP_VERIFY');
 
   if (typeof smtpEnabled === 'boolean') {
     smtpUpdate.enabled = smtpEnabled;
@@ -129,6 +130,9 @@ async function main() {
   }
   if (smtpLocalName) {
     smtpUpdate.localName = smtpLocalName;
+  }
+  if (smtpInsecureSkipVerify) {
+    console.warn('POCKETBASE_SMTP_INSECURE_SKIP_VERIFY is enabled. This is handled by the app mail hook and should only be used in development.');
   }
 
   if (Object.keys(smtpUpdate).length > 0) {

@@ -7,15 +7,17 @@ import type { Newsletter } from '../types/newsletter';
 
 interface LatestArticlesProps {
   newsletters: Newsletter[];
+  currentUserId?: string;
   onArticleClick?: (newsletter: Newsletter) => void;
 }
 
-export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesProps) {
+export function LatestArticles({ newsletters, currentUserId, onArticleClick }: LatestArticlesProps) {
   const { formatDate, formatNumber, isRTL, t } = useLocale();
   const tabs = [
     { key: 'Latest', label: t('latest.tab.latest') },
     { key: 'Top', label: t('latest.tab.top') },
     { key: 'Discussions', label: t('latest.tab.discussions') },
+    { key: 'Bookmarks', label: t('latest.tab.bookmarks') },
   ];
   const [activeTab, setActiveTab] = useState('Latest');
 
@@ -28,6 +30,10 @@ export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesPr
         );
       case 'Discussions':
         return [...newsletters].sort((a, b) => b.comments - a.comments);
+      case 'Bookmarks':
+        return currentUserId
+          ? newsletters.filter((a) => a.bookmarkedByUserIds.includes(currentUserId))
+          : [];
       case 'Latest':
       default:
         return newsletters;
@@ -66,7 +72,12 @@ export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesPr
 
       {/* Articles list */}
       <div className="space-y-6">
-        {filteredArticles.map((article) => (
+        {filteredArticles.length === 0 && activeTab === 'Bookmarks' ? (
+          <div className="text-center py-12 bg-[#F9FAFB] rounded-xl">
+            <p className="text-[#737373]">{t('latest.noBookmarks')}</p>
+          </div>
+        ) : (
+        filteredArticles.map((article) => (
           <article
             key={article.id}
             onClick={() => onArticleClick?.(article)}
@@ -123,7 +134,8 @@ export function LatestArticles({ newsletters, onArticleClick }: LatestArticlesPr
               </div>
             </div>
           </article>
-        ))}
+        ))
+        )}
       </div>
     </section>
   );

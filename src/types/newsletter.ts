@@ -9,6 +9,20 @@ export interface NewsletterComment {
   likedByUserIds: string[];
 }
 
+export type NewsletterTextAlignment = 'left' | 'center' | 'right';
+
+export interface PresentationPreview {
+  sourceFileName: string;
+  sourceUrl?: string;
+  title?: string;
+  status: 'ready' | 'failed';
+  slideCount: number;
+  previewFiles: string[];
+  previewUrls: string[];
+  error?: string;
+  createdAt?: string;
+}
+
 export interface Newsletter {
   id: string;
   title: string;
@@ -21,6 +35,7 @@ export interface Newsletter {
   publishedAt: string;
   readTime: string;
   coverImage: string;
+  textAlignment: NewsletterTextAlignment;
   likes: number;
   comments: number;
   shares: number;
@@ -29,7 +44,9 @@ export interface Newsletter {
   hasAudio?: boolean;
   audioDuration?: string;
   presentationFiles?: string[];
+  presentationPreviews?: PresentationPreview[];
   likedByUserIds: string[];
+  bookmarkedByUserIds: string[];
   commentItems: NewsletterComment[];
 }
 

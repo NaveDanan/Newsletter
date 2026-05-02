@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowLeft01Icon, Bookmark01Icon, Heart, Link01Icon, Message01Icon, PlayIcon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, Bookmark01Icon, BookmarkCheck01Icon, Heart, Link01Icon, Message01Icon, PlayIcon } from "@hugeicons/core-free-icons";
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
@@ -20,6 +20,8 @@ interface NewsletterViewerProps {
   onToggleLike?: (newsletterId: string) => void;
   onAddComment?: (newsletterId: string, body: string) => Promise<NewsletterComment | null> | NewsletterComment | null;
   onToggleCommentLike?: (newsletterId: string, commentId: string) => void;
+  isBookmarked?: boolean;
+  onToggleBookmark?: (newsletterId: string) => void;
 }
 
 function getInitials(name: string): string {
@@ -39,6 +41,8 @@ export function NewsletterViewer({
   onToggleLike,
   onAddComment,
   onToggleCommentLike,
+  isBookmarked = false,
+  onToggleBookmark,
 }: NewsletterViewerProps) {
   const { formatDate, formatNumber, formatRelativeTime, isRTL, t } = useLocale();
   const articleRef = useRef<HTMLDivElement>(null);
@@ -130,8 +134,19 @@ export function NewsletterViewer({
             >
               <HugeiconsIcon icon={Link01Icon} className="h-5 w-5" />
             </button>
-            <button className="p-2 text-[#737373] transition-colors hover:text-[#171717]">
-              <HugeiconsIcon icon={Bookmark01Icon} className="h-5 w-5" />
+            <button
+              onClick={() => {
+                onToggleBookmark?.(newsletter.id);
+                toast.success(isBookmarked ? t('viewer.unbookmarked') : t('viewer.bookmarked'));
+              }}
+              className={cn(
+                'p-2 transition-colors',
+                isBookmarked
+                  ? 'text-[#D93A3A] hover:text-[#B91C1C]'
+                  : 'text-[#737373] hover:text-[#171717]'
+              )}
+            >
+              <HugeiconsIcon icon={isBookmarked ? BookmarkCheck01Icon : Bookmark01Icon} className="h-5 w-5" />
             </button>
           </div>
         </div>

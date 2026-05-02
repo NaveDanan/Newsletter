@@ -36,7 +36,15 @@ WORKDIR /app
 RUN apk add --no-cache --allow-untrusted \
       --repository http://dl-cdn.alpinelinux.org/alpine/v3.23/main \
       --repository http://dl-cdn.alpinelinux.org/alpine/v3.23/community \
-      curl nginx tini
+      curl \
+      font-liberation \
+      font-noto \
+      font-noto-cjk \
+      libreoffice \
+      nginx \
+      poppler-utils \
+      tini \
+      ttf-dejavu
 
 COPY --from=runtime-deps /app/node_modules ./node_modules
 COPY package.json ./package.json
@@ -45,13 +53,11 @@ COPY docker ./docker
 COPY pb_hooks /opt/pocketbase/pb_hooks
 COPY --from=frontend-build /app/dist /usr/share/nginx/html
 COPY --from=pocketbase-dist /pocketbase /opt/pocketbase/pocketbase
-COPY --from=pocketbase-dist /pb_migrations /opt/pocketbase/pb_migrations
-COPY --from=pocketbase-dist /pb_data /opt/pocketbase/pb_data
 COPY --from=pocketbase-dist /CHANGELOG.md /opt/pocketbase/CHANGELOG.md
 COPY --from=pocketbase-dist /LICENSE.md /opt/pocketbase/LICENSE.md
 
 RUN chmod +x /app/docker/entrypoint.sh /opt/pocketbase/pocketbase \
-  && mkdir -p /run/nginx /var/lib/nginx/tmp/client_body /pb_data \
+  && mkdir -p /run/nginx /var/lib/nginx/tmp/client_body /pb_data /opt/pocketbase/pb_migrations \
   && rm -f /etc/nginx/http.d/default.conf
 
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf

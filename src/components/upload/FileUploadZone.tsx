@@ -2,6 +2,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, Image01Icon, Upload01Icon } from "@hugeicons/core-free-icons";
 import { useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
+import { useLocale } from '@/contexts/LocaleContext';
+import { UploadLoadingDialog } from './UploadLoadingDialog';
 
 interface FileUploadZoneProps {
   value: string;
@@ -12,6 +14,22 @@ interface FileUploadZoneProps {
   showPreview?: boolean;
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result;
+      if (typeof result === 'string') {
+        resolve(result);
+        return;
+      }
+      reject(new Error('File read returned an empty result.'));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function FileUploadZone({
   value,
   onChange,
@@ -20,11 +38,13 @@ export function FileUploadZone({
   label = 'Upload Image',
   showPreview = true,
 }: FileUploadZoneProps) {
+  const { t } = useLocale();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const processFile = useCallback((file: File) => {
+  const processFile = useCallback(async (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload an image file');
@@ -38,22 +58,20 @@ export function FileUploadZone({
     }
 
     setIsUploading(true);
+    setUploadingFileName(file.name);
 
-    // Convert to base64 for local storage
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
+    try {
+      const result = await readFileAsDataUrl(file);
       if (result) {
         onChange(result);
         toast.success('Image uploaded successfully');
       }
-      setIsUploading(false);
-    };
-    reader.onerror = () => {
+    } catch {
       toast.error('Failed to read image file');
+    } finally {
       setIsUploading(false);
-    };
-    reader.readAsDataURL(file);
+      setUploadingFileName(null);
+    }
   }, [maxSize, onChange]);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -106,6 +124,12 @@ export function FileUploadZone({
   if (value && showPreview) {
     return (
       <div className="relative">
+        <UploadLoadingDialog
+          open={isUploading}
+          title={t('editor.uploadingImage')}
+          description={t('editor.uploadingFileDescription')}
+          fileName={uploadingFileName ?? undefined}
+        />
         <div className="relative h-48 lg:h-56 rounded-xl overflow-hidden group">
           <img
             src={value}
@@ -141,58 +165,66 @@ export function FileUploadZone({
   }
 
   return (
-    <div
-      onClick={handleClick}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      className={`
-        relative border-2 border-dashed rounded-xl p-8 cursor-pointer
-        transition-all duration-200
-        ${isDragging 
-          ? 'border-[#D93A3A] bg-[#D93A3A]/5' 
-          : 'border-[#E5E5E5] bg-[#F9FAFB] hover:border-[#D93A3A]/50 hover:bg-[#F3F4F6]'
-        }
-        ${isUploading ? 'pointer-events-none opacity-70' : ''}
-      `}
-    >
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={accept}
-        onChange={handleFileSelect}
-        className="hidden"
+    <>
+      <UploadLoadingDialog
+        open={isUploading}
+        title={t('editor.uploadingImage')}
+        description={t('editor.uploadingFileDescription')}
+        fileName={uploadingFileName ?? undefined}
       />
-      
-      <div className="flex flex-col items-center gap-3">
-        <div className={`
-          w-14 h-14 rounded-full flex items-center justify-center
-          transition-colors duration-200
-          ${isDragging ? 'bg-[#D93A3A]/10' : 'bg-white'}
-        `}>
-          {isUploading ? (
-            <div className="w-6 h-6 border-2 border-[#D93A3A] border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <HugeiconsIcon icon={Image01Icon} className={`
-              w-6 h-6 transition-colors duration-200
-              ${isDragging ? 'text-[#D93A3A]' : 'text-[#737373]'}
-            `} />
-          )}
-        </div>
+      <div
+        onClick={handleClick}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        className={`
+          relative border-2 border-dashed rounded-xl p-8 cursor-pointer
+          transition-all duration-200
+          ${isDragging 
+            ? 'border-[#D93A3A] bg-[#D93A3A]/5' 
+            : 'border-[#E5E5E5] bg-[#F9FAFB] hover:border-[#D93A3A]/50 hover:bg-[#F3F4F6]'
+          }
+          ${isUploading ? 'pointer-events-none opacity-70' : ''}
+        `}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={accept}
+          onChange={handleFileSelect}
+          className="hidden"
+        />
         
-        <div className="text-center">
-          <p className="font-medium text-[#171717] mb-1">
-            {isUploading ? 'Uploading...' : isDragging ? 'Drop image here' : label}
-          </p>
-          <p className="text-sm text-[#737373]">
-            Drag & drop or click to browse
-          </p>
-          <p className="text-xs text-[#A3A3A3] mt-2">
-            Supports: JPG, PNG, GIF, WebP (max {maxSize}MB)
-          </p>
+        <div className="flex flex-col items-center gap-3">
+          <div className={`
+            w-14 h-14 rounded-full flex items-center justify-center
+            transition-colors duration-200
+            ${isDragging ? 'bg-[#D93A3A]/10' : 'bg-white'}
+          `}>
+            {isUploading ? (
+              <div className="w-6 h-6 border-2 border-[#D93A3A] border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <HugeiconsIcon icon={Image01Icon} className={`
+                w-6 h-6 transition-colors duration-200
+                ${isDragging ? 'text-[#D93A3A]' : 'text-[#737373]'}
+              `} />
+            )}
+          </div>
+          
+          <div className="text-center">
+            <p className="font-medium text-[#171717] mb-1">
+              {isUploading ? 'Uploading...' : isDragging ? 'Drop image here' : label}
+            </p>
+            <p className="text-sm text-[#737373]">
+              Drag & drop or click to browse
+            </p>
+            <p className="text-xs text-[#A3A3A3] mt-2">
+              Supports: JPG, PNG, GIF, WebP (max {maxSize}MB)
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

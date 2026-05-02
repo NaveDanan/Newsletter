@@ -1,3 +1,6 @@
 node_modules
 *.env
 dist
+*.tar
+.venv
+.tmp

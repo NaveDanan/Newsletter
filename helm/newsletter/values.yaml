@@ -41,6 +41,7 @@ credentials:
   adminPassword: change-this-password
   smtpUsername: ""
   smtpPassword: ""
+  ssoOidcClientSecret: ""
 
 env:
   appPublicUrl: ""
@@ -53,7 +54,16 @@ env:
   pocketbaseSmtpPort: 587
   pocketbaseSmtpAuthMethod: "PLAIN"
   pocketbaseSmtpTls: false
+  pocketbaseSmtpInsecureSkipVerify: false
   pocketbaseSmtpLocalName: ""
+  pocketbaseSsoOidcEnabled: false
+  pocketbaseSsoOidcProviderName: "oidc"
+  pocketbaseSsoOidcDisplayName: "Company SSO"
+  pocketbaseSsoOidcClientId: ""
+  pocketbaseSsoOidcAuthUrl: ""
+  pocketbaseSsoOidcTokenUrl: ""
+  pocketbaseSsoOidcUserInfoUrl: ""
+  pocketbaseSsoOidcPkce: true
   pocketbaseRecreateCollections: false
   newsletterTelemetry: false
 
@@ -65,7 +75,10 @@ ingress:
   frontend:
     enabled: false
     className: ""
-    annotations: {}
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "110m"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     host: newsletter.local
     path: /
     pathType: Prefix
@@ -73,7 +86,10 @@ ingress:
   pocketbase:
     enabled: false
     className: ""
-    annotations: {}
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "110m"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     host: pocketbase.local
     path: /
     pathType: Prefix

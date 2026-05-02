@@ -45,6 +45,7 @@ The secret keys expected by the chart are:
 - `POCKETBASE_ADMIN_PASSWORD`
 - `POCKETBASE_SMTP_USERNAME`
 - `POCKETBASE_SMTP_PASSWORD`
+- `POCKETBASE_SSO_OIDC_CLIENT_SECRET`
 
 The example below assumes the namespace already exists and is mainly for manual Helm installs.
 If you deploy with ArgoCD and enable namespace auto-creation, either let the chart create the secret from `credentials.*` values, or sync a Secret or ExternalSecret manifest into the same namespace.
@@ -61,7 +62,8 @@ kubectl create secret generic newsletter-pocketbase-env \
   --from-literal=POCKETBASE_ADMIN_EMAIL=admin@example.com \
   --from-literal=POCKETBASE_ADMIN_PASSWORD=change-this-password \
   --from-literal=POCKETBASE_SMTP_USERNAME=smtp-user \
-  --from-literal=POCKETBASE_SMTP_PASSWORD=smtp-password
+  --from-literal=POCKETBASE_SMTP_PASSWORD=smtp-password \
+  --from-literal=POCKETBASE_SSO_OIDC_CLIENT_SECRET=oidc-client-secret
 ```
 
 ## Install
@@ -112,6 +114,30 @@ env:
 - `pocketbasePublicUrl` is written into PocketBase mail settings and other PocketBase-generated URLs.
 
 SMTP settings are exposed directly in chart values, while the SMTP username and password stay in the Kubernetes secret.
+For local/dev SMTP servers with self-signed certificates, set `env.pocketbaseSmtpInsecureSkipVerify: true`; keep it `false` in production.
+
+## SSO / OIDC
+
+The chart can sync the PocketBase `users` collection OIDC provider at pod startup.
+Set the non-secret provider values under `env` and keep the client secret in `credentials.ssoOidcClientSecret` or in the existing secret key `POCKETBASE_SSO_OIDC_CLIENT_SECRET`.
+
+```yaml
+env:
+  pocketbaseSsoOidcEnabled: true
+  pocketbaseSsoOidcProviderName: oidc
+  pocketbaseSsoOidcDisplayName: Company SSO
+  pocketbaseSsoOidcClientId: your-entra-application-client-id
+  pocketbaseSsoOidcAuthUrl: https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/authorize
+  pocketbaseSsoOidcTokenUrl: https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/token
+  pocketbaseSsoOidcUserInfoUrl: https://graph.microsoft.com/oidc/userinfo
+  pocketbaseSsoOidcPkce: true
+```
+
+The identity provider redirect URI must match the public PocketBase URL:
+
+```text
+https://pb.example.com/api/oauth2-redirect
+```
 
 ## Port Forwarding
 

@@ -12,6 +12,8 @@ export interface Project {
   status: ProjectStatus;
   isVisibleInGantt: boolean;
   gantt: ProjectGantt;
+  createdBy: string;
+  allowedUserIds: string[];
 }
 
 export interface ProjectFormData {

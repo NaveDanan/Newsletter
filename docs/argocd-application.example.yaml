@@ -29,6 +29,7 @@ spec:
           adminPassword: change-this-password
           smtpUsername: smtp-user
           smtpPassword: smtp-password
+          ssoOidcClientSecret: oidc-client-secret
         env:
           appPublicUrl: https://newsletter.example.com
           pocketbaseAppName: AI-BREAK
@@ -40,7 +41,16 @@ spec:
           pocketbaseSmtpPort: 587
           pocketbaseSmtpAuthMethod: PLAIN
           pocketbaseSmtpTls: false
+          pocketbaseSmtpInsecureSkipVerify: false
           pocketbaseSmtpLocalName: ""
+          pocketbaseSsoOidcEnabled: true
+          pocketbaseSsoOidcProviderName: oidc
+          pocketbaseSsoOidcDisplayName: Company SSO
+          pocketbaseSsoOidcClientId: your-entra-application-client-id
+          pocketbaseSsoOidcAuthUrl: https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/authorize
+          pocketbaseSsoOidcTokenUrl: https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/token
+          pocketbaseSsoOidcUserInfoUrl: https://graph.microsoft.com/oidc/userinfo
+          pocketbaseSsoOidcPkce: true
           pocketbaseRecreateCollections: false
         persistence:
           enabled: true

@@ -188,6 +188,12 @@ function App() {
     logout: handleUserLogout,
     user,
   } = useAuth();
+  const currentPathname = useSyncExternalStore(
+    subscribeToRouteChanges,
+    getCurrentPathnameSnapshot,
+    () => '/',
+  );
+  const currentRoute = useMemo(() => resolveRoute(currentPathname), [currentPathname]);
   const userRole = user?.role ?? null;
   const {
     newsletters,
@@ -197,19 +203,16 @@ function App() {
     updateNewsletter,
     uploadPresentation,
     deleteNewsletter,
+    sendNewsletterUpdate,
     toggleNewsletterLike,
     addNewsletterComment,
     toggleCommentLike,
+    toggleBookmark,
   } = useNewsletters({
     currentUser: user,
     currentUserRole: userRole,
+    enabled: currentRoute.view !== 'migrate',
   });
-  const currentPathname = useSyncExternalStore(
-    subscribeToRouteChanges,
-    getCurrentPathnameSnapshot,
-    () => '/',
-  );
-  const currentRoute = useMemo(() => resolveRoute(currentPathname), [currentPathname]);
   const [searchQuery, setSearchQuery] = useState('');
   const managerToastRouteRef = useRef<string | null>(null);
   const appReadyRef = useRef(false);
@@ -463,6 +466,15 @@ function App() {
     toggleCommentLike(newsletterId, commentId);
   };
 
+  const handleToggleBookmark = (newsletterId: string) => {
+    if (!isUserAuthenticated) {
+      handleRequireAuth();
+      return;
+    }
+
+    toggleBookmark(newsletterId);
+  };
+
   // Render article view
   if (currentRoute.view === 'article' && selectedArticle) {
     return (
@@ -476,6 +488,8 @@ function App() {
           onToggleLike={handleArticleLike}
           onAddComment={handleArticleComment}
           onToggleCommentLike={handleCommentLike}
+          isBookmarked={Boolean(user?.id && selectedArticle.bookmarkedByUserIds.includes(user.id))}
+          onToggleBookmark={handleToggleBookmark}
         />
       </div>
     );
@@ -546,6 +560,7 @@ function App() {
           updateNewsletter={updateNewsletter}
           uploadPresentation={uploadPresentation}
           deleteNewsletter={deleteNewsletter}
+          sendNewsletterUpdate={sendNewsletterUpdate}
           onToggleNewsletterLike={handleArticleLike}
           onAddNewsletterComment={handleArticleComment}
           onToggleCommentLike={handleCommentLike}
@@ -646,6 +661,7 @@ function App() {
                   />
                   <LatestArticles
                     newsletters={filteredNewsletters}
+                    currentUserId={user?.id}
                     onArticleClick={handleArticleClick}
                   />
                 </>
@@ -664,7 +680,7 @@ function App() {
               )}
             </div>
             <div className="lg:col-span-1">
-              <Sidebar />
+              <Sidebar publishedCount={publishedNewsletters.length} />
             </div>
           </div>
         </div>

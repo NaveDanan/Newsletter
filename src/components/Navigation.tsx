@@ -144,7 +144,7 @@ export function Navigation({
   const navLinks = [
     { id: 'home', label: t('nav.home'), href: '#', active: true },
     { id: 'topics', label: t('nav.topics'), href: '#topics' },
-    { id: 'features', label: t('nav.features'), href: '#features' },
+    { id: 'bookmarks', label: t('nav.bookmarks'), href: '#workflows' },
     { id: 'community', label: t('nav.community'), href: '#community' },
   ];
 

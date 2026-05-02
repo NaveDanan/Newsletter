@@ -68,7 +68,7 @@ export function PasswordResetPage({ token, onBack, onSuccess }: PasswordResetPag
             <CardTitle className="text-2xl font-bold">{t('auth.resetPageTitle')}</CardTitle>
             <CardDescription>{t('auth.resetPageDescription')}</CardDescription>
           </CardHeader>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="new-password">{t('auth.newPassword')}</Label>
@@ -110,13 +110,13 @@ export function PasswordResetPage({ token, onBack, onSuccess }: PasswordResetPag
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex gap-3">
-              <Button type="button" variant="outline" className="w-full" onClick={onBack}>
-                {t('auth.backToSignIn')}
-              </Button>
+            <CardFooter className="flex flex-col gap-3">
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <HugeiconsIcon icon={Loading02Icon} className="mr-2 h-4 w-4 animate-spin" />}
                 {t('auth.saveNewPassword')}
+              </Button>
+              <Button type="button" variant="outline" className="w-full" onClick={onBack}>
+                {t('auth.backToSignIn')}
               </Button>
             </CardFooter>
           </form>

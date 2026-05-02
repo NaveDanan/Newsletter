@@ -97,9 +97,16 @@ docker compose --env-file .env up --build
 If you prefer building and running directly without Compose, use the PocketBase build context explicitly and pass the Docker env file at runtime:
 
 ```bash
-docker build --build-context pocketbase-dist=C:/Users/your-user/Downloads/pocketbase_0.36.9_linux_amd64 -t newsletter:v1.0.4 .
-docker run -d --name newsletter-app --env-file .env.docker.example -p 8080:8080 -p 8090:8090 -v C:/path/to/pb_data:/pb_data newsletter:v1.0.4
+docker build --build-context pocketbase-dist='C:/Users/naved/Downloads/pocketbase_0.36.9_linux_amd64' -t newsletter:test-rebuild -f Dockerfile .
 ```
+```bash
+docker stop newsletter-app && docker rm newsletter-app
+```
+```bash
+docker run -d --name newsletter-app --env-file .env.docker.example -p 8080:8080 -p 8090:8090 --mount "type=bind,src=C:/Users/your-user/Downloads/pocketbase_0.36.8_windows_amd64/pb_data,dst=/pb_data" newsletter:test-rebuild
+```
+
+The `--mount` path should point to your existing PocketBase `pb_data` directory if you want the rebuilt container to keep all existing projects, newsletters, and auth data. If you use a new empty directory, the app will start with a fresh PocketBase dataset.
 
 Frontend: `http://localhost:8080`
 PocketBase UI: `http://localhost:8090/_/`
@@ -109,6 +116,7 @@ Notes:
 - The container Nginx proxies `/api/*` and `/_/` to the PocketBase process on port `8090`, so browser traffic can use the same public origin as the frontend.
 - Destructive collection recreation is disabled by default. Set `POCKETBASE_RECREATE_COLLECTIONS=1` only if you intentionally want startup to drop and recreate the app collections.
 - Safe collection schema sync, mail settings sync, users schema sync, and optional app-admin bootstrap run on every start.
+- Optional OIDC/SSO provider sync runs on every start when `POCKETBASE_SSO_OIDC_ENABLED=1`.
 - Set `APP_PUBLIC_URL` to the public frontend URL. It is used for newsletter article links and the frontend password reset page.
 - Leave `POCKETBASE_PUBLIC_URL` empty when you want the frontend to use the same public origin as the app through the built-in Nginx proxy. Set it only if you intentionally expose PocketBase on a separate public address.
 - SMTP is configured with the `POCKETBASE_MAIL_*` and `POCKETBASE_SMTP_*` environment variables.
@@ -127,6 +135,8 @@ PocketBase now handles both mail flows server-side:
 
 - Forgot-password emails are sent by PocketBase and link users to `APP_PUBLIC_URL/reset-password/:token`.
 - Newsletter publish notifications are sent to subscribed users when a newsletter is first published.
+- Admins can also send or resend a published newsletter update from the manager newsletter list.
+- Full SMTP and Kubernetes setup guide: `docs/email-delivery.md`
 
 Relevant environment variables:
 
@@ -142,7 +152,17 @@ Relevant environment variables:
 - `POCKETBASE_SMTP_PASSWORD`
 - `POCKETBASE_SMTP_AUTH_METHOD`
 - `POCKETBASE_SMTP_TLS`
+- `POCKETBASE_SMTP_INSECURE_SKIP_VERIFY`
 - `POCKETBASE_SMTP_LOCAL_NAME`
+- `POCKETBASE_SSO_OIDC_ENABLED`
+- `POCKETBASE_SSO_OIDC_PROVIDER_NAME`
+- `POCKETBASE_SSO_OIDC_DISPLAY_NAME`
+- `POCKETBASE_SSO_OIDC_CLIENT_ID`
+- `POCKETBASE_SSO_OIDC_CLIENT_SECRET`
+- `POCKETBASE_SSO_OIDC_AUTH_URL`
+- `POCKETBASE_SSO_OIDC_TOKEN_URL`
+- `POCKETBASE_SSO_OIDC_USER_INFO_URL`
+- `POCKETBASE_SSO_OIDC_PKCE`
 
 ---
 

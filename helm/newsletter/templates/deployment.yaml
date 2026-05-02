@@ -93,8 +93,32 @@ spec:
               value: {{ .Values.env.pocketbaseSmtpAuthMethod | quote }}
             - name: POCKETBASE_SMTP_TLS
               value: {{ ternary "1" "0" .Values.env.pocketbaseSmtpTls | quote }}
+            - name: POCKETBASE_SMTP_INSECURE_SKIP_VERIFY
+              value: {{ ternary "1" "0" .Values.env.pocketbaseSmtpInsecureSkipVerify | quote }}
             - name: POCKETBASE_SMTP_LOCAL_NAME
               value: {{ .Values.env.pocketbaseSmtpLocalName | quote }}
+            - name: POCKETBASE_SSO_OIDC_ENABLED
+              value: {{ ternary "1" "0" .Values.env.pocketbaseSsoOidcEnabled | quote }}
+            - name: POCKETBASE_SSO_OIDC_PROVIDER_NAME
+              value: {{ .Values.env.pocketbaseSsoOidcProviderName | quote }}
+            - name: POCKETBASE_SSO_OIDC_DISPLAY_NAME
+              value: {{ .Values.env.pocketbaseSsoOidcDisplayName | quote }}
+            - name: POCKETBASE_SSO_OIDC_CLIENT_ID
+              value: {{ .Values.env.pocketbaseSsoOidcClientId | quote }}
+            - name: POCKETBASE_SSO_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "newsletter.secretName" . }}
+                  key: POCKETBASE_SSO_OIDC_CLIENT_SECRET
+                  optional: true
+            - name: POCKETBASE_SSO_OIDC_AUTH_URL
+              value: {{ .Values.env.pocketbaseSsoOidcAuthUrl | quote }}
+            - name: POCKETBASE_SSO_OIDC_TOKEN_URL
+              value: {{ .Values.env.pocketbaseSsoOidcTokenUrl | quote }}
+            - name: POCKETBASE_SSO_OIDC_USER_INFO_URL
+              value: {{ .Values.env.pocketbaseSsoOidcUserInfoUrl | quote }}
+            - name: POCKETBASE_SSO_OIDC_PKCE
+              value: {{ ternary "1" "0" .Values.env.pocketbaseSsoOidcPkce | quote }}
             - name: POCKETBASE_RECREATE_COLLECTIONS
               value: {{ ternary "1" "0" .Values.env.pocketbaseRecreateCollections | quote }}
             - name: NEWSLETTER_TELEMETRY

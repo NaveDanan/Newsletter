@@ -4,7 +4,8 @@ set -eu
 
 POCKETBASE_BIN=${POCKETBASE_BIN:-/opt/pocketbase/pocketbase}
 POCKETBASE_DATA_DIR=${POCKETBASE_DATA_DIR:-/pb_data}
-POCKETBASE_BUNDLED_DATA_DIR=${POCKETBASE_BUNDLED_DATA_DIR:-/opt/pocketbase/pb_data}
+POCKETBASE_HOOKS_DIR=${POCKETBASE_HOOKS_DIR:-/opt/pocketbase/pb_hooks}
+POCKETBASE_MIGRATIONS_DIR=${POCKETBASE_MIGRATIONS_DIR:-/opt/pocketbase/pb_migrations}
 POCKETBASE_HTTP_ADDR=${POCKETBASE_HTTP_ADDR:-0.0.0.0:8090}
 POCKETBASE_URL=${POCKETBASE_URL:-http://127.0.0.1:8090}
 POCKETBASE_INIT_MARKER=${POCKETBASE_INIT_MARKER:-$POCKETBASE_DATA_DIR/.newsletter-pocketbase-initialized}
@@ -62,21 +63,6 @@ wait_for_pocketbase() {
   done
 }
 
-seed_pocketbase_data_dir() {
-  mkdir -p "$POCKETBASE_DATA_DIR"
-
-  if [ ! -d "$POCKETBASE_BUNDLED_DATA_DIR" ]; then
-    return
-  fi
-
-  if [ -n "$(find "$POCKETBASE_DATA_DIR" -mindepth 1 -print -quit 2>/dev/null)" ]; then
-    return
-  fi
-
-  echo 'Seeding PocketBase data directory from bundled pb_data...'
-  cp -R "$POCKETBASE_BUNDLED_DATA_DIR"/. "$POCKETBASE_DATA_DIR"/
-}
-
 run_first_bootstrap() {
   if [ "$POCKETBASE_RECREATE_COLLECTIONS" != "1" ]; then
     echo 'Skipping destructive PocketBase collection recreation.'
@@ -103,17 +89,24 @@ run_safe_bootstrap() {
   echo 'Syncing PocketBase users schema...'
   node "$APP_ROOT/scripts/sync-pocketbase-users-schema.mjs"
 
+  echo 'Syncing PocketBase OIDC settings...'
+  node "$APP_ROOT/scripts/sync-pocketbase-oidc-settings.mjs"
+
   echo 'Ensuring configured app admin exists...'
   node "$APP_ROOT/scripts/ensure-pocketbase-admin.mjs"
 }
 
 start_pocketbase() {
-  seed_pocketbase_data_dir
+  mkdir -p "$POCKETBASE_DATA_DIR"
 
   cd /opt/pocketbase
 
   "$POCKETBASE_BIN" --dir "$POCKETBASE_DATA_DIR" superuser upsert "$POCKETBASE_SUPERUSER_EMAIL" "$POCKETBASE_SUPERUSER_PASSWORD"
-  "$POCKETBASE_BIN" --dir "$POCKETBASE_DATA_DIR" serve --http "$POCKETBASE_HTTP_ADDR" &
+  "$POCKETBASE_BIN" \
+    --dir "$POCKETBASE_DATA_DIR" \
+    --hooksDir "$POCKETBASE_HOOKS_DIR" \
+    --migrationsDir "$POCKETBASE_MIGRATIONS_DIR" \
+    serve --http "$POCKETBASE_HTTP_ADDR" &
   PB_PID=$!
 }
 

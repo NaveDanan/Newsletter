@@ -10,6 +10,7 @@ credentials:
   adminPassword: change-this-password
   smtpUsername: ""
   smtpPassword: ""
+  ssoOidcClientSecret: ""
 
 env:
   appPublicUrl: https://newsletter.localtest.me
@@ -22,7 +23,16 @@ env:
   pocketbaseSmtpPort: 587
   pocketbaseSmtpAuthMethod: PLAIN
   pocketbaseSmtpTls: false
+  pocketbaseSmtpInsecureSkipVerify: true
   pocketbaseSmtpLocalName: ""
+  pocketbaseSsoOidcEnabled: false
+  pocketbaseSsoOidcProviderName: oidc
+  pocketbaseSsoOidcDisplayName: Company SSO
+  pocketbaseSsoOidcClientId: ""
+  pocketbaseSsoOidcAuthUrl: https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/authorize
+  pocketbaseSsoOidcTokenUrl: https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+  pocketbaseSsoOidcUserInfoUrl: https://graph.microsoft.com/oidc/userinfo
+  pocketbaseSsoOidcPkce: true
   pocketbaseRecreateCollections: false
 
 persistence:
@@ -33,7 +43,10 @@ ingress:
   frontend:
     enabled: true
     className: nginx
-    annotations: {}
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "110m"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     host: newsletter.localtest.me
     path: /
     pathType: Prefix
@@ -41,7 +54,10 @@ ingress:
   pocketbase:
     enabled: true
     className: nginx
-    annotations: {}
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "110m"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     host: pocketbase.localtest.me
     path: /
     pathType: Prefix

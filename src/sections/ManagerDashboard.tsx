@@ -428,9 +428,9 @@ export function ManagerDashboard({
         )}
 
         {/* Main content */}
-        <main className="flex-1 p-4 lg:p-8">
+        <main className="min-w-0 flex-1 p-4 lg:p-8">
           {/* View content */}
-          <div className="animate-in fade-in duration-300">
+          <div className="min-w-0 animate-in fade-in duration-300">
             {renderContent()}
           </div>
         </main>

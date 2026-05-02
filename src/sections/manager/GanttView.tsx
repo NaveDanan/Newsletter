@@ -1,6 +1,7 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Calendar01Icon, Edit02Icon, ViewIcon, ViewOffIcon, Calendar03Icon, ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { addWeeks, differenceInCalendarDays, differenceInCalendarWeeks, endOfWeek, format, isAfter, parseISO, startOfWeek } from 'date-fns';
+import { enUS, he as heLocale } from 'date-fns/locale';
 import { useMemo, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
@@ -90,6 +91,7 @@ function buildContentTimelineRow(
   windowEnd: Date,
   formatLabel: (date: Date) => string,
   unassignedLabel: string,
+  isRTL: boolean,
 ): ContentTimelineRow {
   const resourceNameById = new Map(project.gantt.resources.map((resource) => [resource.id, resource.name]));
   const laneEndDates: Date[] = [];
@@ -118,6 +120,9 @@ function buildContentTimelineRow(
 
       laneEndDates[resolvedLaneIndex] = clampedEnd;
 
+      const startPercent = (differenceInCalendarDays(clampedStart, windowStart) / totalWindowDays) * 100;
+      const widthPercent = Math.max(((differenceInCalendarDays(clampedEnd, clampedStart) + 1) / totalWindowDays) * 100, 2);
+
       result.push({
         id: task.id,
         name: task.name,
@@ -125,8 +130,8 @@ function buildContentTimelineRow(
         status: task.status,
         startLabel: formatLabel(taskStart),
         endLabel: formatLabel(taskEnd),
-        left: `${(differenceInCalendarDays(clampedStart, windowStart) / totalWindowDays) * 100}%`,
-        width: `${Math.max(((differenceInCalendarDays(clampedEnd, clampedStart) + 1) / totalWindowDays) * 100, 2)}%`,
+        left: `${isRTL ? 100 - startPercent - widthPercent : startPercent}%`,
+        width: `${widthPercent}%`,
         top: contentTimelineRowPadding + (resolvedLaneIndex * (contentTimelineBarHeight + contentTimelineBarGap)),
       });
 
@@ -150,7 +155,8 @@ function buildContentTimelineRow(
 }
 
 export function GanttView({ onEditProjectGantt }: GanttViewProps) {
-  const { formatDate, formatNumber, isRTL, t } = useLocale();
+  const { formatDate, formatNumber, isRTL, locale, t } = useLocale();
+  const calendarLocale = locale === 'he' ? heLocale : enUS;
   const [activeStatuses, setActiveStatuses] = useState<GanttTask['status'][]>([]);
   const [showManageModal, setShowManageModal] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -205,12 +211,29 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
       contentTimelineEnd,
       (date) => formatDate(date, { month: 'short', day: 'numeric' }),
       t('manager.unassigned'),
+      isRTL,
     )),
-    [contentTimelineEnd, contentTimelineStart, formatDate, t, visibleProjects],
+    [contentTimelineEnd, contentTimelineStart, formatDate, isRTL, t, visibleProjects],
   );
   const timelineStart = previewTimelineDays[0] ?? new Date();
   const dayWidth = 30;
   const timelineWidth = Math.max(previewTimelineDays.length * dayWidth, 640);
+  const timelineCellWidth = previewTimelineDays.length > 0 ? timelineWidth / previewTimelineDays.length : dayWidth;
+  const formatTimelineDayLabel = (value: Date) => format(value, 'EEEEE', { locale: calendarLocale });
+  const getPreviewTaskTimelineLayout = (task: GanttTask) => {
+    const offsetDays = getTaskOffsetDays(task, timelineStart);
+    const spanDays = getTaskCalendarSpanDays(task);
+    const width = task.milestone ? 18 : Math.max((spanDays * timelineCellWidth) - 8, 24);
+    const left = task.milestone
+      ? isRTL
+        ? timelineWidth - ((offsetDays * timelineCellWidth) + (timelineCellWidth / 2)) - 9
+        : (offsetDays * timelineCellWidth) + (timelineCellWidth / 2) - 9
+      : isRTL
+        ? timelineWidth - ((offsetDays + spanDays) * timelineCellWidth) + 4
+        : (offsetDays * timelineCellWidth) + 4;
+
+    return { left, width };
+  };
 
   const toggleStatusFilter = (status: GanttTask['status']) => {
     setActiveStatuses((current) => (
@@ -608,16 +631,16 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                           })}
                         </div>
 
-                        <div className="overflow-x-auto">
-                          <div style={{ width: timelineWidth }}>
+                        <div className="overflow-x-auto" dir="ltr">
+                          <div dir={isRTL ? 'rtl' : 'ltr'} style={{ width: timelineWidth }}>
                             <div
                               className="grid h-14 border-b border-[#E5E5E5] bg-[#F8FAFC]"
                               style={{ gridTemplateColumns: `repeat(${previewTimelineDays.length}, minmax(${dayWidth}px, 1fr))` }}
                             >
                               {previewTimelineDays.map((day) => (
-                                <div key={day.toISOString()} className="border-r border-[#E5E5E5] px-1 py-2 text-center text-xs last:border-r-0">
-                                  <p className="uppercase tracking-[0.18em] text-[#A3A3A3]">{format(day, 'EEE')}</p>
-                                  <p className="mt-1 font-medium text-[#171717]">{format(day, 'd')}</p>
+                                <div key={day.toISOString()} className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#E5E5E5] px-1 py-2 text-center text-xs last:border-r-0">
+                                  <p className="max-w-full truncate whitespace-nowrap uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">{formatTimelineDayLabel(day)}</p>
+                                  <p className="max-w-full truncate whitespace-nowrap font-medium leading-tight text-[#171717]">{formatNumber(day.getDate())}</p>
                                 </div>
                               ))}
                             </div>
@@ -625,8 +648,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                             {filteredTasks.map((task) => {
                               const resource = selectedProject.gantt.resources.find((entry) => entry.id === task.resourceId) ?? null;
                               const barColor = resource?.color ?? getStatusBarColor(task.status);
-                              const left = getTaskOffsetDays(task, timelineStart) * dayWidth + 4;
-                              const width = task.milestone ? 18 : Math.max((getTaskCalendarSpanDays(task) * dayWidth) - 8, 24);
+                              const { left, width } = getPreviewTaskTimelineLayout(task);
 
                               return (
                                 <div key={task.id} className="relative h-14 border-b border-[#E5E5E5] last:border-b-0">

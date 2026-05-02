@@ -39,6 +39,71 @@ function parseCurrency(s: string): GanttCurrency {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+const EXCEL_DATE_FORMAT = 'yyyy-mm-dd';
+const EXCEL_EDIT_BUFFER_ROWS = 500;
+
+function toExcelDate(value: unknown): Date | null {
+  const s = String(value ?? '').trim();
+  if (!s || s === '—' || s === '-' || s === 'ג€”') return null;
+  const parsed = parseISO(s);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
+function fromExcelDate(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return format(value, 'yyyy-MM-dd');
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed) {
+      return format(new Date(parsed.y, parsed.m - 1, parsed.d), 'yyyy-MM-dd');
+    }
+  }
+
+  const s = String(value ?? '').trim();
+  if (!s) return '';
+
+  const iso = parseISO(s);
+  if (!Number.isNaN(iso.getTime())) {
+    return format(iso, 'yyyy-MM-dd');
+  }
+
+  const fallback = new Date(s);
+  if (!Number.isNaN(fallback.getTime())) {
+    return format(fallback, 'yyyy-MM-dd');
+  }
+
+  return s;
+}
+
+function applyDateCellValidation(cell: ExcelJS.Cell) {
+  cell.numFmt = EXCEL_DATE_FORMAT;
+  cell.dataValidation = {
+    type: 'date',
+    operator: 'between',
+    allowBlank: true,
+    showErrorMessage: true,
+    errorStyle: 'error',
+    errorTitle: 'Invalid date',
+    error: 'Enter a valid date.',
+    formulae: [new Date(1900, 0, 1), new Date(9999, 11, 31)],
+  };
+}
+
+function applyListCellValidation(cell: ExcelJS.Cell, formula: string, allowBlank = true) {
+  cell.dataValidation = {
+    type: 'list',
+    allowBlank,
+    showErrorMessage: true,
+    errorStyle: 'error',
+    errorTitle: 'Invalid selection',
+    error: 'Choose a value from the list.',
+    formulae: [formula],
+  };
+}
+
 function getProjectDueDate(project: Project): string {
   const tasks = project.gantt?.tasks ?? [];
   if (tasks.length === 0) return '—';
@@ -113,10 +178,11 @@ function taskColors(t: GanttTask) {
 
 // ─── Excel Gantt Visual Sheet Builder ────────────────────────────────────────
 
-function buildGanttVisualSheet(ws: Worksheet, project: Project) {
+function buildGanttVisualSheet(ws: Worksheet, project: Project, isRTL: boolean) {
   const tasks = project.gantt?.tasks ?? [];
   if (tasks.length === 0) {
     ws.getCell('A1').value = 'No tasks in this project.';
+    ws.views = [{ rightToLeft: isRTL }];
     return;
   }
 
@@ -191,14 +257,14 @@ function buildGanttVisualSheet(ws: Worksheet, project: Project) {
     const idCell = row.getCell(1);
     idCell.value = num;
     idCell.font = { size: 8, color: { argb: 'FFA3A3A3' }, italic: true };
-    idCell.alignment = { horizontal: 'right', vertical: 'middle' };
+    idCell.alignment = { horizontal: isRTL ? 'left' : 'right', vertical: 'middle' };
     idCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
 
     // Name cell
     const nameCell = row.getCell(2);
     nameCell.value = (task.milestone ? '◆ ' : '') + task.name;
     nameCell.font = { size: 9, bold: task.milestone, color: { argb: task.milestone ? c.argbBg : 'FF171717' } };
-    nameCell.alignment = { indent: task.indentLevel, vertical: 'middle' };
+    nameCell.alignment = { indent: task.indentLevel, vertical: 'middle', horizontal: isRTL ? 'right' : 'left', readingOrder: isRTL ? 'rtl' : 'ltr' };
     nameCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
     nameCell.border = { right: { style: 'thin', color: { argb: 'FFE5E5E5' } } };
 
@@ -242,7 +308,7 @@ function buildGanttVisualSheet(ws: Worksheet, project: Project) {
   });
 
   // Freeze panes
-  ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 2, topLeftCell: 'C3', showGridLines: true }];
+  ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 2, topLeftCell: 'C3', showGridLines: true, rightToLeft: isRTL }];
   ws.getRow(1).height = 18;
   ws.getRow(2).height = 14;
 }
@@ -253,7 +319,7 @@ const DAY_W = 26;
 const NAME_W = 210;
 
 function MiniGanttViewer({ project }: { project: Project }) {
-  const { formatDate, formatNumber, t } = useLocale();
+  const { formatDate, formatNumber, isRTL, t } = useLocale();
   const tasks = project.gantt?.tasks ?? [];
   if (tasks.length === 0) {
     return (
@@ -270,6 +336,8 @@ function MiniGanttViewer({ project }: { project: Project }) {
   const today = startOfDay(new Date());
   const todayOff = differenceInCalendarDays(today, rangeStart);
   const taskNums = generateTaskNumbers(tasks);
+  const timelineWidth = days.length * DAY_W;
+  const stickySide = isRTL ? { right: 0 } : { left: 0 };
 
   const months: { label: string; count: number }[] = [];
   days.forEach(d => {
@@ -279,12 +347,12 @@ function MiniGanttViewer({ project }: { project: Project }) {
   });
 
   return (
-    <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 440 }}>
-      <div style={{ minWidth: NAME_W + days.length * DAY_W }}>
+    <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto', overflowY: 'auto', maxHeight: 440 }} dir="ltr">
+      <div style={{ minWidth: NAME_W + timelineWidth }} dir={isRTL ? 'rtl' : 'ltr'}>
 
         {/* Month header */}
         <div style={{ display: 'flex', position: 'sticky', top: 0, zIndex: 10, borderBottom: '2px solid #E5E5E5' }}>
-          <div style={{ width: NAME_W, flexShrink: 0, background: '#F9FAFB', borderRight: '1px solid #E5E5E5', padding: '6px 12px', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: '0.08em' }}>{t('manager.task')}</div>
+          <div style={{ width: NAME_W, flexShrink: 0, background: '#F9FAFB', borderRight: isRTL ? undefined : '1px solid #E5E5E5', borderLeft: isRTL ? '1px solid #E5E5E5' : undefined, padding: '6px 12px', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: '0.08em', position: 'sticky', ...stickySide, zIndex: 12, textAlign: isRTL ? 'right' : 'left' }}>{t('manager.task')}</div>
           {months.map((m, i) => (
             <div key={i} style={{ width: m.count * DAY_W, flexShrink: 0, background: '#F9FAFB', borderLeft: i > 0 ? '1px solid #E5E5E5' : undefined, padding: '6px 4px', fontSize: 11, fontWeight: 700, color: '#D93A3A', textAlign: 'center' }}>{m.label}</div>
           ))}
@@ -292,7 +360,7 @@ function MiniGanttViewer({ project }: { project: Project }) {
 
         {/* Day header */}
         <div style={{ display: 'flex', position: 'sticky', top: 29, zIndex: 9, borderBottom: '1px solid #E5E5E5' }}>
-          <div style={{ width: NAME_W, flexShrink: 0, background: '#FAFAFA', borderRight: '1px solid #E5E5E5' }} />
+          <div style={{ width: NAME_W, flexShrink: 0, background: '#FAFAFA', borderRight: isRTL ? undefined : '1px solid #E5E5E5', borderLeft: isRTL ? '1px solid #E5E5E5' : undefined, position: 'sticky', ...stickySide, zIndex: 11 }} />
           {days.map((d, i) => {
             const weekend = d.getDay() === 5 || d.getDay() === 6;
             const todayDay = isToday(d);
@@ -306,27 +374,30 @@ function MiniGanttViewer({ project }: { project: Project }) {
           const startOff = differenceInCalendarDays(parseISO(task.startDate), rangeStart);
           const endOff = differenceInCalendarDays(parseISO(task.endDate), rangeStart);
           const barW = Math.max(DAY_W, (endOff - startOff + 1) * DAY_W);
+          const barLeft = isRTL ? timelineWidth - (endOff + 1) * DAY_W + 2 : startOff * DAY_W + 2;
+          const milestoneLeft = isRTL ? timelineWidth - (startOff + 1) * DAY_W + DAY_W / 2 - 7 : startOff * DAY_W + DAY_W / 2 - 7;
+          const todayLeft = isRTL ? timelineWidth - (todayOff + 1) * DAY_W + DAY_W / 2 : todayOff * DAY_W + DAY_W / 2;
           const prog = getTaskProgress(task);
           const isMile = task.milestone;
           const num = taskNums.get(task.id) ?? '';
 
           return (
             <div key={task.id} style={{ display: 'flex', borderBottom: '1px solid #F3F4F6', height: 36 }}>
-              <div style={{ width: NAME_W, flexShrink: 0, display: 'flex', alignItems: 'center', paddingLeft: 12 + task.indentLevel * 14, paddingRight: 8, fontSize: 12, color: '#171717', fontWeight: isMile ? 600 : 400, borderRight: '1px solid #E5E5E5', background: '#fff', overflow: 'hidden', whiteSpace: 'nowrap', gap: 4 }}>
+              <div style={{ width: NAME_W, flexShrink: 0, display: 'flex', alignItems: 'center', paddingLeft: isRTL ? 8 : 12 + task.indentLevel * 14, paddingRight: isRTL ? 12 + task.indentLevel * 14 : 8, fontSize: 12, color: '#171717', fontWeight: isMile ? 600 : 400, borderRight: isRTL ? undefined : '1px solid #E5E5E5', borderLeft: isRTL ? '1px solid #E5E5E5' : undefined, background: '#fff', overflow: 'hidden', whiteSpace: 'nowrap', gap: 4, position: 'sticky', ...stickySide, zIndex: 8 }}>
                 <span style={{ color: '#A3A3A3', fontSize: 10, flexShrink: 0, minWidth: 20, fontFamily: 'monospace' }}>{num}</span>
                 {isMile && <span style={{ color: c.bg, fontSize: 10, flexShrink: 0 }}>◆</span>}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.name}</span>
               </div>
-              <div style={{ flex: 1, height: '100%', position: 'relative', backgroundImage: `repeating-linear-gradient(to right, transparent ${DAY_W - 1}px, #F3F4F6 ${DAY_W - 1}px, #F3F4F6 ${DAY_W}px)` }}>
+              <div style={{ flex: 1, minWidth: timelineWidth, height: '100%', position: 'relative', backgroundImage: `repeating-linear-gradient(to right, transparent ${DAY_W - 1}px, #F3F4F6 ${DAY_W - 1}px, #F3F4F6 ${DAY_W}px)` }}>
                 {todayOff >= 0 && todayOff < days.length && (
-                  <div style={{ position: 'absolute', top: 0, bottom: 0, left: todayOff * DAY_W + DAY_W / 2, width: 1.5, background: '#D93A3A', opacity: 0.45, zIndex: 2 }} />
+                  <div style={{ position: 'absolute', top: 0, bottom: 0, left: todayLeft, width: 1.5, background: '#D93A3A', opacity: 0.45, zIndex: 2 }} />
                 )}
                 {isMile ? (
-                  <div title={task.name} style={{ position: 'absolute', top: '50%', left: startOff * DAY_W + DAY_W / 2 - 7, width: 14, height: 14, transform: 'translateY(-50%) rotate(45deg)', background: c.bg, borderRadius: 2, zIndex: 3 }} />
+                  <div title={task.name} style={{ position: 'absolute', top: '50%', left: milestoneLeft, width: 14, height: 14, transform: 'translateY(-50%) rotate(45deg)', background: c.bg, borderRadius: 2, zIndex: 3 }} />
                 ) : (
-                  <div title={`${task.name} - ${formatNumber(prog)}%`} style={{ position: 'absolute', top: 6, height: 22, left: startOff * DAY_W + 2, width: barW - 4, background: c.light, border: `1.5px solid ${c.bg}`, borderRadius: 5, overflow: 'hidden', zIndex: 3 }}>
+                  <div title={`${task.name} - ${formatNumber(prog)}%`} style={{ position: 'absolute', top: 6, height: 22, left: barLeft, width: barW - 4, background: c.light, border: `1.5px solid ${c.bg}`, borderRadius: 5, overflow: 'hidden', zIndex: 3 }}>
                     <div style={{ height: '100%', width: `${prog}%`, background: c.bg, opacity: 0.65 }} />
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', paddingLeft: 5, fontSize: 10, color: c.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden' }}>{task.name}</div>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', paddingLeft: isRTL ? undefined : 5, paddingRight: isRTL ? 5 : undefined, fontSize: 10, color: c.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden' }}>{task.name}</div>
                   </div>
                 )}
               </div>
@@ -464,6 +535,7 @@ export function SpreadsheetView() {
     const toExport = selectedProject ? [selectedProject] : projects;
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Pulse AI';
+    wb.calcProperties.fullCalcOnLoad = true;
 
     const styleHeader = (ws: Worksheet) => {
       ws.getRow(1).eachCell(cell => {
@@ -472,6 +544,26 @@ export function SpreadsheetView() {
         cell.border = { bottom: { style: 'thin', color: { argb: 'FFE5E5E5' } } };
       });
     };
+
+    const validationNames = new Map<string, { resources: string; roles: string }>();
+    toExport.forEach((p, i) => {
+      validationNames.set(p.id, {
+        resources: `Project${i + 1}Resources`,
+        roles: `Project${i + 1}Roles`,
+      });
+    });
+    const resourceRowsByProject = new Map<string, { start: number; end: number }>();
+    const roleRowsByProject = new Map<string, { start: number; end: number }>();
+    let nextResourceRow = 2;
+    let nextRoleRow = 2;
+    toExport.forEach(p => {
+      const resourceRowCount = (p.gantt?.resources?.length ?? 0) + EXCEL_EDIT_BUFFER_ROWS;
+      const roleRowCount = (p.gantt?.roles?.length ?? 0) + EXCEL_EDIT_BUFFER_ROWS;
+      resourceRowsByProject.set(p.id, { start: nextResourceRow, end: nextResourceRow + resourceRowCount - 1 });
+      roleRowsByProject.set(p.id, { start: nextRoleRow, end: nextRoleRow + roleRowCount - 1 });
+      nextResourceRow += resourceRowCount;
+      nextRoleRow += roleRowCount;
+    });
 
     // Projects sheet — each project title goes in column A starting row 2
     const projWs = wb.addWorksheet('Projects');
@@ -486,8 +578,19 @@ export function SpreadsheetView() {
     const projRowNum = new Map<string, number>();
     toExport.forEach((p, i) => {
       projRowNum.set(p.id, i + 2);
-      projWs.addRow({ title: p.title, dept: p.department, div: p.devision, field: p.field, desc: p.description, status: fmtStatus(p.status), due: getProjectDueDate(p) });
+      projWs.addRow({
+        title: p.title,
+        dept: p.department,
+        div: p.devision,
+        field: p.field,
+        desc: p.description,
+        status: fmtStatus(p.status),
+        due: toExcelDate(getProjectDueDate(p)),
+      });
     });
+    for (let row = 2; row <= projWs.rowCount; row++) {
+      applyDateCellValidation(projWs.getCell(row, 7));
+    }
 
     // Helper: returns a formula cell value referencing the Projects sheet title cell
     const projRef = (p: { id: string; title: string }) => {
@@ -507,37 +610,55 @@ export function SpreadsheetView() {
       { header: 'Date', key: 'date', width: 15 }, { header: 'Progress (%)', key: 'prog', width: 15 },
       { header: 'Status', key: 'status', width: 15 },
     ];
+    goalsWs.getColumn(1).hidden = true;
     styleHeader(goalsWs);
     goalsForExport.forEach(g => {
       const p = projByTitle.get(g.projectTitle);
-      goalsWs.addRow({ project: p ? projRef(p) : g.projectTitle, ms: g.milestoneName, date: g.milestoneDate, prog: g.progress, status: g.status });
+      goalsWs.addRow({ project: p ? projRef(p) : g.projectTitle, ms: g.milestoneName, date: toExcelDate(g.milestoneDate), prog: g.progress, status: g.status });
     });
+    for (let row = 2; row <= Math.max(2, goalsWs.rowCount); row++) {
+      applyDateCellValidation(goalsWs.getCell(row, 3));
+    }
 
     // Gantt data sheet
     const ganttWs = wb.addWorksheet('Gantt');
     ganttWs.columns = [
       { header: 'Task ID', key: 'num', width: 10 }, { header: 'Project', key: 'proj', width: 25 },
       { header: 'Task Name', key: 'name', width: 30 }, { header: 'Start Date', key: 'start', width: 15 },
-      { header: 'End Date', key: 'end', width: 15 }, { header: 'Duration (Days)', key: 'dur', width: 16 },
-      { header: 'Progress (%)', key: 'prog', width: 14 }, { header: 'Status', key: 'status', width: 15 },
-      { header: 'Milestone', key: 'ms', width: 12 }, { header: 'Resource', key: 'res', width: 20 },
+      { header: 'Duration (Days)', key: 'dur', width: 16 }, { header: 'Progress (%)', key: 'prog', width: 14 },
+      { header: 'Status', key: 'status', width: 15 }, { header: 'Milestone', key: 'ms', width: 12 },
+      { header: 'Resource', key: 'res', width: 20 },
       { header: 'PRED', key: 'pred', width: 15 },
     ];
+    ganttWs.getColumn(2).hidden = true;
     styleHeader(ganttWs);
     for (const p of toExport) {
+      const firstProjectRow = ganttWs.rowCount + 1;
       const tasks = p.gantt?.tasks ?? [];
       const resourceById = new Map((p.gantt?.resources ?? []).map(r => [r.id, r.name]));
       const taskNums = generateTaskNumbers(tasks);
+      const names = validationNames.get(p.id);
       for (const t of tasks) {
         const predNums = t.predecessorIds.map(pid => taskNums.get(pid) ?? '').filter(Boolean).join(', ');
         ganttWs.addRow({
           num: taskNums.get(t.id) ?? '', proj: projRef(p), name: t.name,
-          start: t.startDate, end: t.endDate, dur: t.durationDays,
+          start: toExcelDate(t.startDate), dur: t.durationDays,
           prog: t.progress, status: fmtStatus(t.status),
           ms: t.milestone ? 'Yes' : 'No',
           res: t.resourceId ? (resourceById.get(t.resourceId) ?? '') : '',
           pred: predNums,
         });
+      }
+      for (let i = 0; i < EXCEL_EDIT_BUFFER_ROWS; i++) {
+        ganttWs.addRow({ proj: projRef(p) });
+      }
+      for (let row = firstProjectRow; row <= ganttWs.rowCount; row++) {
+        applyDateCellValidation(ganttWs.getCell(row, 4));
+        applyListCellValidation(ganttWs.getCell(row, 7), '"Pending,In Progress,Completed,Delayed"');
+        applyListCellValidation(ganttWs.getCell(row, 8), '"Yes,No"');
+        if (names) {
+          applyListCellValidation(ganttWs.getCell(row, 9), `=${names.resources}`);
+        }
       }
     }
 
@@ -548,11 +669,22 @@ export function SpreadsheetView() {
       { header: 'Role', key: 'role', width: 20 }, { header: 'Color', key: 'color', width: 12 },
       { header: 'Capacity (%)', key: 'cap', width: 14 },
     ];
+    resWs.getColumn(1).hidden = true;
     styleHeader(resWs);
     for (const p of toExport) {
+      const firstProjectRow = resWs.rowCount + 1;
       const roleById = new Map((p.gantt?.roles ?? []).map(r => [r.id, r.name]));
       for (const r of (p.gantt?.resources ?? [])) {
         resWs.addRow({ proj: projRef(p), name: r.name, role: r.roleId ? (roleById.get(r.roleId) ?? r.role) : r.role, color: r.color, cap: r.capacityPercent });
+      }
+      for (let i = 0; i < EXCEL_EDIT_BUFFER_ROWS; i++) {
+        resWs.addRow({ proj: projRef(p) });
+      }
+      const names = validationNames.get(p.id);
+      if (names) {
+        for (let row = firstProjectRow; row <= resWs.rowCount; row++) {
+          applyListCellValidation(resWs.getCell(row, 3), `=${names.roles}`);
+        }
       }
     }
 
@@ -563,18 +695,34 @@ export function SpreadsheetView() {
       { header: 'Budget', key: 'budget', width: 15 }, { header: 'Paid By', key: 'paidBy', width: 15 },
       { header: 'Currency', key: 'currency', width: 12 },
     ];
+    rolesWs.getColumn(1).hidden = true;
     styleHeader(rolesWs);
     for (const p of toExport) {
       for (const rl of (p.gantt?.roles ?? [])) {
         rolesWs.addRow({ proj: projRef(p), name: rl.name, budget: rl.budget, paidBy: rl.paidBy, currency: rl.currency });
       }
+      for (let i = 0; i < EXCEL_EDIT_BUFFER_ROWS; i++) {
+        rolesWs.addRow({ proj: projRef(p) });
+      }
     }
+
+    toExport.forEach(p => {
+      const names = validationNames.get(p.id);
+      const resourceRows = resourceRowsByProject.get(p.id);
+      const roleRows = roleRowsByProject.get(p.id);
+      if (names && resourceRows) {
+        wb.definedNames.add(`Resources!$B$${resourceRows.start}:$B$${resourceRows.end}`, names.resources);
+      }
+      if (names && roleRows) {
+        wb.definedNames.add(`Roles!$B$${roleRows.start}:$B$${roleRows.end}`, names.roles);
+      }
+    });
 
     // Gantt Visual sheet(s)
     for (const p of toExport) {
       const wsName = toExport.length > 1 ? `Gantt Visual - ${p.title.slice(0, 18)}` : 'Gantt Visual';
       const visWs = wb.addWorksheet(wsName);
-      buildGanttVisualSheet(visWs, p);
+      buildGanttVisualSheet(visWs, p, isRTL);
     }
 
     // Trigger download
@@ -592,7 +740,7 @@ export function SpreadsheetView() {
       count: formatNumber(toExport.length),
       suffix: toExport.length !== 1 ? 's' : '',
     }));
-  }, [selectedProject, projects, allGoals, formatNumber, t]);
+  }, [selectedProject, projects, allGoals, formatNumber, isRTL, t]);
 
   // ── Full Multi-Sheet Import ───────────────────────────────────────
 
@@ -601,7 +749,7 @@ export function SpreadsheetView() {
     if (!file) return;
     try {
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array', cellFormula: true });
+      const wb = XLSX.read(buf, { type: 'array', cellFormula: true, cellDates: true, dateNF: EXCEL_DATE_FORMAT });
 
       // Build row→title map from Projects sheet for formula resolution
       const projSheetRows = wb.Sheets['Projects']
@@ -645,7 +793,9 @@ export function SpreadsheetView() {
         if (!title || !department) { skipped++; continue; }
 
         // Build roles
-        const roles: GanttRole[] = (rolesByProj.get(title) ?? []).map(r => ({
+        const roles: GanttRole[] = (rolesByProj.get(title) ?? [])
+          .filter(r => resolveCell(r['Name']).trim())
+          .map(r => ({
           id:       createRoleId(),
           name:     String(r['Name']     ?? 'Role'),
           budget:   parseFloat(String(r['Budget']   ?? '0')) || 0,
@@ -655,7 +805,9 @@ export function SpreadsheetView() {
 
         // Build resources (link role name → role id)
         const roleByName = new Map(roles.map(r => [r.name, r.id]));
-        const resources: GanttResource[] = (resByProj.get(title) ?? []).map((r, i) => {
+        const resources: GanttResource[] = (resByProj.get(title) ?? [])
+          .filter(r => resolveCell(r['Name']).trim())
+          .map((r, i) => {
           const roleName = String(r['Role'] ?? '').trim();
           return {
             id:              createResourceId(),
@@ -668,7 +820,7 @@ export function SpreadsheetView() {
         });
 
         // Build tasks — two passes: assign IDs, then resolve predecessors
-        const projGanttRows = ganttByProj.get(title) ?? [];
+        const projGanttRows = (ganttByProj.get(title) ?? []).filter(r => resolveCell(r['Task Name']).trim());
         const resourceByName = new Map(resources.map(r => [r.name, r.id]));
         const taskIdByNum = new Map<string, string>();
 
@@ -694,8 +846,8 @@ export function SpreadsheetView() {
           return normalizeTask({
             id,
             name:         String(r['Task Name']      ?? 'Task'),
-            startDate:    String(r['Start Date']     ?? ''),
-            endDate:      String(r['End Date']       ?? ''),
+            startDate:    fromExcelDate(r['Start Date']),
+            endDate:      fromExcelDate(r['End Date']),
             durationDays: parseInt(String(r['Duration (Days)'] ?? '1')) || 1,
             progress:     parseInt(String(r['Progress (%)']    ?? '0')) || 0,
             status:       parseTaskStatus(String(r['Status']   ?? 'pending')),
@@ -779,7 +931,7 @@ export function SpreadsheetView() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-6 overflow-hidden">
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -855,10 +1007,10 @@ export function SpreadsheetView() {
 
       {/* ── Excel Viewer ── */}
       {selectedProject && (
-        <div className="bg-white border border-[#E5E5E5] rounded-xl overflow-hidden shadow-sm">
+        <div className="min-w-0 max-w-full overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm">
 
           {/* Header */}
-          <div className="flex items-center gap-3 px-4 pt-3 border-b border-[#E5E5E5] bg-[#FAFAFA] flex-wrap gap-y-2">
+          <div className="sticky top-0 z-30 flex items-center gap-3 px-4 pt-3 border-b border-[#E5E5E5] bg-[#FAFAFA] flex-wrap gap-y-2">
             <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center flex-shrink-0">
               <HugeiconsIcon icon={FileSpreadsheetIcon} className="w-4 h-4 text-white" />
             </div>
@@ -889,7 +1041,7 @@ export function SpreadsheetView() {
           </div>
 
           {/* Sheet Content */}
-          <div>
+          <div className="min-w-0 max-w-full overflow-hidden">
             {/* Gantt */}
             {activeSheet === 'gantt' && (
               viewMode === 'visual'

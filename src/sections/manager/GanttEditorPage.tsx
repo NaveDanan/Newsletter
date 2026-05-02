@@ -378,6 +378,9 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     const weekNumber = Number.parseInt(format(value, 'w'), 10);
     return `${t('editor.weekShort')} ${formatNumber(Number.isFinite(weekNumber) ? weekNumber : 0)}`;
   }, [formatNumber, t]);
+  const formatTimelineDayLabel = useCallback((value: Date) => (
+    format(value, 'EEEEE', { locale: calendarLocale })
+  ), [calendarLocale]);
   const initialGantt = normalizeProjectGantt(project.gantt);
   const [draftGantt, setDraftGantt] = useState<ProjectGantt>(initialGantt);
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(initialGantt));
@@ -442,12 +445,23 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
   const resourceSummary = useMemo(() => getResourceSummary(draftGantt), [draftGantt]);
   const unassignedTasks = orderedTasks.filter((task) => task.resourceId === null).length;
   const timelineDays = useMemo(() => getTimelineDays(orderedTasks), [orderedTasks]);
+  const timelineWeeks = useMemo(() => {
+    const weeks: Date[][] = [];
+    for (let i = 0; i < timelineDays.length; i += 7) {
+      weeks.push(timelineDays.slice(i, i + 7));
+    }
+    return weeks;
+  }, [timelineDays]);
   const baseDayWidth = draftGantt.zoom === 'week' ? 18 : 30;
   const dayWidth = timelineDays.length > 0 && timelineViewportWidth > 0
     ? Math.max(baseDayWidth, timelineViewportWidth / timelineDays.length)
     : baseDayWidth;
   const timelineStart = useMemo(() => timelineDays[0] ?? new Date(), [timelineDays]);
   const timelineWidth = Math.max(timelineDays.length * dayWidth, timelineViewportWidth, 680);
+  const timelineCellWidth = timelineDays.length > 0 ? timelineWidth / timelineDays.length : dayWidth;
+  const timelineGridColumns = draftGantt.zoom === 'week'
+    ? `repeat(${timelineWeeks.length}, minmax(${7 * dayWidth}px, 1fr))`
+    : `repeat(${timelineDays.length}, minmax(${dayWidth}px, 1fr))`;
   const completion = getProjectProgress(orderedTasks);
   const visibleRowCount = Math.max(visibleTasks.length, minimumVisibleRows);
   const fillerRowCount = Math.max(minimumVisibleRows - visibleTasks.length, 0);
@@ -484,17 +498,26 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     const end = timelineDays[timelineDays.length - 1];
     return visibleTimelineDate < start || visibleTimelineDate > end ? start : visibleTimelineDate;
   }, [timelineDays, visibleTimelineDate]);
+  const getTaskTimelineLayout = useCallback((task: GanttTask) => {
+    const offsetDays = getTaskOffsetDays(task, timelineStart);
+    const spanDays = getTaskCalendarSpanDays(task);
+    const barWidth = task.milestone ? 20 : Math.max(spanDays * timelineCellWidth - 12, 28);
+    const barLeft = task.milestone
+      ? isRTL
+        ? timelineWidth - ((offsetDays * timelineCellWidth) + (timelineCellWidth / 2)) - 10
+        : (offsetDays * timelineCellWidth) + (timelineCellWidth / 2) - 10
+      : isRTL
+        ? timelineWidth - ((offsetDays + spanDays) * timelineCellWidth) + 6
+        : (offsetDays * timelineCellWidth) + 6;
+
+    return { barLeft, barWidth };
+  }, [isRTL, timelineCellWidth, timelineStart, timelineWidth]);
   const selectedTaskBubble = useMemo(() => {
     if (!selectedTask || selectedTaskIndex < 0) {
       return null;
     }
 
-    const offsetDays = getTaskOffsetDays(selectedTask, timelineStart);
-    const spanDays = getTaskCalendarSpanDays(selectedTask);
-    const barWidth = selectedTask.milestone ? 20 : Math.max(spanDays * dayWidth - 12, 28);
-    const barLeft = selectedTask.milestone
-      ? offsetDays * dayWidth + (dayWidth / 2) - 10
-      : offsetDays * dayWidth + 6;
+    const { barLeft, barWidth } = getTaskTimelineLayout(selectedTask);
     const anchorCenter = barLeft + (barWidth / 2);
     const bubbleLeft = clamp(anchorCenter - (taskBubbleWidth / 2), 8, Math.max(timelineWidth - taskBubbleWidth - 8, 8));
     const pointerLeft = clamp(anchorCenter - bubbleLeft, 18, taskBubbleWidth - 18);
@@ -514,14 +537,13 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
       placeAbove,
     };
   }, [
-    dayWidth,
+    getTaskTimelineLayout,
     managedTaskId,
     managedTaskIndex,
     selectedTask,
     timelineSelectedTaskId,
     selectedTaskIndex,
     selectedTaskResource,
-    timelineStart,
     timelineWidth,
     visibleRowCount,
   ]);
@@ -532,7 +554,11 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
 
     const scrollContainer = timelineScrollRef.current;
     const centerPosition = scrollContainer.scrollLeft + (scrollContainer.clientWidth / 2);
-    const dateIndex = clamp(Math.floor(centerPosition / dayWidth), 0, timelineDays.length - 1);
+    const dateIndex = clamp(
+      Math.floor((isRTL ? timelineWidth - centerPosition : centerPosition) / timelineCellWidth),
+      0,
+      timelineDays.length - 1,
+    );
     const nextVisibleDate = timelineDays[dateIndex];
 
     setVisibleTimelineDate(nextVisibleDate);
@@ -540,7 +566,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
       setTimelineCalendarMonth(startOfMonth(nextVisibleDate));
       setShowTimelineYears(false);
     }
-  }, [dayWidth, isTimelineCalendarOpen, timelineDays]);
+  }, [isRTL, isTimelineCalendarOpen, timelineCellWidth, timelineDays, timelineWidth]);
 
   const scrollTimelineToDate = useCallback((date: Date, behavior: ScrollBehavior = 'smooth') => {
     if (!timelineScrollRef.current || timelineDays.length === 0) {
@@ -560,13 +586,16 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
         ? fallbackIndex
         : 0;
     const scrollContainer = timelineScrollRef.current;
-    const targetLeft = Math.max(0, (finalIndex * dayWidth) - (scrollContainer.clientWidth / 2) + (dayWidth / 2));
+    const targetCenter = isRTL
+      ? timelineWidth - ((finalIndex * timelineCellWidth) + (timelineCellWidth / 2))
+      : (finalIndex * timelineCellWidth) + (timelineCellWidth / 2);
+    const targetLeft = Math.max(0, targetCenter - (scrollContainer.clientWidth / 2));
 
     scrollContainer.scrollTo({
       left: targetLeft,
       behavior,
     });
-  }, [dayWidth, timelineDays]);
+  }, [isRTL, timelineCellWidth, timelineDays, timelineWidth]);
 
   useEffect(() => {
     if (!timelineScrollRef.current) {
@@ -612,19 +641,14 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     }
 
     const scrollContainer = timelineScrollRef.current;
-    const offsetDays = getTaskOffsetDays(selectedTask, timelineStart);
-    const spanDays = getTaskCalendarSpanDays(selectedTask);
-    const barWidth = selectedTask.milestone ? 20 : Math.max(spanDays * dayWidth - 12, 28);
-    const barLeft = selectedTask.milestone
-      ? offsetDays * dayWidth + (dayWidth / 2) - 10
-      : offsetDays * dayWidth + 6;
+    const { barLeft, barWidth } = getTaskTimelineLayout(selectedTask);
     const targetLeft = Math.max(0, barLeft - (scrollContainer.clientWidth / 2) + (barWidth / 2));
 
     scrollContainer.scrollTo({
       left: targetLeft,
       behavior: 'smooth',
     });
-  }, [dayWidth, dragState, selectedTask, timelineStart]);
+  }, [dragState, getTaskTimelineLayout, selectedTask]);
 
   const applyDraftGantt = useCallback((nextGantt: ProjectGantt) => {
     draftGanttRef.current = nextGantt;
@@ -1096,7 +1120,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
 
     const handleMouseMove = (event: MouseEvent) => {
       event.preventDefault();
-      const deltaDays = Math.round((event.clientX - dragState.startX) / dayWidth);
+      const deltaDays = Math.round(((event.clientX - dragState.startX) * (isRTL ? -1 : 1)) / timelineCellWidth);
 
       if (deltaDays === dragState.lastDeltaDays) {
         return;
@@ -1158,7 +1182,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [commitTasks, dayWidth, dragState]);
+  }, [commitTasks, dragState, isRTL, timelineCellWidth]);
 
   useEffect(() => {
     if (!taskGridResizeState) {
@@ -1199,13 +1223,17 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
       return;
     }
 
+    if (!event.shiftKey) {
+      return;
+    }
+
     if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
       return;
     }
 
     event.preventDefault();
-    timelineScrollRef.current.scrollLeft += event.deltaY;
-  }, []);
+    timelineScrollRef.current.scrollLeft += event.deltaY * (isRTL ? -1 : 1);
+  }, [isRTL]);
 
   const getRowDropPosition = useCallback((event: React.DragEvent<HTMLDivElement>): Exclude<TaskDropPosition, 'root'> => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -1734,14 +1762,6 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
               </Popover>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleToggleTaskGrid}
-                  className="btn-secondary inline-flex items-center gap-2"
-                >
-                  <HugeiconsIcon icon={isTaskGridCollapsed ? ArrowRight01Icon : ArrowLeft01Icon} className="h-4 w-4" />
-                  {isTaskGridCollapsed ? t('ganttEditor.showGrid') : t('ganttEditor.hideGrid')}
-                </button>
                 <div className="rounded-full border border-[#E5E7EB] bg-[#F8FAFC] p-1">
                   {(['day', 'week'] as const).map((zoom) => (
                     <button
@@ -1783,13 +1803,13 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                 </button>
               </div>
             ) : (
-              <div className="flex min-h-0 flex-1 overflow-hidden">
+              <div className="flex min-h-0 flex-1" style={{ minHeight: timelineGridMinHeight }}>
                 <div
                   className="grid min-h-0 flex-1"
                   style={{ gridTemplateColumns: `${isTaskGridCollapsed ? 0 : taskGridWidth}px 16px minmax(0, 1fr)` }}
                 >
                   <div
-                    className={`overflow-auto ${isTaskGridCollapsed ? 'pointer-events-none opacity-0' : 'border-r border-[#EEF2F6] opacity-100'}`}
+                    className={`overflow-visible ${isTaskGridCollapsed ? 'pointer-events-none opacity-0' : 'border-r border-[#EEF2F6] opacity-100'}`}
                     onClick={() => {
                       if (suppressNextGridDismissRef.current) {
                         suppressNextGridDismissRef.current = false;
@@ -2123,7 +2143,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                     <button
                       type="button"
                       onClick={handleToggleTaskGrid}
-                      className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full border border-[#E5E7EB] bg-white p-1 text-[#737373] shadow-sm transition-colors hover:border-[#D4D4D4] hover:text-[#171717]"
+                      className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-white p-1 text-[#737373] shadow-sm transition-colors hover:border-[#D4D4D4] hover:text-[#171717]"
                       aria-label={isTaskGridCollapsed ? t('ganttEditor.expandTaskGrid') : t('ganttEditor.collapseTaskGrid')}
                       title={isTaskGridCollapsed ? t('ganttEditor.expandTaskGrid') : t('ganttEditor.collapseTaskGrid')}
                     >
@@ -2132,7 +2152,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                     <div
                       role="separator"
                       aria-orientation="vertical"
-                      className={`relative h-full w-full ${isTaskGridCollapsed ? 'cursor-pointer' : 'cursor-col-resize'}`}
+                      className={`relative h-full w-full bg-transparent ${isTaskGridCollapsed ? 'cursor-pointer' : 'cursor-col-resize'}`}
                       onMouseDown={(event) => {
                         event.preventDefault();
                         if (isTaskGridCollapsed) {
@@ -2154,41 +2174,56 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                   <div className="flex min-h-0 flex-col">
                     <div
                       ref={timelineScrollRef}
-                      className="min-h-0 flex-1 overflow-auto scroll-smooth overscroll-contain"
+                      className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scroll-smooth overscroll-x-contain"
                       onWheel={handleTimelineWheel}
+                      dir="ltr"
                     >
-                    <div className="relative min-h-full" style={{ width: `max(100%, ${timelineWidth}px)`, minHeight: timelineGridMinHeight }}>
-                      <div className="sticky top-0 z-10 grid h-14 border-b border-[#EEF2F6] bg-[#F8FAFC]" style={{ gridTemplateColumns: `repeat(${timelineDays.length}, minmax(${dayWidth}px, 1fr))` }}>
-                        {timelineDays.map((day, index) => (
-                          <div
-                            key={day.toISOString()}
-                            className={`border-r px-2 py-2 text-center last:border-r-0 ${
-                              isRestDay(day) ? 'border-[#E9E3D7] bg-[#FAF6EE]' : 'border-[#EEF2F6]'
-                            }`}
-                          >
-                            <p className={`text-[10px] uppercase tracking-[0.18em] ${isRestDay(day) ? 'text-[#B45309]' : 'text-[#A3A3A3]'}`}>
-                              {draftGantt.zoom === 'day' ? formatDate(day, { weekday: 'short' }) : formatWeekLabel(day)}
-                            </p>
-                            <p className={`mt-1 text-sm font-medium ${isRestDay(day) ? 'text-[#92400E]' : 'text-[#171717]'}`}>
-                              {draftGantt.zoom === 'day' ? formatNumber(day.getDate()) : index % 7 === 0 ? formatDate(day, { month: 'short', day: 'numeric' }) : ''}
-                            </p>
-                            {isRestDay(day) ? (
-                              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[#C2410C]">
-                                {t('ganttEditor.restDay')}
+                    <div
+                      className="relative min-h-full"
+                      dir={isRTL ? 'rtl' : 'ltr'}
+                      style={{ width: `max(100%, ${timelineWidth}px)`, minHeight: timelineGridMinHeight }}
+                    >
+                      <div className="sticky top-0 z-10 grid h-14 border-b border-[#EEF2F6] bg-[#F8FAFC]" style={{ gridTemplateColumns: timelineGridColumns }}>
+                        {draftGantt.zoom === 'week' ? (
+                          timelineWeeks.map((weekDays) => {
+                            const weekStart = weekDays[0];
+                            return (
+                              <div
+                                key={weekStart.toISOString()}
+                                className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#EEF2F6] px-1 py-2 text-center last:border-r-0"
+                              >
+                                <p className="max-w-full truncate whitespace-nowrap text-[10px] uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">
+                                  {formatWeekLabel(weekStart)}
+                                </p>
+                                <p className="max-w-full truncate whitespace-nowrap text-sm font-medium leading-tight text-[#171717]">
+                                  {formatDate(weekStart, { month: 'short', day: 'numeric' })}
+                                </p>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          timelineDays.map((day) => (
+                            <div
+                              key={day.toISOString()}
+                              className={`flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r px-1 py-2 text-center last:border-r-0 ${
+                                isRestDay(day) ? 'border-[#E9E3D7] bg-[#FAF6EE]' : 'border-[#EEF2F6]'
+                              }`}
+                              title={isRestDay(day) ? t('ganttEditor.restDay') : undefined}
+                            >
+                              <p className={`max-w-full truncate whitespace-nowrap text-[10px] uppercase leading-none tracking-[0.12em] ${isRestDay(day) ? 'text-[#B45309]' : 'text-[#A3A3A3]'}`}>
+                                {formatTimelineDayLabel(day)}
                               </p>
-                            ) : null}
-                          </div>
-                        ))}
+                              <p className={`max-w-full truncate whitespace-nowrap text-sm font-medium leading-tight ${isRestDay(day) ? 'text-[#92400E]' : 'text-[#171717]'}`}>
+                                {formatNumber(day.getDate())}
+                              </p>
+                            </div>
+                          ))
+                        )}
                       </div>
                       {visibleTasks.map((task) => {
-                        const offsetDays = getTaskOffsetDays(task, timelineStart);
-                        const spanDays = getTaskCalendarSpanDays(task);
                         const resource = draftGantt.resources.find((entry) => entry.id === task.resourceId) ?? null;
                         const barColor = resource?.color ?? '#D93A3A';
-                        const barWidth = task.milestone ? 20 : Math.max(spanDays * dayWidth - 12, 28);
-                        const barLeft = task.milestone
-                          ? offsetDays * dayWidth + (dayWidth / 2) - 10
-                          : offsetDays * dayWidth + 6;
+                        const { barLeft, barWidth } = getTaskTimelineLayout(task);
                         const isHighlighted = task.id === highlightedTaskId;
                         const isManaged = task.id === managedTaskId;
 
@@ -2198,13 +2233,22 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                               className={`relative h-14 border-b border-[#EEF2F6] ${isManaged ? 'border-b-transparent' : ''} ${isHighlighted ? 'bg-[#FFF7F7]' : 'bg-white'
                                 }`}
                             >
-                              <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${timelineDays.length}, minmax(${dayWidth}px, 1fr))` }}>
-                                {timelineDays.map((day) => (
-                                  <div
-                                    key={`${task.id}-${day.toISOString()}`}
-                                    className={`border-r last:border-r-0 ${isRestDay(day) ? 'border-[#EEE5D6] bg-[#FCFAF5]' : 'border-[#F1F5F9]'}`}
-                                  />
-                                ))}
+                              <div className="absolute inset-0 grid" style={{ gridTemplateColumns: timelineGridColumns }}>
+                                {draftGantt.zoom === 'week' ? (
+                                  timelineWeeks.map((weekDays) => (
+                                    <div
+                                      key={`${task.id}-week-${weekDays[0].toISOString()}`}
+                                      className="border-r border-[#F1F5F9] last:border-r-0"
+                                    />
+                                  ))
+                                ) : (
+                                  timelineDays.map((day) => (
+                                    <div
+                                      key={`${task.id}-${day.toISOString()}`}
+                                      className={`border-r last:border-r-0 ${isRestDay(day) ? 'border-[#EEE5D6] bg-[#FCFAF5]' : 'border-[#F1F5F9]'}`}
+                                    />
+                                  ))
+                                )}
                               </div>
 
                               <div
@@ -2252,7 +2296,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                                         setTimelineSelectedTaskId(task.id);
                                         setDragState({
                                           taskId: task.id,
-                                          mode: 'resize-start',
+                                          mode: isRTL ? 'resize-end' : 'resize-start',
                                           startX: event.clientX,
                                           originalTask: task,
                                           baseTasks: orderedTasks,
@@ -2272,7 +2316,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                                         setTimelineSelectedTaskId(task.id);
                                         setDragState({
                                           taskId: task.id,
-                                          mode: 'resize-end',
+                                          mode: isRTL ? 'resize-start' : 'resize-end',
                                           startX: event.clientX,
                                           originalTask: task,
                                           baseTasks: orderedTasks,
@@ -2306,13 +2350,22 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                           onMouseDown={handleEmptyRowMouseDown}
                           onClick={handleEmptyRowClick}
                         >
-                          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${timelineDays.length}, minmax(${dayWidth}px, 1fr))` }}>
-                            {timelineDays.map((day) => (
-                              <div
-                                key={`timeline-filler-${row}-${day.toISOString()}`}
-                                className={`border-r last:border-r-0 ${isRestDay(day) ? 'border-[#EEE5D6] bg-[#FCFAF5]' : 'border-[#F1F5F9]'}`}
-                              />
-                            ))}
+                          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: timelineGridColumns }}>
+                            {draftGantt.zoom === 'week' ? (
+                              timelineWeeks.map((weekDays) => (
+                                <div
+                                  key={`timeline-filler-${row}-week-${weekDays[0].toISOString()}`}
+                                  className="border-r border-[#F1F5F9] last:border-r-0"
+                                />
+                              ))
+                            ) : (
+                              timelineDays.map((day) => (
+                                <div
+                                  key={`timeline-filler-${row}-${day.toISOString()}`}
+                                  className={`border-r last:border-r-0 ${isRestDay(day) ? 'border-[#EEE5D6] bg-[#FCFAF5]' : 'border-[#F1F5F9]'}`}
+                                />
+                              ))
+                            )}
                           </div>
                         </div>
                       ))}

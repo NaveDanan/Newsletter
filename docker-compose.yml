@@ -1,6 +1,6 @@
 services:
   newsletter:
-    image: newsletter:1.0.17
+    image: newsletter:1.0.18
     build:
       context: .
       dockerfile: Dockerfile

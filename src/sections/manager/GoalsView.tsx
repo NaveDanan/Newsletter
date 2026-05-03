@@ -40,7 +40,7 @@ function computeGoalProgress(tasks: GanttTask[], milestone: GanttTask): number {
     return taskEnd <= milestoneDate;
   });
 
-  // Include the milestone itself (it contributes 1 day unit)
+  // Include the milestone itself so its completion state is considered.
   const allRelevantTasks = [...precedingTasks, milestone];
 
   const totalDays = allRelevantTasks.reduce((sum, t) => sum + getTaskSpanDays(t), 0);

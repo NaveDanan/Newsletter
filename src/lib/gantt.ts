@@ -90,16 +90,18 @@ export function getNextResourceColor(index: number): string {
 
 export function normalizeTask(task: Partial<GanttTask>, fallbackDate = startOfDay(new Date())): GanttTask {
   const start = toWorkday(toDate(task.startDate ?? '', fallbackDate));
-  const rawDuration = typeof task.durationDays === 'number' && Number.isFinite(task.durationDays)
-    ? Math.max(1, Math.round(task.durationDays))
-    : 1;
   const milestone = Boolean(task.milestone);
-  const durationDays = milestone ? 1 : rawDuration;
+  const rawDuration = typeof task.durationDays === 'number' && Number.isFinite(task.durationDays)
+    ? Math.round(task.durationDays)
+    : milestone
+      ? 0
+      : 1;
+  const durationDays = milestone ? 0 : Math.max(1, rawDuration);
   const end = milestone ? start : addWorkdays(start, durationDays - 1);
 
   return {
     id: typeof task.id === 'string' && task.id ? task.id : createTaskId(),
-    name: typeof task.name === 'string' && task.name.trim() ? task.name.trim() : 'Untitled task',
+    name: typeof task.name === 'string' ? task.name : '',
     startDate: formatGanttDate(start),
     endDate: formatGanttDate(end),
     durationDays,
@@ -387,7 +389,7 @@ export function getTaskOffsetDays(task: GanttTask, timelineStart: Date): number 
 }
 
 export function getTaskSpanDays(task: GanttTask): number {
-  return task.milestone ? 1 : Math.max(1, task.durationDays);
+  return task.milestone ? 0 : Math.max(1, task.durationDays);
 }
 
 export function getTaskCalendarSpanDays(task: GanttTask): number {

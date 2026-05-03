@@ -47,6 +47,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -165,6 +166,10 @@ function buildVisibleTasks(tasks: GanttTask[], collapsedTaskIds: Set<string>) {
   });
 
   return visibleTasks;
+}
+
+function getBlankTaskNameCount(tasks: GanttTask[]) {
+  return tasks.filter((task) => task.name.trim().length === 0).length;
 }
 
 function getDescendantTaskIds(tasks: GanttTask[], parentTaskId: string) {
@@ -398,6 +403,9 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
   const [taskDropTarget, setTaskDropTarget] = useState<TaskDropTarget | null>(null);
   const [showResourcesDialog, setShowResourcesDialog] = useState(false);
   const [showRolesDialog, setShowRolesDialog] = useState(false);
+  const [showUnsavedLeaveDialog, setShowUnsavedLeaveDialog] = useState(false);
+  const [showEmptyTaskNameDialog, setShowEmptyTaskNameDialog] = useState(false);
+  const [emptyTaskNameWarningCount, setEmptyTaskNameWarningCount] = useState(0);
   const [isTimelineCalendarOpen, setIsTimelineCalendarOpen] = useState(false);
   const [showTimelineYears, setShowTimelineYears] = useState(false);
   const suppressNextGridDismissRef = useRef(false);
@@ -566,7 +574,16 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
       setTimelineCalendarMonth(startOfMonth(nextVisibleDate));
       setShowTimelineYears(false);
     }
-  }, [isRTL, isTimelineCalendarOpen, timelineCellWidth, timelineDays, timelineWidth]);
+  }, [
+    isRTL,
+    isTimelineCalendarOpen,
+    setShowTimelineYears,
+    setTimelineCalendarMonth,
+    setVisibleTimelineDate,
+    timelineCellWidth,
+    timelineDays,
+    timelineWidth,
+  ]);
 
   const scrollTimelineToDate = useCallback((date: Date, behavior: ScrollBehavior = 'smooth') => {
     if (!timelineScrollRef.current || timelineDays.length === 0) {
@@ -671,27 +688,42 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
   }, [applyDraftGantt, t]);
 
   const handleBack = () => {
-    if (isDirty && !window.confirm(t('ganttEditor.unsavedLeave'))) {
+    if (isDirty) {
+      setShowUnsavedLeaveDialog(true);
       return;
     }
 
     onBack();
   };
 
-  const handleSave = () => {
-    if (!project) {
-      return;
-    }
+  const handleConfirmLeaveWithoutSaving = useCallback(() => {
+    setShowUnsavedLeaveDialog(false);
+    onBack();
+  }, [onBack]);
 
+  const persistDraftGantt = useCallback(() => {
     const nextGantt = {
-      ...draftGantt,
+      ...draftGanttRef.current,
       lastEditedAt: new Date().toISOString(),
     };
 
     void updateProjectGantt(project.id, nextGantt);
     setSavedSnapshot(JSON.stringify(nextGantt));
     applyDraftGantt(nextGantt);
+    setShowEmptyTaskNameDialog(false);
+    setEmptyTaskNameWarningCount(0);
     toast.success(t('ganttEditor.scheduleSaved'));
+  }, [applyDraftGantt, project.id, t, updateProjectGantt]);
+
+  const handleSave = () => {
+    const blankTaskNameCount = getBlankTaskNameCount(draftGanttRef.current.tasks);
+    if (blankTaskNameCount > 0) {
+      setEmptyTaskNameWarningCount(blankTaskNameCount);
+      setShowEmptyTaskNameDialog(true);
+      return;
+    }
+
+    persistDraftGantt();
   };
 
   const createAppendedTask = useCallback((tasks: GanttTask[]) => {
@@ -1143,12 +1175,17 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
           : originalEnd;
         const proposedStart = addDays(originalStart, deltaDays);
         const nextStart = compareAsc(proposedStart, maxStart) > 0 ? maxStart : proposedStart;
-        nextTask = {
-          ...dragState.originalTask,
-          startDate: sameDayValue(nextStart),
-          durationDays: Math.max(1, Math.round((originalEnd.getTime() - nextStart.getTime()) / 86400000) + 1),
-          milestone: dragState.originalTask.milestone ? true : dragState.originalTask.milestone,
-        };
+        nextTask = dragState.originalTask.milestone
+          ? {
+            ...dragState.originalTask,
+            startDate: sameDayValue(nextStart),
+            durationDays: 0,
+          }
+          : {
+            ...dragState.originalTask,
+            startDate: sameDayValue(nextStart),
+            durationDays: Math.max(1, Math.round((originalEnd.getTime() - nextStart.getTime()) / 86400000) + 1),
+          };
       }
 
       if (dragState.mode === 'resize-end') {
@@ -1157,11 +1194,15 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
           1,
           Math.round((proposedEnd.getTime() - originalStart.getTime()) / 86400000) + 1,
         );
-        nextTask = {
-          ...dragState.originalTask,
-          durationDays: nextDuration,
-          milestone: dragState.originalTask.milestone && nextDuration === 1,
-        };
+        nextTask = dragState.originalTask.milestone
+          ? {
+            ...dragState.originalTask,
+            durationDays: 0,
+          }
+          : {
+            ...dragState.originalTask,
+            durationDays: nextDuration,
+          };
       }
 
       const nextTasks = dragState.baseTasks.map((task) => (
@@ -1366,7 +1407,12 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
       setTimelineCalendarMonth(startOfMonth(activeVisibleTimelineDate));
       setShowTimelineYears(false);
     }
-  }, [activeVisibleTimelineDate]);
+  }, [
+    activeVisibleTimelineDate,
+    setIsTimelineCalendarOpen,
+    setShowTimelineYears,
+    setTimelineCalendarMonth,
+  ]);
 
   return (
     <div
@@ -1374,6 +1420,107 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
       onClick={() => setTimelineSelectedTaskId(null)}
       dir={isRTL ? 'rtl' : 'ltr'}
     >
+      <Dialog open={showUnsavedLeaveDialog} onOpenChange={setShowUnsavedLeaveDialog}>
+        <DialogContent
+          showCloseButton={false}
+          className="overflow-hidden border-[#F4D9D9] bg-white p-0 shadow-[0_28px_80px_rgba(23,23,23,0.18)] sm:max-w-md"
+        >
+          <div className="border-b border-[#F7DEDE] bg-[linear-gradient(180deg,#FFF6F6_0%,#FFFFFF_100%)] px-6 py-5">
+            <div className="inline-flex rounded-full bg-[#D93A3A]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#D93A3A]">
+              {t('ganttEditor.unsavedChanges')}
+            </div>
+            <DialogHeader className="mt-4 text-start sm:text-start">
+              <DialogTitle className="text-xl font-semibold text-[#171717]">
+                {t('ganttEditor.unsavedLeaveTitle')}
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-6 text-[#737373]">
+                {t('ganttEditor.unsavedLeave')}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="px-6 pb-6 pt-4">
+            <p className="rounded-2xl border border-[#F3E1E1] bg-[#FFF8F8] px-4 py-3 text-sm leading-6 text-[#6B5757]">
+              {t('ganttEditor.unsavedLeaveDescription')}
+            </p>
+
+            <DialogFooter className="mt-5 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowUnsavedLeaveDialog(false)}
+                className="btn-secondary"
+              >
+                {t('manager.keepEditing')}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmLeaveWithoutSaving}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <HugeiconsIcon icon={backIcon} className="h-4 w-4" />
+                {t('ganttEditor.leaveWithoutSaving')}
+              </button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showEmptyTaskNameDialog}
+        onOpenChange={(open) => {
+          setShowEmptyTaskNameDialog(open);
+          if (!open) {
+            setEmptyTaskNameWarningCount(0);
+          }
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className="overflow-hidden border-[#F4D9D9] bg-white p-0 shadow-[0_28px_80px_rgba(23,23,23,0.18)] sm:max-w-md"
+        >
+          <div className="border-b border-[#F7DEDE] bg-[linear-gradient(180deg,#FFF6F6_0%,#FFFFFF_100%)] px-6 py-5">
+            <div className="inline-flex rounded-full bg-[#D93A3A]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#D93A3A]">
+              {formatNumber(emptyTaskNameWarningCount)}
+            </div>
+            <DialogHeader className="mt-4 text-start sm:text-start">
+              <DialogTitle className="text-xl font-semibold text-[#171717]">
+                {t('ganttEditor.emptyTaskNameTitle')}
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-6 text-[#737373]">
+                {t('ganttEditor.emptyTaskNameConfirm', { count: formatNumber(emptyTaskNameWarningCount) })}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="px-6 pb-6 pt-4">
+            <p className="rounded-2xl border border-[#F3E1E1] bg-[#FFF8F8] px-4 py-3 text-sm leading-6 text-[#6B5757]">
+              {t('ganttEditor.emptyTaskNameDescription')}
+            </p>
+
+            <DialogFooter className="mt-5 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmptyTaskNameDialog(false);
+                  setEmptyTaskNameWarningCount(0);
+                }}
+                className="btn-secondary"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={persistDraftGantt}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <HugeiconsIcon icon={Tick01Icon} className="h-4 w-4" />
+                {t('ganttEditor.saveAnyway')}
+              </button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showResourcesDialog} onOpenChange={setShowResourcesDialog}>
         <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
@@ -1948,8 +2095,10 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                                       <input
                                         type="text"
                                         data-gantt-task-name-input="true"
+                                        dir="auto"
                                         value={task.name}
                                         onChange={(event) => updateTask(task.id, { name: event.target.value })}
+                                        onKeyDownCapture={(event) => event.stopPropagation()}
                                         className={`h-full w-full border-transparent bg-transparent px-0 py-1 text-sm focus:border-[#D93A3A] focus:bg-white ${
                                           hierarchyItem?.hasChildren
                                             ? 'font-semibold text-[#171717]'
@@ -1969,9 +2118,14 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                                   <div className="border-r border-[#EEF2F6] px-2 py-2">
                                     <input
                                       type="number"
-                                      min={1}
+                                      min={task.milestone ? 0 : 1}
                                       value={task.durationDays}
-                                      onChange={(event) => updateTask(task.id, { durationDays: Math.max(1, Number.parseInt(event.target.value, 10) || 1) })}
+                                      disabled={task.milestone}
+                                      onChange={(event) => updateTask(task.id, {
+                                        durationDays: task.milestone
+                                          ? 0
+                                          : Math.max(1, Number.parseInt(event.target.value, 10) || 1),
+                                      })}
                                       className="h-full w-full px-2 py-1 text-sm"
                                     />
                                   </div>
@@ -2026,7 +2180,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                                             checked={task.milestone}
                                             onChange={(event) => updateTask(task.id, {
                                               milestone: event.target.checked,
-                                              durationDays: event.target.checked ? 1 : task.durationDays,
+                                              durationDays: event.target.checked ? 0 : Math.max(1, task.durationDays),
                                             })}
                                             className="h-4 w-4 rounded border-[#D8CCB7]"
                                           />

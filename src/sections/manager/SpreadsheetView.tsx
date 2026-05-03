@@ -14,7 +14,7 @@ import { useProjects } from '@/hooks/useProjects';
 import { cn } from '@/lib/utils';
 import type { Project } from '@/types/project';
 import type { GanttTask, GanttRole, GanttResource, ProjectGantt, GanttTaskStatus, GanttRoleBillingPeriod, GanttCurrency } from '@/types/gantt';
-import { getTimelineRange, getTaskProgress, createTaskId, createResourceId, createRoleId, getNextResourceColor, normalizeTask } from '@/lib/gantt';
+import { getTimelineRange, getTaskProgress, getTaskSpanDays, createTaskId, createResourceId, createRoleId, getNextResourceColor, normalizeTask } from '@/lib/gantt';
 
 // ─── Import Parse Helpers ─────────────────────────────────────────────────────
 
@@ -150,10 +150,9 @@ function goalProgress(tasks: GanttTask[], ms: GanttTask): number {
   const msDate = parseISO(ms.startDate);
   const preceding = tasks.filter(t => t.id !== ms.id && !t.milestone && parseISO(t.endDate) <= msDate);
   const all = [...preceding, ms];
-  const span = (t: GanttTask) => (t.milestone ? 1 : Math.max(1, t.durationDays));
-  const total = all.reduce((s, t) => s + span(t), 0);
+  const total = all.reduce((s, t) => s + getTaskSpanDays(t), 0);
   if (total === 0) return 0;
-  return Math.round(all.reduce((s, t) => s + (span(t) * getTaskProgress(t)) / 100, 0) / total * 100);
+  return Math.round(all.reduce((s, t) => s + (getTaskSpanDays(t) * getTaskProgress(t)) / 100, 0) / total * 100);
 }
 
 function goalStatus(tasks: GanttTask[], ms: GanttTask): GoalStatus {

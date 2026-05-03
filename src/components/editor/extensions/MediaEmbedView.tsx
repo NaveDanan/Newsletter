@@ -60,6 +60,7 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
   const pptxHostRef = useRef<HTMLDivElement | null>(null);
   const pptxViewerRef = useRef<PptxViewerInstance | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const previewShellRef = useRef<HTMLDivElement | null>(null);
   const mediaFrameRef = useRef<HTMLDivElement | null>(null);
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const dragStartRef = useRef({ x: 0, y: 0 });
@@ -75,6 +76,7 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
   const [isDragging, setIsDragging] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [isPptxPreviewFullscreen, setIsPptxPreviewFullscreen] = useState(false);
   const widthRef = useRef(widthAttr);
   const heightRef = useRef(heightAttr);
   const textWrapRef = useRef<MediaEmbedTextWrap>(textWrapAttr);
@@ -177,6 +179,22 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
       pptxViewerRef.current = null;
     };
   }, [mediaType, previewUrls.length, src, t]);
+
+  useEffect(() => {
+    if (mediaType !== 'pptx' || previewUrls.length === 0) {
+      return;
+    }
+
+    const handleFullscreenChange = () => {
+      setIsPptxPreviewFullscreen(document.fullscreenElement === previewShellRef.current);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [mediaType, previewUrls.length]);
 
   const handleWrapChange = useCallback((nextWrap: MediaEmbedTextWrap) => {
     textWrapRef.current = nextWrap;
@@ -318,7 +336,7 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
   }, [commitAttributes]);
 
   const handlePptxPreviewFullscreen = useCallback(() => {
-    const target = mediaFrameRef.current;
+    const target = previewShellRef.current;
     if (!target) {
       return;
     }
@@ -336,11 +354,42 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
   }
 
   if (interactiveMedia) {
+    const isPptxPreviewMode = mediaType === 'pptx' && previewUrls.length > 0;
+    const previewCardFullscreen = isPptxPreviewMode && isPptxPreviewFullscreen;
     const frameStyle: React.CSSProperties = height
       ? { height }
       : mediaType === 'video'
         ? { aspectRatio: '16 / 9' }
         : { height: getDefaultMediaHeight(mediaType) ?? undefined };
+    const previewFrameStyle: React.CSSProperties = previewCardFullscreen
+      ? {
+          ...frameStyle,
+          flex: '1 1 auto',
+          height: 'auto',
+          minHeight: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '28px 28px 20px',
+          boxSizing: 'border-box',
+          background: '#0F1115',
+        }
+      : frameStyle;
+    const previewControlsClass = previewCardFullscreen
+      ? 'flex flex-wrap items-center justify-between gap-3 bg-[#0F1115] px-4 py-4'
+      : 'flex items-center justify-between gap-2 border-t border-[#F0F0F0] px-2 py-1';
+    const previewNavButtonClass = previewCardFullscreen
+      ? 'rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs font-medium text-[#F5F5F5] disabled:cursor-not-allowed disabled:opacity-45'
+      : 'rounded-md border border-[#E5E5E5] bg-transparent px-2 py-1 text-xs font-medium text-[#525252] disabled:cursor-not-allowed disabled:opacity-45';
+    const previewCounterClass = previewCardFullscreen
+      ? 'text-xs font-medium text-[#F5F5F5]'
+      : 'text-xs font-medium text-[#525252]';
+    const previewLinkClass = previewCardFullscreen
+      ? 'text-xs font-medium text-[#F87171] hover:text-[#FCA5A5]'
+      : 'text-xs font-medium text-[#525252] hover:text-[#D93A3A]';
+    const previewFullscreenButtonClass = previewCardFullscreen
+      ? 'rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-medium text-[#F5F5F5] transition-colors hover:border-[#F87171] hover:text-[#FCA5A5]'
+      : 'rounded-md border border-[#E5E5E5] bg-transparent px-2.5 py-1 text-xs font-medium text-[#525252] transition-colors hover:border-[#D93A3A] hover:text-[#D93A3A]';
 
     return (
       <NodeViewWrapper
@@ -419,7 +468,8 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
           )}
 
           <div
-            className={`overflow-hidden rounded-xl border-2 bg-white transition-colors ${selected ? 'border-[#D93A3A]' : 'border-[#E5E5E5]'}`}
+            ref={previewShellRef}
+            className={`overflow-hidden transition-colors ${previewCardFullscreen ? 'flex h-full flex-col rounded-none border-0 bg-[#0F1115]' : `rounded-xl border-2 bg-white ${selected ? 'border-[#D93A3A]' : 'border-[#E5E5E5]'}`}`}
           >
             <div className="flex min-w-0 items-center gap-2 border-b border-[#E5E5E5] bg-[#FAFAFA] px-3 py-2">
               <HugeiconsIcon icon={Icon} className="h-4 w-4 shrink-0 text-[#737373]" />
@@ -429,10 +479,10 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
               ) : null}
             </div>
 
-            <div ref={mediaFrameRef} className="bg-white" style={frameStyle}>
+            <div ref={mediaFrameRef} className={previewCardFullscreen ? 'bg-[#0F1115]' : 'bg-white'} style={previewFrameStyle}>
               {mediaType === 'pptx' ? (
                 previewUrls.length > 0 ? (
-                  <div className="flex h-full w-full items-center justify-center bg-white">
+                  <div className={`flex h-full w-full items-center justify-center ${previewCardFullscreen ? 'bg-[#0F1115]' : 'bg-white'}`}>
                     <img
                       src={previewUrls[activeSlide]}
                       alt={title ?? `PowerPoint slide ${activeSlide + 1}`}
@@ -460,27 +510,27 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
               )}
             </div>
             {mediaType === 'pptx' ? (
-              <div className="flex items-center justify-between gap-2 border-t border-[#F0F0F0] px-2 py-1">
+              <div className={previewControlsClass}>
                 {previewUrls.length > 0 ? (
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setCurrentSlide(Math.max(0, activeSlide - 1))}
                       disabled={activeSlide <= 0}
-                      className="rounded-md border border-[#E5E5E5] bg-transparent px-2 py-1 text-xs font-medium text-[#525252] disabled:cursor-not-allowed disabled:opacity-45"
+                      className={previewNavButtonClass}
                     >
-                      Prev
+                      {t('editor.previous')}
                     </button>
-                    <span className="text-xs font-medium text-[#525252]">
+                    <span className={previewCounterClass}>
                       {activeSlide + 1} / {previewUrls.length}
                     </span>
                     <button
                       type="button"
                       onClick={() => setCurrentSlide(Math.min(previewUrls.length - 1, activeSlide + 1))}
                       disabled={activeSlide >= previewUrls.length - 1}
-                      className="rounded-md border border-[#E5E5E5] bg-transparent px-2 py-1 text-xs font-medium text-[#525252] disabled:cursor-not-allowed disabled:opacity-45"
+                      className={previewNavButtonClass}
                     >
-                      Next
+                      {t('editor.next')}
                     </button>
                   </div>
                 ) : (
@@ -493,16 +543,16 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
                     href={src}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs font-medium text-[#525252] hover:text-[#D93A3A]"
+                    className={previewLinkClass}
                   >
                     {t('editor.downloadPresentation')}
                   </a>
                   <button
                     type="button"
                     onClick={previewUrls.length > 0 ? handlePptxPreviewFullscreen : () => void pptxViewerRef.current?.toggleFullscreen()}
-                    className="rounded-md border border-[#E5E5E5] bg-transparent px-2.5 py-1 text-xs font-medium text-[#525252] transition-colors hover:border-[#D93A3A] hover:text-[#D93A3A]"
+                    className={previewFullscreenButtonClass}
                   >
-                    {t('editor.fullscreenLabel')}
+                    {previewCardFullscreen ? t('editor.exitFullscreenLabel') : t('editor.fullscreenLabel')}
                   </button>
                 </div>
               </div>

@@ -74,17 +74,29 @@ export function NewsletterContent({ html, className, dir = 'auto' }: NewsletterC
         const downloadLink = wrapper.querySelector<HTMLAnchorElement>('[data-pptx-download="true"]');
 
         if (src && previewUrls.length > 0) {
+          const viewer = wrapper.querySelector<HTMLElement>('[data-pptx-preview-viewer="true"]');
           const frame = wrapper.querySelector<HTMLElement>('[data-pptx-preview-frame="true"]');
           const image = wrapper.querySelector<HTMLImageElement>('[data-pptx-preview-image="true"]');
+          const controls = wrapper.querySelector<HTMLElement>('[data-pptx-preview-controls="true"]');
           const previous = wrapper.querySelector<HTMLButtonElement>('[data-pptx-preview-prev="true"]');
           const next = wrapper.querySelector<HTMLButtonElement>('[data-pptx-preview-next="true"]');
           const counter = wrapper.querySelector<HTMLElement>('[data-pptx-preview-counter="true"]');
           const fullscreen = wrapper.querySelector<HTMLButtonElement>('[data-pptx-preview-fullscreen="true"]');
           const previewDownload = wrapper.querySelector<HTMLAnchorElement>('[data-pptx-download="true"]');
 
-          if (!frame || !image || !previous || !next || !counter || !fullscreen) {
+          if (!viewer || !frame || !image || !controls || !previous || !next || !counter || !fullscreen) {
             continue;
           }
+
+          const viewerStyle = viewer.getAttribute('style') ?? '';
+          const frameStyle = frame.getAttribute('style') ?? '';
+          const controlsStyle = controls.getAttribute('style') ?? '';
+          const imageStyle = image.getAttribute('style') ?? '';
+          const previousStyle = previous.getAttribute('style') ?? '';
+          const nextStyle = next.getAttribute('style') ?? '';
+          const counterStyle = counter.getAttribute('style') ?? '';
+          const fullscreenStyle = fullscreen.getAttribute('style') ?? '';
+          const previewDownloadStyle = previewDownload?.getAttribute('style') ?? '';
 
           let currentSlide = 0;
           const updateSlide = () => {
@@ -93,6 +105,42 @@ export function NewsletterContent({ html, className, dir = 'auto' }: NewsletterC
             counter.textContent = `${currentSlide + 1} / ${previewUrls.length}`;
             previous.disabled = currentSlide <= 0;
             next.disabled = currentSlide >= previewUrls.length - 1;
+          };
+          const applyFullscreenState = () => {
+            const isFullscreen = document.fullscreenElement === viewer;
+
+            viewer.style.cssText = isFullscreen
+              ? `${viewerStyle};display:flex;flex-direction:column;width:100vw;height:100vh;max-width:none;border-radius:0;box-sizing:border-box;background:#0F1115;`
+              : viewerStyle;
+            frame.style.cssText = isFullscreen
+              ? `${frameStyle};display:flex;flex:1 1 auto;min-height:0;height:auto;align-items:center;justify-content:center;padding:28px 28px 20px;box-sizing:border-box;background:#0F1115;`
+              : frameStyle;
+            controls.style.cssText = isFullscreen
+              ? `${controlsStyle};flex:0 0 auto;flex-wrap:wrap;gap:12px;padding:10px 14px 18px;background:#0F1115;border-top:0;`
+              : controlsStyle;
+            image.style.cssText = isFullscreen
+              ? `${imageStyle};max-height:100%;`
+              : imageStyle;
+            previous.style.cssText = isFullscreen
+              ? `${previousStyle};border-color:rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#F5F5F5;`
+              : previousStyle;
+            next.style.cssText = isFullscreen
+              ? `${nextStyle};border-color:rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#F5F5F5;`
+              : nextStyle;
+            counter.style.cssText = isFullscreen
+              ? `${counterStyle};color:#F5F5F5;`
+              : counterStyle;
+            fullscreen.style.cssText = isFullscreen
+              ? `${fullscreenStyle};border-color:rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#F5F5F5;`
+              : fullscreenStyle;
+            if (previewDownload) {
+              previewDownload.style.cssText = isFullscreen
+                ? `${previewDownloadStyle};color:#F87171;text-decoration:none;`
+                : previewDownloadStyle;
+            }
+            fullscreen.textContent = isFullscreen
+              ? t('editor.exitFullscreenLabel')
+              : t('editor.fullscreenLabel');
           };
           const handlePrevious = () => {
             currentSlide = Math.max(0, currentSlide - 1);
@@ -103,22 +151,26 @@ export function NewsletterContent({ html, className, dir = 'auto' }: NewsletterC
             updateSlide();
           };
           const handleFullscreen = () => {
-            if (document.fullscreenElement === frame) {
+            if (document.fullscreenElement === viewer) {
               void document.exitFullscreen();
               return;
             }
-            void frame.requestFullscreen();
+            void viewer.requestFullscreen();
+          };
+          const handleFullscreenChange = () => {
+            applyFullscreenState();
           };
 
-          previous.textContent = 'Prev';
-          next.textContent = 'Next';
-          fullscreen.textContent = t('editor.fullscreenLabel');
+          previous.textContent = t('editor.previous');
+          next.textContent = t('editor.next');
           if (previewDownload) {
             previewDownload.textContent = t('editor.downloadPresentation');
           }
           previous.addEventListener('click', handlePrevious);
           next.addEventListener('click', handleNext);
           fullscreen.addEventListener('click', handleFullscreen);
+          document.addEventListener('fullscreenchange', handleFullscreenChange);
+          applyFullscreenState();
           updateSlide();
 
           bindings.push({
@@ -131,6 +183,7 @@ export function NewsletterContent({ html, className, dir = 'auto' }: NewsletterC
                 previous.removeEventListener('click', handlePrevious);
                 next.removeEventListener('click', handleNext);
                 fullscreen.removeEventListener('click', handleFullscreen);
+                document.removeEventListener('fullscreenchange', handleFullscreenChange);
               },
             },
           });

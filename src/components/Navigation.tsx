@@ -58,8 +58,8 @@ export function Navigation({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { dropdowns, links: navigationLinks } = useNavigationData();
 
-  const visibleDropdowns = useMemo(() => {
-    const items = dropdowns.filter((dd) => !dd.hidden);
+  const resolvedDropdowns = useMemo(() => {
+    const items = [...dropdowns];
     const itemIds = new Set(items.map((dd) => dd.id));
     const itemLabels = new Set(items.map((dd) => normalizeDropdownLabel(dd.label)));
 
@@ -72,21 +72,28 @@ export function Navigation({
     return items.sort((a, b) => a.order - b.order);
   }, [dropdowns]);
 
+  const visibleDropdowns = useMemo(
+    () => resolvedDropdowns.filter((dropdown) => !dropdown.hidden),
+    [resolvedDropdowns],
+  );
+
   const fallbackDropdownId = visibleDropdowns.find((dd) => dd.id === DEFAULT_DROPDOWN_IDS.resources)?.id
     ?? visibleDropdowns[0]?.id
     ?? DEFAULT_DROPDOWN_IDS.resources;
 
   const resolvedLinksByDropdownId = useMemo(() => {
-    const dropdownIds = new Set(visibleDropdowns.map((dd) => dd.id));
-    const builtinDropdownTargets = new Map<string, string>();
+    const resolvedDropdownsById = new Map(resolvedDropdowns.map((dropdown) => [dropdown.id, dropdown]));
+    const builtinDropdownTargets = new Map<string, { id: string; hidden: boolean }>();
     const groupedLinks = new Map<string, typeof navigationLinks>();
 
     for (const dropdown of visibleDropdowns) {
       groupedLinks.set(dropdown.id, []);
+    }
 
+    for (const dropdown of resolvedDropdowns) {
       const builtinId = resolveBuiltinDropdownId(dropdown.id, dropdown.label);
       if (builtinId && !builtinDropdownTargets.has(builtinId)) {
-        builtinDropdownTargets.set(builtinId, dropdown.id);
+        builtinDropdownTargets.set(builtinId, { id: dropdown.id, hidden: dropdown.hidden });
       }
     }
 
@@ -95,10 +102,35 @@ export function Navigation({
         continue;
       }
 
-      const resolvedDropdownId = dropdownIds.has(link.dropdownId)
-        ? link.dropdownId
-        : builtinDropdownTargets.get(link.dropdownId)
-          ?? fallbackDropdownId;
+      const directDropdown = resolvedDropdownsById.get(link.dropdownId);
+      if (directDropdown) {
+        if (directDropdown.hidden) {
+          continue;
+        }
+
+        const bucket = groupedLinks.get(directDropdown.id);
+        if (bucket) {
+          bucket.push(link);
+        }
+
+        continue;
+      }
+
+      const builtinTarget = builtinDropdownTargets.get(link.dropdownId);
+      if (builtinTarget) {
+        if (builtinTarget.hidden) {
+          continue;
+        }
+
+        const bucket = groupedLinks.get(builtinTarget.id);
+        if (bucket) {
+          bucket.push(link);
+        }
+
+        continue;
+      }
+
+      const resolvedDropdownId = fallbackDropdownId;
       const bucket = groupedLinks.get(resolvedDropdownId);
       if (!bucket) {
         groupedLinks.set(resolvedDropdownId, [link]);
@@ -113,7 +145,7 @@ export function Navigation({
     }
 
     return groupedLinks;
-  }, [fallbackDropdownId, navigationLinks, visibleDropdowns]);
+  }, [fallbackDropdownId, navigationLinks, resolvedDropdowns, visibleDropdowns]);
 
   const accountMenuItem = isAuthenticated
     ? {

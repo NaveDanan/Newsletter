@@ -7,6 +7,7 @@ interface NavigationDataContextType {
   // Dropdowns
   dropdowns: NavigationDropdown[];
   dropdownsLoading: boolean;
+  dropdownError: string | null;
   dropdownStorageMode: DropdownStorageMode;
   addDropdown: (data: NavigationDropdownFormData) => Promise<NavigationDropdown>;
   updateDropdown: (id: string, data: Partial<NavigationDropdownFormData & { hidden: boolean; order: number }>) => Promise<void>;
@@ -29,6 +30,7 @@ export function NavigationDataProvider({ children }: { children: React.ReactNode
   const {
     dropdowns,
     isLoading: dropdownsLoading,
+    error: dropdownError,
     storageMode: dropdownStorageMode,
     addDropdown,
     updateDropdown,
@@ -52,6 +54,7 @@ export function NavigationDataProvider({ children }: { children: React.ReactNode
       value={{
         dropdowns,
         dropdownsLoading,
+        dropdownError,
         dropdownStorageMode,
         addDropdown,
         updateDropdown,
@@ -72,6 +75,7 @@ export function NavigationDataProvider({ children }: { children: React.ReactNode
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNavigationData(): NavigationDataContextType {
   const ctx = useContext(NavigationDataContext);
   if (!ctx) {

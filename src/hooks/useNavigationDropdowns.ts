@@ -15,35 +15,36 @@ import type { NavigationDropdown, NavigationDropdownFormData } from '@/types/nav
 
 export type DropdownStorageMode = 'pocketbase' | 'local';
 
+function toErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 export function useNavigationDropdowns() {
   const [dropdowns, setDropdowns] = useState<NavigationDropdown[]>(() => readStoredDropdowns());
   const [storageMode, setStorageMode] = useState<DropdownStorageMode>('pocketbase');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // On mount, try to load from PocketBase
   useEffect(() => {
     let cancelled = false;
 
-    setIsLoading(true);
     pbFetchDropdowns()
       .then((data) => {
         if (cancelled) return;
-        // If the collection is empty, fall back to local defaults instead of
-        // attempting to seed PocketBase from the client. Client-side seeding
-        // can fail on environments where the current user cannot create these
-        // admin-only records yet.
-        if (data.length === 0) {
-          setDropdowns(readStoredDropdowns());
-          setStorageMode('local');
-        } else {
-          setDropdowns(data);
-          setStorageMode('pocketbase');
-        }
+        setDropdowns(data);
+        setStorageMode('pocketbase');
+        setError(null);
       })
-      .catch(() => {
+      .catch((fetchError: unknown) => {
         if (cancelled) return;
         setDropdowns(readStoredDropdowns());
         setStorageMode('local');
+        setError(toErrorMessage(fetchError, 'Failed to load shared navigation dropdowns'));
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -58,6 +59,7 @@ export function useNavigationDropdowns() {
       writeStoredDropdowns(next);
       return next;
     });
+    setStorageMode('local');
   }, []);
 
   const addDropdown = useCallback(async (data: NavigationDropdownFormData): Promise<NavigationDropdown> => {
@@ -66,9 +68,15 @@ export function useNavigationDropdowns() {
       try {
         const created = await pbCreateDropdown({ ...data, order: maxOrder + 1 });
         setDropdowns((prev) => [...prev, created]);
+        setError(null);
         return created;
-      } catch { /* fall through */ }
+      } catch (createError: unknown) {
+        const message = toErrorMessage(createError, 'Failed to create shared navigation dropdown');
+        setError(message);
+        throw createError instanceof Error ? createError : new Error(message);
+      }
     }
+
     const created = createDropdownRecord(data, { order: maxOrder + 1 });
     persistLocal((prev) => [...prev, created]);
     return created;
@@ -79,9 +87,15 @@ export function useNavigationDropdowns() {
       try {
         const updated = await pbUpdateDropdown(id, data);
         setDropdowns((prev) => prev.map((d) => (d.id === id ? updated : d)));
+        setError(null);
         return;
-      } catch { /* fall through */ }
+      } catch (updateError: unknown) {
+        const message = toErrorMessage(updateError, 'Failed to update shared navigation dropdown');
+        setError(message);
+        throw updateError instanceof Error ? updateError : new Error(message);
+      }
     }
+
     persistLocal((prev) => prev.map((d) => {
       if (d.id !== id) return d;
       return {
@@ -99,9 +113,15 @@ export function useNavigationDropdowns() {
       try {
         await pbDeleteDropdown(id);
         setDropdowns((prev) => prev.filter((d) => d.id !== id));
+        setError(null);
         return;
-      } catch { /* fall through */ }
+      } catch (deleteError: unknown) {
+        const message = toErrorMessage(deleteError, 'Failed to delete shared navigation dropdown');
+        setError(message);
+        throw deleteError instanceof Error ? deleteError : new Error(message);
+      }
     }
+
     persistLocal((prev) => prev.filter((d) => d.id !== id));
   }, [persistLocal, storageMode]);
 
@@ -123,9 +143,15 @@ export function useNavigationDropdowns() {
             return d ? { ...d, order: i } : null;
           }).filter(Boolean) as NavigationDropdown[];
         });
+        setError(null);
         return;
-      } catch { /* fall through */ }
+      } catch (reorderError: unknown) {
+        const message = toErrorMessage(reorderError, 'Failed to reorder shared navigation dropdowns');
+        setError(message);
+        throw reorderError instanceof Error ? reorderError : new Error(message);
+      }
     }
+
     persistLocal((prev) => {
       const map = new Map(prev.map((d) => [d.id, d]));
       return ids.map((id, i) => {
@@ -138,6 +164,7 @@ export function useNavigationDropdowns() {
   return {
     dropdowns: [...dropdowns].sort((a, b) => a.order - b.order),
     isLoading,
+    error,
     storageMode,
     addDropdown,
     updateDropdown,

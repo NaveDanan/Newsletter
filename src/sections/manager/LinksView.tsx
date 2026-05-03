@@ -68,6 +68,8 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
   const { t } = useLocale();
   const {
     dropdowns,
+    dropdownError,
+    dropdownStorageMode,
     addDropdown,
     updateDropdown,
     removeDropdown,
@@ -75,11 +77,15 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
     reorderDropdowns,
     links,
     linksLoading: isLoading,
-    linksStorageMode: storageMode,
+    linksError,
+    linksStorageMode,
     addLink,
     updateLink,
     deleteLink,
   } = useNavigationData();
+
+  const isUsingLocalFallback = dropdownStorageMode === 'local' || linksStorageMode === 'local';
+  const navigationSyncError = dropdownError ?? linksError;
 
   // Link dialog state
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
@@ -135,25 +141,39 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
       toast.error(t('linksPage.dropdownLabelRequired'));
       return;
     }
-    if (editingDropdown) {
-      await updateDropdown(editingDropdown.id, dropdownDraft);
-      toast.success(t('linksPage.dropdownUpdated'));
-    } else {
-      await addDropdown(dropdownDraft);
-      toast.success(t('linksPage.dropdownCreated'));
+
+    try {
+      if (editingDropdown) {
+        await updateDropdown(editingDropdown.id, dropdownDraft);
+        toast.success(t('linksPage.dropdownUpdated'));
+      } else {
+        await addDropdown(dropdownDraft);
+        toast.success(t('linksPage.dropdownCreated'));
+      }
+
+      setIsDropdownDialogOpen(false);
+      setEditingDropdown(null);
+      setDropdownDraft(emptyDropdownForm);
+    } catch {
+      toast.error(t('common.tryAgain'));
     }
-    setIsDropdownDialogOpen(false);
   };
 
   const handleDeleteDropdown = async (dd: NavigationDropdown) => {
     if (!window.confirm(t('linksPage.confirmDeleteDropdown', { name: dd.label }))) return;
-    // Delete all links in this dropdown first
-    const ddLinks = linksByDropdown.get(dd.id) ?? [];
-    for (const link of ddLinks) {
-      await deleteLink(link.id);
+
+    try {
+      // Delete all links in this dropdown first
+      const ddLinks = linksByDropdown.get(dd.id) ?? [];
+      for (const link of ddLinks) {
+        await deleteLink(link.id);
+      }
+
+      await removeDropdown(dd.id);
+      toast.success(t('linksPage.dropdownDeleted'));
+    } catch {
+      toast.error(t('common.tryAgain'));
     }
-    await removeDropdown(dd.id);
-    toast.success(t('linksPage.dropdownDeleted'));
   };
 
   const handleMoveDropdown = async (dd: NavigationDropdown, direction: -1 | 1) => {
@@ -163,7 +183,20 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
     if (targetIdx < 0 || targetIdx >= sorted.length) return;
     const ids = sorted.map((d) => d.id);
     [ids[idx], ids[targetIdx]] = [ids[targetIdx], ids[idx]];
-    await reorderDropdowns(ids);
+
+    try {
+      await reorderDropdowns(ids);
+    } catch {
+      toast.error(t('common.tryAgain'));
+    }
+  };
+
+  const handleToggleDropdownVisibility = async (dd: NavigationDropdown) => {
+    try {
+      await toggleDropdownVisibility(dd.id);
+    } catch {
+      toast.error(t('common.tryAgain'));
+    }
   };
 
   // --- Link CRUD ---
@@ -259,12 +292,21 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
         <p className="mt-1 text-sm text-[#737373]">{t('linksPage.description')}</p>
       </div>
 
-      {storageMode === 'local' ? (
+      {isUsingLocalFallback ? (
         <Alert className="border border-[#F5D0D0] bg-[#FFF7F7] text-[#171717]">
           <HugeiconsIcon icon={Image01Icon} className="h-4 w-4 text-[#D93A3A]" />
           <AlertTitle className="text-[#171717]">{t('managerLinks.savedLocallyTitle')}</AlertTitle>
           <AlertDescription className="text-[#737373]">
             {t('managerLinks.savedLocallyDescription')}
+          </AlertDescription>
+        </Alert>
+      ) : navigationSyncError ? (
+        <Alert variant="destructive" className="border border-[#F5D0D0] bg-[#FFF7F7] text-[#171717]">
+          <HugeiconsIcon icon={Image01Icon} className="h-4 w-4 text-[#D93A3A]" />
+          <AlertTitle className="text-[#171717]">{t('managerLinks.sharedSyncFailedTitle')}</AlertTitle>
+          <AlertDescription className="text-[#737373]">
+            <p>{t('managerLinks.sharedSyncFailedDescription')}</p>
+            <p className="break-words text-xs">{navigationSyncError}</p>
           </AlertDescription>
         </Alert>
       ) : null}
@@ -319,7 +361,7 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
                     <HugeiconsIcon icon={ArrowDown01Icon} className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={() => toggleDropdownVisibility(dd.id)}
+                    onClick={() => handleToggleDropdownVisibility(dd)}
                     className="rounded-lg p-1.5 text-[#737373] transition-colors hover:bg-[#F3F4F6] hover:text-[#171717]"
                     title={dd.hidden ? t('linksPage.showDropdown') : t('linksPage.hideDropdown')}
                   >

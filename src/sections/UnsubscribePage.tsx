@@ -1,7 +1,7 @@
 import { LoaderCircle, MailMinus, TriangleAlert } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLocale } from '@/contexts/LocaleContext';
 import { unsubscribeFromNewsletter } from '@/lib/pocketbase/subscribers';
 import { cn } from '@/lib/utils';

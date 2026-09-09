@@ -51,6 +51,10 @@ RUN printf '%s\n' \
       tini \
       ttf-dejavu
 
+RUN apk add --no-cache imagemagick imagemagick-heic imagemagick-jp2 \
+      imagemagick-jpeg imagemagick-jxl imagemagick-openexr \
+      imagemagick-svg imagemagick-tiff imagemagick-webp
+
 COPY --from=runtime-deps /app/node_modules ./node_modules
 COPY package.json ./package.json
 COPY scripts ./scripts

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<policymap>
+  <policy domain="resource" name="memory" value="128MiB"/>
+  <policy domain="resource" name="map" value="0"/>
+  <policy domain="resource" name="disk" value="0"/>
+  <policy domain="resource" name="width" value="16KP"/>
+  <policy domain="resource" name="height" value="16KP"/>
+  <policy domain="resource" name="list-length" value="32"/>
+  <policy domain="resource" name="thread" value="2"/>
+  <policy domain="resource" name="time" value="15"/>
+  <policy domain="delegate" rights="none" pattern="*"/>
+  <policy domain="filter" rights="none" pattern="*"/>
+  <policy domain="path" rights="none" pattern="*"/>
+  <policy domain="path" rights="read|write" pattern="-"/>
+  <policy domain="path" rights="read|write" pattern="*newsletter-image-*/*"/>
+  <policy domain="coder" rights="none" pattern="*"/>
+  <policy domain="coder" rights="read" pattern="{AVIF,HEIC,HEIF,BMP,BMP2,BMP3,DIB,TIFF,TIFF64,SVG,MSVG,RSVG,ICO,ICON,CUR,PSD,PSB,TGA,PCX,DCX,PNM,PBM,PGM,PPM,PAM,PFM,JP2,J2K,JPC,JXL,EXR,HDR,RGBE,WBMP,XBM,XPM,WMF,EMF,GIF,JPEG,JPG,WEBP}"/>
+  <policy domain="coder" rights="read|write" pattern="{PNG,PNG8,PNG24,PNG32,PNG48,PNG64}"/>
+</policymap>

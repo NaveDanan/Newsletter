@@ -8,6 +8,15 @@ import { repairImportedPublicationDate, sourcePublicationDate } from '../../scri
 
 const image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j1xoAAAAASUVORK5CYII=';
 const p = (text, style = '', props = '') => `<w:p><w:pPr>${style ? `<w:pStyle w:val="${style}"/>` : ''}${props}</w:pPr><w:r><w:t>${text}</w:t></w:r></w:p>`;
+test('detects embedded image contents when Word uses a generic .image extension', async () => {
+  const zip = await JSZip.loadAsync(await fixture(p('Article') + '<w:p><w:r><w:drawing><a:blip r:embed="image1"/></w:drawing></w:r></w:p>'));
+  const rels = await zip.file('word/_rels/document.xml.rels').async('string');
+  zip.file('word/_rels/document.xml.rels', rels.replace('image.png', 'image.image'));
+  zip.file('word/media/image.image', image, { base64: true });
+  zip.remove('word/media/image.png');
+  const [article] = await parseDocx(await zip.generateAsync({ type: 'nodebuffer' }));
+  assert.equal(article.coverImage, `data:image/png;base64,${image}`);
+});
 export async function fixture(body) {
   const zip = new JSZip();
   zip.file('word/document.xml', `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><w:body>${body}</w:body></w:document>`);

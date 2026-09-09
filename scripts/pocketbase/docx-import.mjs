@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { DOMParser } from '@xmldom/xmldom';
 import path from 'node:path';
 import { sourcePublicationDate } from './import-publication-date.mjs';
+import { importImage } from './import-image.mjs';
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -40,9 +41,8 @@ export async function parseDocx(buffer, filename = 'Newsletter.docx') {
   for (const [id, rel] of relationships) {
     if (!(rel.getAttribute('Type') || '').endsWith('/image') || rel.getAttribute('TargetMode') === 'External') continue;
     const target = path.posix.normalize(path.posix.join('word', rel.getAttribute('Target')));
-    const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }[path.posix.extname(target).toLowerCase()];
-    if (!mime || !target.startsWith('word/') || !zip.file(target)) throw new Error('DOCX contains an unsupported or missing image. Use PNG, JPEG, GIF or WebP.');
-    images.set(id, `data:${mime};base64,${await zip.file(target).async('base64')}`);
+    if (!target.startsWith('word/') || !zip.file(target)) throw new Error(`DOCX image ${target} is missing. Embed the image in Word again.`);
+    images.set(id, await importImage(await zip.file(target).async('nodebuffer'), target));
   }
   function styleChain(id, seen = new Set()) {
     if (!id || seen.has(id)) return [];

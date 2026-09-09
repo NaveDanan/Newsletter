@@ -13,11 +13,11 @@ The implementation was checked against the three DOCX files in `mems-generic-loc
 - Each Heading 1 starts an article. Collection front matter before the first article is omitted.
 - If a document has multiple Title paragraphs, those are the article boundaries instead.
 - A document without those boundaries becomes one article.
-- The article heading becomes its title, without repeating it in the body. Embedded PNG, JPEG, GIF and WebP images remain inline; the first image also becomes the cover.
+- The article heading becomes its title, without repeating it in the body. Image formats are detected from their bytes, including images Word names `.image`. Embedded PNG, JPEG, GIF and WebP images remain unchanged, preserving GIF/WebP animation; the first image also becomes the cover.
 - Paragraph direction and alignment, common text styles, hyperlinks, lists and basic tables are converted into article HTML. Hebrew direction is inferred only when the paragraph has no explicit direction.
 - The observed collection markers and redundant image URL lines are omitted. A valid source publication date becomes the article's `publishedAt` date and is omitted from the body; the article header uses its existing localized date format. Image captions remain in the body. Hebrew bylines populate the author field.
 
-This is an article conversion, not a Word page-layout renderer. Floating objects are placed inline. Unsupported or missing image formats fail that file with an actionable error instead of silently losing the image.
+This is an article conversion, not a Word page-layout renderer. Floating objects are placed inline. Other image formats are decoded by ImageMagick and converted to PNG, using the first page/frame for multipage images. The container includes BMP, TIFF, ICO, PSD, TGA, JPEG 2000, AVIF/HEIC, JPEG XL, OpenEXR and SVG decoders. Decoder availability still applies; corrupt, missing or undecodable images fail the file with the image name instead of silently losing it. SVGs must be self-contained. External resources, executable delegates and filesystem reads are blocked by the conversion policy. Conversion is bounded to 15 seconds, 128 MiB of pixel memory and 20 MiB of output per image.
 
 ## Scheduling and retries
 
@@ -36,7 +36,9 @@ The normal container startup schema sync creates `newsletter_import_jobs` and `n
 Run the parser and Artifactory client tests with:
 
 ```sh
-node --test tests/scripts/scheduled-import.test.mjs
+node --test tests/scripts/scheduled-import.test.mjs tests/scripts/import-image.test.mjs
 ```
+
+For conversion tests, run with ImageMagick installed and `REQUIRE_IMAGE_CONVERTER=1`. The container bundles ImageMagick; standalone installations need it on PATH. See [ImageMagick's format list](https://imagemagick.org/formats/) and [security policy documentation](https://imagemagick.org/security-policy/).
 
 `tests/scripts/scheduled-import-api.mjs` exercises a disposable local PocketBase instance with the test accounts specified in that script. It expects the three sample collections at the worker's test Artifactory endpoint. The development verification used a local fetch substitute with the original downloaded bytes, without copying production credentials into the test instance. It checked admin authorization, token omission, settings validation, twelve drafts, repeat imports, the run lease, authentication failures and the publishing queue.

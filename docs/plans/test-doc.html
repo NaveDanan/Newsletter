@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Documentation Wiki</title>
+  <link rel="icon" type="image/gif" href="../../public/logo.gif" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Red/Coral Theme - aligned with app */
+      --red-primary: #D93A3A;
+      --red-dark: #B91C1C;
+      --red-light: #FCA5A5;
+      --red-soft: #FEF2F2;
+      --bg-primary: #F9FAFB;
+      --bg-content: #FFFFFF;
+      --text-primary: #111827;
+      --text-secondary: #4B5563;
+      --text-muted: #9CA3AF;
+      --border-color: #E5E7EB;
+      --code-bg: #F3F4F6;
+      --accent: #D93A3A;
+      --accent-hover: #B91C1C;
+      --sidebar-width: 300px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-secondary);
+      display: flex;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Sidebar Layout */
+    aside {
+      width: var(--sidebar-width);
+      background-color: var(--bg-content);
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      overflow-y: auto;
+      padding: 2rem 1.5rem;
+      border-right: 1px solid var(--border-color);
+      z-index: 10;
+    }
+
+    /* Brand / Logo */
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .brand img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+    }
+
+    .brand .brand-name {
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .brand .brand-name span {
+      color: var(--red-primary);
+    }
+
+    .nav-group {
+      margin-bottom: 2rem;
+    }
+
+    .nav-group-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      font-weight: 700;
+    }
+
+    aside ul {
+      list-style: none;
+    }
+
+    aside li {
+      margin-bottom: 0.35rem;
+    }
+
+    aside a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      transition: all 0.15s ease;
+      font-weight: 500;
+    }
+
+    aside a:hover {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    aside a.active {
+      background-color: var(--red-soft);
+      color: var(--red-dark);
+      font-weight: 600;
+    }
+
+    /* Method Badges */
+    .method {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.25rem;
+      margin-right: 0.65rem;
+      display: inline-block;
+      width: 48px;
+      text-align: center;
+      font-family: 'IBM Plex Mono', monospace;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+    }
+    .method.get { background-color: #DBEAFE; color: #1D4ED8; }
+    .method.post { background-color: #DCFCE7; color: #15803D; }
+    .method.patch { background-color: #FEF3C7; color: #B45309; }
+    .method.delete { background-color: #FEE2E2; color: #DC2626; }
+
+    /* Main Content Layout */
+    main {
+      margin-left: var(--sidebar-width);
+      flex-grow: 1;
+      padding: 3.5rem 5rem;
+      max-width: 1120px;
+    }
+
+    header {
+      margin-bottom: 3rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    h1 {
+      color: var(--text-primary);
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 1.15rem;
+      line-height: 1.5;
+    }
+
+    section {
+      background: var(--bg-content);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 2.5rem;
+      margin-bottom: 2.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.04);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    section:hover {
+      border-color: #D1D5DB;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+
+    /* Content Typography */
+    h2 {
+      color: var(--text-primary);
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      letter-spacing: -0.02em;
+    }
+
+    section[id^="newsletter-"] h2,
+    section[id*="-routes"] h2 {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    section h2 .method {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      width: 54px;
+      margin-right: 0.75rem;
+      border-radius: 6px;
+    }
+
+    p {
+      line-height: 1.625;
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+
+    ul.content-list {
+      list-style: none;
+      margin-bottom: 1.5rem;
+    }
+
+    ul.content-list li {
+      position: relative;
+      padding-left: 1.5rem;
+      margin-bottom: 0.75rem;
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    ul.content-list li::before {
+      content: "•";
+      color: var(--red-primary);
+      font-weight: bold;
+      position: absolute;
+      left: 0.5rem;
+      top: 0;
+    }
+
+    strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    a {
+      color: var(--red-primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+
+    code {
+      background-color: var(--code-bg);
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.375rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.85em;
+      color: #B91C1C;
+      font-weight: 500;
+    }
+
+    /* Code Blocks */
+    pre {
+      background: #0F172A;
+      color: #F8FAFC;
+      padding: 1.25rem 1.5rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 1rem 0 1.5rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+      border: 1px solid #1E293B;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+    }
+
+    /* System Statuses & Callouts */
+    .status-ok {
+      background-color: #DCFCE7;
+      color: #15803D;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.375rem;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      display: inline-block;
+      margin-right: 0.5rem;
+    }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      margin: 1.5rem 0;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+
+    th {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-weight: 600;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    td {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    table code {
+      white-space: nowrap;
+    }
+
+    /* Scrollbar Design */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #E5E7EB;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #D1D5DB;
+    }
+
+    /* Responsive adjustment */
+    @media (max-width: 1024px) {
+      main {
+        padding: 2.5rem 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <aside>
+    <div class="brand">
+      <img src="../../public/logo.gif" alt="AI-BREAK logo" />
+      <span class="brand-name">AI-<span>BREAK</span></span>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title">Getting Started</div>
+      <ul>
+        <li><a href="#summary" class="active">Overview & Summary</a></li>
+        <li><a href="#database">Database Compatibility</a></li>
+        <li><a href="#auth-validation">Auth & Validation</a></li>
+        <li><a href="#implementation">Implementation & Testing</a></li>
+      </ul>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title">Newsletter Endpoints</div>
+      <ul>
+        <li><a href="#newsletter-list"><span class="method get">GET</span>List All</a></li>
+        <li><a href="#newsletter-create"><span class="method post">POST</span>Create</a></li>
+        <li><a href="#newsletter-detail"><span class="method get">GET</span>Fetch One</a></li>
+        <li><a href="#newsletter-update"><span class="method patch">PATCH</span>Update</a></li>
+        <li><a href="#newsletter-delete"><span class="method delete">DEL</span>Delete</a></li>
+        <li><a href="#newsletter-actions"><span class="method post">POST</span>Status Actions</a></li>
+      </ul>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title">Project & Task Endpoints</div>
+      <ul>
+        <li><a href="#project-routes">Project Management</a></li>
+        <li><a href="#task-routes">Task Operations</a></li>
+        <li><a href="#subtask-routes">Subtask Operations</a></li>
+        <li><a href="#milestone-routes">Milestones</a></li>
+        <li><a href="#helpers">Helpers</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main>
+    <header>
+      <h1>Newsletter & Project API Documentation</h1>
+      <p class="subtitle">Developer guide and API endpoint references for custom PocketBase hook implementations.</p>
+    </header>
+
+    <section id="summary">
+      <h2>Overview & Architecture</h2>
+      <p>Welcome to the API Wiki. This documentation outlines the hook-based custom API routes added to PocketBase for managing newsletters and complex project Gantt workflows without modifying underlying collection schemas.</p>
+      <p>Select an endpoint or topic from the sidebar to view detailed parameters, validation constraints, schemas, and usage examples.</p>
+    </section>
+
+    <section id="database">
+      <h2>System Restrictions & Rules Quick-View</h2>
+      <p>All endpoints must rigidly adhere to the non-breaking database requirements rules established in the planning lifecycle:</p>
+      <ul class="content-list">
+        <li><strong>Immutable Fields:</strong> <code>projects.gantt</code> JSON structure and <code>newsletters</code> native attributes remain strictly locked.</li>
+        <li><strong>Embedded Hierarchies:</strong> Subtasks must continuously leverage the <code>indentLevel</code> metadata flags.</li>
+        <li><strong>Milestone Enforcements:</strong> Automatic assignment of <code>milestone: true</code> and forced <code>durationDays: 0</code>.</li>
+      </ul>
+    </section>
+
+    <section id="implementation">
+      <h2>Implementation & Testing</h2>
+      <p><span class="status-ok">Implemented</span> Routes are registered from <code>pb_hooks/main.pb.js</code> through <code>pb_hooks/lib/api-manager.js</code>. Frontend wrappers in <code>src/lib/pocketbase/newsletters.ts</code> and <code>src/lib/pocketbase/projects.ts</code> call the custom API routes where useful.</p>
+      <p>Verification commands run:</p>
+      <pre><code>node scripts/test-api-manager.cjs
+npm run build</code></pre>
+      <p>The helper test validates route-independent behavior: accepted statuses, rejected unknown statuses, workday task date normalization, milestone duration, subtask indentation, predecessor validation, deletion cleanup, newsletter role rules, project access rules, and project payload normalization.</p>
+    </section>
+
+    <section id="auth-validation">
+      <h2>Auth & Validation</h2>
+      <ul class="content-list">
+        <li><strong>Newsletter create:</strong> <code>author</code>, <code>manager</code>, <code>general_manager</code>, and <code>admin</code>.</li>
+        <li><strong>Newsletter edit:</strong> <code>admin</code> can edit all records; other allowed roles can edit records where <code>createdById</code> matches the authenticated user.</li>
+        <li><strong>Newsletter delete:</strong> <code>admin</code> only.</li>
+        <li><strong>Newsletter public access:</strong> unauthenticated users can list or fetch only <code>published</code> newsletters.</li>
+        <li><strong>Project access and mutation:</strong> authenticated <code>admin</code>, <code>general_manager</code>, project <code>createdBy</code>, or users listed in <code>allowedUserIds</code>.</li>
+        <li><strong>Status validation:</strong> project/task statuses are <code>pending</code>, <code>in-progress</code>, <code>completed</code>, and <code>delayed</code>; newsletter statuses are <code>draft</code> and <code>published</code>.</li>
+        <li><strong>Task validation:</strong> task dates are normalized to workdays, duration/progress values are clamped, milestones force zero duration, missing/self predecessor references are rejected, and duplicate task IDs are rejected.</li>
+      </ul>
+    </section>
+
+    <section id="newsletter-list">
+      <h2><span class="method get">GET</span>/api/newsletters</h2>
+      <p>Lists newsletters. Query params: <code>status</code>, <code>page</code>, <code>perPage</code>, and <code>sort</code>. Public callers only receive published items; authenticated authors can also see their own drafts; admins can see all.</p>
+      <pre><code>curl "$PB_URL/api/newsletters?status=published&amp;page=1&amp;perPage=20&amp;sort=-created"</code></pre>
+    </section>
+
+    <section id="newsletter-create">
+      <h2><span class="method post">POST</span>/api/newsletters</h2>
+      <p>Creates a newsletter using existing collection fields. Requires an allowed authoring role and sets <code>createdById</code> from the authenticated user on new records.</p>
+      <pre><code>curl -X POST "$PB_URL/api/newsletters" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"API update","subtitle":"","content":"&lt;p&gt;Hello&lt;/p&gt;","author":"Team","coverImage":"","tags":[],"status":"draft"}'</code></pre>
+    </section>
+
+    <section id="newsletter-detail">
+      <h2><span class="method get">GET</span>/api/newsletters/:id</h2>
+      <p>Fetches one newsletter. Draft records require edit permission; published records are public.</p>
+      <pre><code>curl "$PB_URL/api/newsletters/$NEWSLETTER_ID"</code></pre>
+    </section>
+
+    <section id="newsletter-update">
+      <h2><span class="method patch">PATCH</span>/api/newsletters/:id</h2>
+      <p>Updates editable newsletter fields and rejects unknown newsletter statuses.</p>
+      <pre><code>curl -X PATCH "$PB_URL/api/newsletters/$NEWSLETTER_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Updated title","status":"draft"}'</code></pre>
+    </section>
+
+    <section id="newsletter-delete">
+      <h2><span class="method delete">DEL</span>/api/newsletters/:id</h2>
+      <p>Deletes a newsletter. Requires <code>admin</code>.</p>
+      <pre><code>curl -X DELETE "$PB_URL/api/newsletters/$NEWSLETTER_ID" \
+  -H "Authorization: Bearer $ADMIN_TOKEN"</code></pre>
+    </section>
+
+    <section id="newsletter-actions">
+      <h2><span class="method post">POST</span>Newsletter Status Actions</h2>
+      <p><code>/api/newsletters/:id/make-public</code> sets <code>status</code> to <code>published</code>. <code>/api/newsletters/:id/make-draft</code> sets <code>status</code> to <code>draft</code>. Both require newsletter edit permission.</p>
+      <pre><code>curl -X POST "$PB_URL/api/newsletters/$NEWSLETTER_ID/make-public" -H "Authorization: Bearer $TOKEN"
+curl -X POST "$PB_URL/api/newsletters/$NEWSLETTER_ID/make-draft" -H "Authorization: Bearer $TOKEN"</code></pre>
+    </section>
+
+    <section id="project-routes">
+      <h2>Project Management Routes</h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr><th>Route</th><th>Behavior</th><th>Command</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>GET /api/projects</code></td>
+              <td>Lists projects visible to the authenticated user.</td>
+              <td><code>curl "$PB_URL/api/projects" -H "Authorization: Bearer $TOKEN"</code></td>
+            </tr>
+            <tr>
+              <td><code>POST /api/projects</code></td>
+              <td>Creates a project with normalized empty <code>gantt</code>, default <code>pending</code> status, and <code>createdBy</code> from auth.</td>
+              <td><code>curl -X POST "$PB_URL/api/projects" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"title":"Roadmap","description":"","department":"","devision":"","field":""}'</code></td>
+            </tr>
+            <tr>
+              <td><code>GET /api/projects/:projectId</code></td>
+              <td>Fetches one accessible project.</td>
+              <td><code>curl "$PB_URL/api/projects/$PROJECT_ID" -H "Authorization: Bearer $TOKEN"</code></td>
+            </tr>
+            <tr>
+              <td><code>PATCH /api/projects/:projectId</code></td>
+              <td>Updates project metadata, visibility, allowed users, status, or normalized <code>gantt</code>.</td>
+              <td><code>curl -X PATCH "$PB_URL/api/projects/$PROJECT_ID" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"isVisibleInGantt":true}'</code></td>
+            </tr>
+            <tr>
+              <td><code>PATCH /api/projects/:projectId/status</code></td>
+              <td>Updates only project status.</td>
+              <td><code>curl -X PATCH "$PB_URL/api/projects/$PROJECT_ID/status" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"status":"in-progress"}'</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="task-routes">
+      <h2>Task Operations</h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr><th>Route</th><th>Behavior</th><th>Command</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>GET /api/projects/:projectId/tasks</code></td>
+              <td>Returns <code>projects.gantt.tasks</code> without schema changes.</td>
+              <td><code>curl "$PB_URL/api/projects/$PROJECT_ID/tasks" -H "Authorization: Bearer $TOKEN"</code></td>
+            </tr>
+            <tr>
+              <td><code>POST /api/projects/:projectId/tasks</code></td>
+              <td>Adds a root task with <code>indentLevel: 0</code>.</td>
+              <td><code>curl -X POST "$PB_URL/api/projects/$PROJECT_ID/tasks" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"name":"Build API","startDate":"2026-07-06","durationDays":3,"status":"pending"}'</code></td>
+            </tr>
+            <tr>
+              <td><code>PATCH /api/projects/:projectId/tasks/:taskId</code></td>
+              <td>Updates a task or subtask, preserving the task ID and normalized fields.</td>
+              <td><code>curl -X PATCH "$PB_URL/api/projects/$PROJECT_ID/tasks/$TASK_ID" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"progress":50}'</code></td>
+            </tr>
+            <tr>
+              <td><code>PATCH /api/projects/:projectId/tasks/:taskId/status</code></td>
+              <td>Updates only task status; <code>completed</code> also sets progress to <code>100</code>.</td>
+              <td><code>curl -X PATCH "$PB_URL/api/projects/$PROJECT_ID/tasks/$TASK_ID/status" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"status":"completed"}'</code></td>
+            </tr>
+            <tr>
+              <td><code>DELETE /api/projects/:projectId/tasks/:taskId</code></td>
+              <td>Deletes a task and descendant subtasks, then removes deleted IDs from remaining <code>predecessorIds</code>.</td>
+              <td><code>curl -X DELETE "$PB_URL/api/projects/$PROJECT_ID/tasks/$TASK_ID" -H "Authorization: Bearer $TOKEN"</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="subtask-routes">
+      <h2>Subtask Operations</h2>
+      <p>Subtasks are represented only with <code>indentLevel</code>. Creating a subtask sets <code>indentLevel</code> to the parent task's level plus one.</p>
+      <pre><code>curl "$PB_URL/api/projects/$PROJECT_ID/tasks/$TASK_ID/subtasks" -H "Authorization: Bearer $TOKEN"
+curl -X POST "$PB_URL/api/projects/$PROJECT_ID/tasks/$TASK_ID/subtasks" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Write tests","startDate":"2026-07-06","durationDays":1,"status":"pending"}'</code></pre>
+    </section>
+
+    <section id="milestone-routes">
+      <h2>Milestones</h2>
+      <p>Milestones are stored as tasks with <code>milestone: true</code> and <code>durationDays: 0</code>.</p>
+      <pre><code>curl "$PB_URL/api/projects/$PROJECT_ID/milestones" -H "Authorization: Bearer $TOKEN"
+curl -X POST "$PB_URL/api/projects/$PROJECT_ID/milestones" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Launch","startDate":"2026-07-06","status":"pending"}'</code></pre>
+    </section>
+
+    <section id="helpers">
+      <h2>Helpers</h2>
+      <p>The registered helper module exports these functions for route wiring and tests: <code>registerApiManager</code>, <code>normalizeTask</code>, <code>normalizeGantt</code>, <code>getDescendantIds</code>, <code>listDirectSubtasks</code>, <code>cleanupTaskReferences</code>, <code>buildNewsletterPayload</code>, <code>buildProjectPayload</code>, <code>canCreateNewsletter</code>, <code>canEditNewsletter</code>, <code>canDeleteNewsletter</code>, <code>canReadNewsletter</code>, and <code>canAccessProject</code>.</p>
+    </section>
+  </main>
+
+  <script>
+    // Simple logic to dynamic update active state in sidebar during scrolling
+    const sections = document.querySelectorAll('section');
+    const navLinks = document.querySelectorAll('aside a');
+
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop;
+        if (pageYOffset >= sectionTop - 120) {
+          current = section.getAttribute('id');
+        }
+      });
+
+      navLinks.forEach(a => {
+        a.classList.remove('active');
+        if (a.getAttribute('href') === `#${current}`) {
+          a.classList.add('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

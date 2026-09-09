@@ -1,9 +1,10 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:20-alpine AS frontend-build
+FROM node:24-alpine AS frontend-build
 WORKDIR /app
 
 RUN corepack enable
+RUN pnpm config set dangerouslyAllowAllBuilds true
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -22,20 +23,23 @@ COPY vite.config.ts ./
 
 RUN pnpm build
 
-FROM node:20-alpine AS runtime-deps
+FROM node:24-alpine AS runtime-deps
 WORKDIR /app
 
 RUN corepack enable
+RUN pnpm config set dangerouslyAllowAllBuilds true
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --prod --frozen-lockfile
 
-FROM node:20-alpine AS runtime
+FROM node:24-alpine AS runtime
 WORKDIR /app
 
-RUN apk add --no-cache --allow-untrusted \
-      --repository http://dl-cdn.alpinelinux.org/alpine/v3.23/main \
-      --repository http://dl-cdn.alpinelinux.org/alpine/v3.23/community \
+RUN printf '%s\n' \
+      http://dl-cdn.alpinelinux.org/alpine/v3.23/main \
+      http://dl-cdn.alpinelinux.org/alpine/v3.23/community \
+      > /etc/apk/repositories \
+  && apk add --no-cache --allow-untrusted \
       curl \
       font-liberation \
       font-noto \
@@ -43,6 +47,7 @@ RUN apk add --no-cache --allow-untrusted \
       libreoffice \
       nginx \
       poppler-utils \
+      sqlite \
       tini \
       ttf-dejavu
 

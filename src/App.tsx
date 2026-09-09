@@ -9,6 +9,7 @@ import { GanttEditorPage } from './sections/manager/GanttEditorPage';
 import { NewsletterViewer } from './sections/NewsletterViewer';
 import { UnsubscribePage } from './sections/UnsubscribePage';
 import { PasswordResetPage } from './components/auth/PasswordResetPage';
+import { VerifyEmailPage } from './components/auth/VerifyEmailPage';
 import { SignIn } from './components/auth/SignIn';
 import { SSOCallback } from './components/auth/SSOCallback';
 import { MigratePage } from './sections/MigratePage';
@@ -22,9 +23,9 @@ import { toast } from 'sonner';
 import type { Newsletter } from './types/newsletter';
 import './App.css';
 
-export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'sso-callback' | 'gantt-editor' | 'migrate' | 'unsubscribe';
+export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'verify-email' | 'sso-callback' | 'gantt-editor' | 'migrate' | 'unsubscribe';
 
-const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet', 'links'];
+const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet', 'links', 'scheduled'];
 
 interface RouteState {
   view: View;
@@ -142,6 +143,18 @@ function resolveRoute(pathname: string): RouteState {
     if (token) {
       return {
         view: 'reset-password',
+        pathname: normalizedPathname,
+        token: decodeURIComponent(token),
+      };
+    }
+  }
+
+  if (normalizedPathname.startsWith('/verify-email/')) {
+    const [, , token] = normalizedPathname.split('/');
+
+    if (token) {
+      return {
+        view: 'verify-email',
         pathname: normalizedPathname,
         token: decodeURIComponent(token),
       };
@@ -376,7 +389,7 @@ function App() {
       return;
     }
 
-    if (currentRoute.view === 'signin' || currentRoute.view === 'reset-password' || currentRoute.view === 'sso-callback' || currentRoute.view === 'migrate' || currentRoute.view === 'unsubscribe') {
+    if (currentRoute.view === 'signin' || currentRoute.view === 'reset-password' || currentRoute.view === 'verify-email' || currentRoute.view === 'sso-callback' || currentRoute.view === 'migrate' || currentRoute.view === 'unsubscribe') {
       appReadyRef.current = true;
       bootLogger.markReady('app', 'Standalone route is ready', {
         pathname: currentRoute.pathname,
@@ -600,6 +613,19 @@ function App() {
           token={currentRoute.token}
           onBack={() => navigateTo('/sign-in', { replace: true })}
           onSuccess={handlePasswordResetSuccess}
+        />
+      </div>
+    );
+  }
+
+  if (currentRoute.view === 'verify-email' && currentRoute.token) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Toaster position={toasterPosition} richColors />
+        <VerifyEmailPage
+          token={currentRoute.token}
+          onBack={() => navigateTo('/sign-in', { replace: true })}
+          onSuccess={handleAuthSuccess}
         />
       </div>
     );

@@ -166,6 +166,10 @@ Relevant environment variables:
 
 ---
 
+## Air-gapped Longhorn setup
+
+For a fresh Longhorn installation managed by ArgoCD with images and charts hosted in Artifactory, use the [air-gapped setup guide](docs/longhorn-airgap.md). Prepare the transfer bundle with `scripts/longhorn-airgap/prepare-bundle.ps1`, then run its interactive `wizard.sh` on an internal Linux administration workstation.
+
 ## 🛠 Tech Stack Overview
 
 - **Frontend Core:** React, TypeScript, Vite

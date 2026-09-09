@@ -1,13 +1,13 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Calendar01Icon, Edit02Icon, ViewIcon, ViewOffIcon, Calendar03Icon, ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
-import { addWeeks, differenceInCalendarDays, differenceInCalendarWeeks, endOfWeek, format, isAfter, parseISO, startOfWeek } from 'date-fns';
+import { addMonths, addWeeks, differenceInCalendarDays, differenceInCalendarMonths, differenceInCalendarWeeks, endOfMonth, endOfWeek, format, isAfter, parseISO, startOfMonth, startOfWeek } from 'date-fns';
 import { enUS, he as heLocale } from 'date-fns/locale';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
 import { useProjects } from '../../hooks/useProjects';
-import { getTaskCalendarSpanDays, getTaskEnd, getTaskOffsetDays, getTimelineDays } from '../../lib/gantt';
-import type { GanttTask } from '../../types/gantt';
+import { applyDependencyScheduling, getStatusBadgeClass, getStatusBarClass, getStatusColor, getTaskCalendarSpanDays, getTaskEnd, getTaskOffsetDays, getTimelineDays, updateTaskDeadline } from '../../lib/gantt';
+import type { GanttTask, GanttZoom } from '../../types/gantt';
 import type { Project } from '../../types/project';
 import {
   Dialog,
@@ -22,50 +22,11 @@ interface GanttViewProps {
 }
 
 const statusOrder: GanttTask['status'][] = ['pending', 'in-progress', 'completed', 'delayed'];
-const contentTimelineWeekCount = 6;
+const contentTimelinePeriodCount = 6;
 const contentTimelineWeekStartsOn = 0 as const;
 const contentTimelineBarHeight = 20;
 const contentTimelineBarGap = 4;
 const contentTimelineRowPadding = 8;
-
-function getStatusBadge(status: GanttTask['status']) {
-  switch (status) {
-    case 'completed':
-      return 'bg-green-100 text-green-700';
-    case 'in-progress':
-      return 'bg-[#D93A3A]/10 text-[#D93A3A]';
-    case 'pending':
-      return 'bg-[#F3F4F6] text-[#737373]';
-    case 'delayed':
-      return 'bg-yellow-100 text-yellow-700';
-  }
-}
-
-function getStatusBarColor(status: GanttTask['status']) {
-  switch (status) {
-    case 'completed':
-      return '#16A34A';
-    case 'in-progress':
-      return '#D93A3A';
-    case 'pending':
-      return '#A3A3A3';
-    case 'delayed':
-      return '#EAB308';
-  }
-}
-
-function getTimelineBarColor(status: GanttTask['status']) {
-  switch (status) {
-    case 'completed':
-      return 'bg-green-600';
-    case 'in-progress':
-      return 'bg-[#D93A3A]';
-    case 'pending':
-      return 'bg-[#D4D4D4]';
-    case 'delayed':
-      return 'bg-yellow-500';
-  }
-}
 
 interface ContentTimelineBar {
   id: string;
@@ -83,6 +44,30 @@ interface ContentTimelineRow {
   project: Project;
   bars: ContentTimelineBar[];
   rowMinHeight: number;
+}
+
+function buildTimelineWeeks(days: Date[]) {
+  const weeks: Date[][] = [];
+  for (let index = 0; index < days.length; index += 7) {
+    weeks.push(days.slice(index, index + 7));
+  }
+  return weeks;
+}
+
+function buildTimelineMonths(days: Date[]) {
+  const months: Date[][] = [];
+
+  days.forEach((day) => {
+    const lastMonth = months[months.length - 1];
+    if (!lastMonth || startOfMonth(lastMonth[0]).getTime() !== startOfMonth(day).getTime()) {
+      months.push([day]);
+      return;
+    }
+
+    lastMonth.push(day);
+  });
+
+  return months;
 }
 
 function buildContentTimelineRow(
@@ -161,7 +146,11 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
   const [showManageModal, setShowManageModal] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [timelineOffsetWeeks, setTimelineOffsetWeeks] = useState(0);
-  const { projects, setProjectGanttVisibility } = useProjects();
+  const [contentTimelineMode, setContentTimelineMode] = useState<'week' | 'month'>('week');
+  const taskTableBodyRef = useRef<HTMLDivElement | null>(null);
+  const taskTimelineBodyRef = useRef<HTMLDivElement | null>(null);
+  const isSyncingTaskScrollRef = useRef(false);
+  const { projects, setProjectGanttVisibility, updateProjectGantt } = useProjects();
 
   const visibleProjects = useMemo(
     () => projects.filter((project) => project.isVisibleInGantt),
@@ -188,22 +177,31 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
     [selectedProject?.gantt.tasks],
   );
   const contentTimelineStart = useMemo(
-    () => addWeeks(startOfWeek(new Date(), { weekStartsOn: contentTimelineWeekStartsOn }), timelineOffsetWeeks),
-    [timelineOffsetWeeks],
+    () => contentTimelineMode === 'month'
+      ? addMonths(startOfMonth(new Date()), timelineOffsetWeeks)
+      : addWeeks(startOfWeek(new Date(), { weekStartsOn: contentTimelineWeekStartsOn }), timelineOffsetWeeks),
+    [contentTimelineMode, timelineOffsetWeeks],
   );
-  const contentTimelineWeeks = useMemo(
-    () => Array.from({ length: contentTimelineWeekCount }, (_, index) => addWeeks(contentTimelineStart, index)),
-    [contentTimelineStart],
+  const contentTimelinePeriods = useMemo(
+    () => Array.from({ length: contentTimelinePeriodCount }, (_, index) => (
+      contentTimelineMode === 'month'
+        ? addMonths(contentTimelineStart, index)
+        : addWeeks(contentTimelineStart, index)
+    )),
+    [contentTimelineMode, contentTimelineStart],
   );
   const contentTimelineEnd = useMemo(
-    () => endOfWeek(contentTimelineWeeks[contentTimelineWeeks.length - 1], { weekStartsOn: contentTimelineWeekStartsOn }),
-    [contentTimelineWeeks],
+    () => contentTimelineMode === 'month'
+      ? endOfMonth(contentTimelinePeriods[contentTimelinePeriods.length - 1])
+      : endOfWeek(contentTimelinePeriods[contentTimelinePeriods.length - 1], { weekStartsOn: contentTimelineWeekStartsOn }),
+    [contentTimelineMode, contentTimelinePeriods],
   );
-  const currentTimelineWeekIndex = useMemo(() => {
-    const realCurrentWeekStart = startOfWeek(new Date(), { weekStartsOn: contentTimelineWeekStartsOn });
-    const index = differenceInCalendarWeeks(realCurrentWeekStart, contentTimelineStart, { weekStartsOn: contentTimelineWeekStartsOn });
-    return index >= 0 && index < contentTimelineWeekCount ? index : -1;
-  }, [contentTimelineStart]);
+  const currentTimelinePeriodIndex = useMemo(() => {
+    const index = contentTimelineMode === 'month'
+      ? differenceInCalendarMonths(startOfMonth(new Date()), contentTimelineStart)
+      : differenceInCalendarWeeks(startOfWeek(new Date(), { weekStartsOn: contentTimelineWeekStartsOn }), contentTimelineStart, { weekStartsOn: contentTimelineWeekStartsOn });
+    return index >= 0 && index < contentTimelinePeriodCount ? index : -1;
+  }, [contentTimelineMode, contentTimelineStart]);
   const contentTimelineRows = useMemo(
     () => visibleProjects.map((project) => buildContentTimelineRow(
       project,
@@ -217,19 +215,32 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
   );
   const timelineStart = previewTimelineDays[0] ?? new Date();
   const dayWidth = 30;
-  const timelineWidth = Math.max(previewTimelineDays.length * dayWidth, 640);
-  const timelineCellWidth = previewTimelineDays.length > 0 ? timelineWidth / previewTimelineDays.length : dayWidth;
+  const previewZoom: GanttZoom = selectedProject?.gantt.zoom ?? 'day';
+  const previewBaseDayWidth = previewZoom === 'month' ? 8 : previewZoom === 'week' ? 18 : dayWidth;
+  const previewTimelineWeeks = useMemo(() => buildTimelineWeeks(previewTimelineDays), [previewTimelineDays]);
+  const previewTimelineMonths = useMemo(() => buildTimelineMonths(previewTimelineDays), [previewTimelineDays]);
+  const previewTimelineWidth = Math.max(previewTimelineDays.length * previewBaseDayWidth, 640);
+  const timelineCellWidth = previewTimelineDays.length > 0 ? previewTimelineWidth / previewTimelineDays.length : previewBaseDayWidth;
+  const previewTimelineGridColumns = previewZoom === 'month'
+    ? previewTimelineMonths.map((monthDays) => `minmax(${monthDays.length * previewBaseDayWidth}px, ${monthDays.length}fr)`).join(' ')
+    : previewZoom === 'week'
+      ? `repeat(${previewTimelineWeeks.length}, minmax(${7 * previewBaseDayWidth}px, 1fr))`
+      : `repeat(${previewTimelineDays.length}, minmax(${previewBaseDayWidth}px, 1fr))`;
   const formatTimelineDayLabel = (value: Date) => format(value, 'EEEEE', { locale: calendarLocale });
+  const formatWeekLabel = (value: Date) => {
+    const weekNumber = Number.parseInt(format(value, 'w'), 10);
+    return `${t('editor.weekShort')} ${formatNumber(Number.isFinite(weekNumber) ? weekNumber : 0)}`;
+  };
   const getPreviewTaskTimelineLayout = (task: GanttTask) => {
     const offsetDays = getTaskOffsetDays(task, timelineStart);
     const spanDays = getTaskCalendarSpanDays(task);
     const width = task.milestone ? 18 : Math.max((spanDays * timelineCellWidth) - 8, 24);
     const left = task.milestone
       ? isRTL
-        ? timelineWidth - ((offsetDays * timelineCellWidth) + (timelineCellWidth / 2)) - 9
+        ? previewTimelineWidth - ((offsetDays * timelineCellWidth) + (timelineCellWidth / 2)) - 9
         : (offsetDays * timelineCellWidth) + (timelineCellWidth / 2) - 9
       : isRTL
-        ? timelineWidth - ((offsetDays + spanDays) * timelineCellWidth) + 4
+        ? previewTimelineWidth - ((offsetDays + spanDays) * timelineCellWidth) + 4
         : (offsetDays * timelineCellWidth) + 4;
 
     return { left, width };
@@ -246,6 +257,56 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
   const handleOpenEditor = (projectId: string) => {
     setShowManageModal(false);
     onEditProjectGantt(projectId);
+  };
+
+  const syncTaskScroll = (source: 'table' | 'timeline') => {
+    if (isSyncingTaskScrollRef.current) {
+      return;
+    }
+
+    const sourceElement = source === 'table' ? taskTableBodyRef.current : taskTimelineBodyRef.current;
+    const targetElement = source === 'table' ? taskTimelineBodyRef.current : taskTableBodyRef.current;
+    if (!sourceElement || !targetElement) {
+      return;
+    }
+
+    isSyncingTaskScrollRef.current = true;
+    targetElement.scrollTop = sourceElement.scrollTop;
+    window.requestAnimationFrame(() => {
+      isSyncingTaskScrollRef.current = false;
+    });
+  };
+
+  const handleTaskStatusChange = (taskId: string, status: GanttTask['status']) => {
+    if (!selectedProject) {
+      return;
+    }
+
+    const existingTask = selectedProject.gantt.tasks.find((task) => task.id === taskId);
+    if (!existingTask) {
+      return;
+    }
+
+    let nextTask: GanttTask = {
+      ...existingTask,
+      status,
+      progress: status === 'completed' ? 100 : status === 'pending' || status === 'delayed' ? 0 : existingTask.progress || 50,
+    };
+
+    if (status === 'delayed') {
+      const deadline = window.prompt(t('ganttEditor.delayedDeadlinePrompt'), existingTask.endDate);
+      if (!deadline) {
+        return;
+      }
+      nextTask = updateTaskDeadline(nextTask, deadline);
+    }
+
+    const tasks = selectedProject.gantt.tasks.map((task) => task.id === taskId ? nextTask : task);
+    void updateProjectGantt(selectedProject.id, {
+      ...selectedProject.gantt,
+      tasks: applyDependencyScheduling(tasks, taskId),
+      lastEditedAt: new Date().toISOString(),
+    });
   };
 
   const getStatusLabel = (status: GanttTask['status']) => {
@@ -434,7 +495,24 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                   <p className="text-sm text-[#737373]">{t('manager.publishingSchedule')}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button 
+                  <div className="flex rounded-lg border border-[#E5E5E5] bg-white p-1">
+                    {(['week', 'month'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          setContentTimelineMode(mode);
+                          setTimelineOffsetWeeks(0);
+                        }}
+                        className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                          contentTimelineMode === mode ? 'bg-[#171717] text-white' : 'text-[#525252] hover:bg-[#F3F4F6]'
+                        }`}
+                      >
+                        {mode === 'week' ? t('ganttEditor.weekly') : t('ganttEditor.monthly')}
+                      </button>
+                    ))}
+                  </div>
+                  <button
                     type="button"
                     onClick={() => setTimelineOffsetWeeks((current) => current - 1)}
                     className="p-2 text-[#737373] hover:text-[#171717] hover:bg-[#F3F4F6] rounded-lg transition-colors"
@@ -445,7 +523,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                     <HugeiconsIcon icon={Calendar03Icon} className="h-4 w-4 text-[#D93A3A]" />
                     <span className="text-sm text-[#171717]">{formatRangeLabel(contentTimelineStart, contentTimelineEnd)}</span>
                   </div>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setTimelineOffsetWeeks((current) => current + 1)}
                     className="p-2 text-[#737373] hover:text-[#171717] hover:bg-[#F3F4F6] rounded-lg transition-colors"
@@ -462,16 +540,16 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                   <div className="p-4 border-r border-[#E5E5E5]">
                     <span className="text-xs font-medium text-[#737373] uppercase tracking-wider">{t('manager.projects')}</span>
                   </div>
-                  <div className="grid grid-cols-6">
-                    {contentTimelineWeeks.map((weekStart, i) => (
-                      <div 
-                        key={weekStart.toISOString()} 
+                  <div className="grid" style={{ gridTemplateColumns: `repeat(${contentTimelinePeriods.length}, minmax(0, 1fr))` }}>
+                    {contentTimelinePeriods.map((periodStart, i) => (
+                      <div
+                        key={periodStart.toISOString()}
                         className={`p-4 text-center border-r border-[#E5E5E5] last:border-r-0 ${
-                          i === currentTimelineWeekIndex ? 'bg-[#D93A3A]/5' : ''
+                          i === currentTimelinePeriodIndex ? 'bg-[#D93A3A]/5' : ''
                         }`}
                       >
-                        <span className={`text-sm ${i === currentTimelineWeekIndex ? 'text-[#D93A3A] font-medium' : 'text-[#737373]'}`}>
-                          {formatDate(weekStart, { month: 'short', day: 'numeric' })}
+                        <span className={`text-sm ${i === currentTimelinePeriodIndex ? 'text-[#D93A3A] font-medium' : 'text-[#737373]'}`}>
+                          {contentTimelineMode === 'month' ? formatDate(periodStart, { month: 'short', year: 'numeric' }) : formatDate(periodStart, { month: 'short', day: 'numeric' })}
                         </span>
                       </div>
                     ))}
@@ -485,18 +563,18 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                       {/* Project label */}
                       <div className="p-4 border-r border-[#E5E5E5] bg-[#F9FAFB]">
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getStatusBarColor(project.status) }} />
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getStatusColor(project.status) }} />
                           <span className="font-medium text-[#171717] truncate" dir="auto">{project.title}</span>
                         </div>
                       </div>
 
                       {/* Timeline grid */}
-                      <div className="relative grid grid-cols-6" style={{ minHeight: rowMinHeight }}>
-                        {contentTimelineWeeks.map((weekStart, i) => (
-                          <div 
-                            key={weekStart.toISOString()} 
+                      <div className="relative grid" style={{ minHeight: rowMinHeight, gridTemplateColumns: `repeat(${contentTimelinePeriods.length}, minmax(0, 1fr))` }}>
+                        {contentTimelinePeriods.map((periodStart, i) => (
+                          <div
+                            key={periodStart.toISOString()}
                             className={`border-r border-[#E5E5E5] last:border-r-0 ${
-                              i === currentTimelineWeekIndex ? 'bg-[#D93A3A]/5' : ''
+                              i === currentTimelinePeriodIndex ? 'bg-[#D93A3A]/5' : ''
                             }`}
                           />
                         ))}
@@ -513,8 +591,8 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                                   top: `${task.top}px`,
                                 }}
                               >
-                                <div 
-                                  className={`h-full rounded ${getTimelineBarColor(task.status)} opacity-80 group-hover:opacity-100 transition-opacity`}
+                                <div
+                                  className={`h-full rounded ${getStatusBarClass(task.status)} opacity-80 group-hover:opacity-100 transition-opacity`}
                                 />
                                 <div className="absolute inset-0 flex items-center px-2">
                                   <span className="text-xs text-white font-medium truncate" dir="auto">
@@ -547,7 +625,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                   <span className="text-sm text-[#737373]">{t('manager.completed')}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-[#D93A3A]" />
+                  <div className="w-4 h-4 rounded bg-yellow-500" />
                   <span className="text-sm text-[#737373]">{t('manager.inProgress')}</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -555,7 +633,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                   <span className="text-sm text-[#737373]">{t('manager.pending')}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-yellow-500" />
+                  <div className="w-4 h-4 rounded bg-[#D93A3A]" />
                   <span className="text-sm text-[#737373]">{t('manager.delayed')}</span>
                 </div>
               </div>
@@ -602,18 +680,19 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                     </div>
                   ) : (
                     <div className="overflow-hidden rounded-3xl border border-[#E5E5E5] bg-white">
-                      <div className="grid grid-cols-[320px_minmax(0,1fr)]">
+                      <div className="grid max-h-[620px] grid-cols-[320px_minmax(0,1fr)]">
                         <div className="border-r border-[#E5E5E5]">
-                          <div className="grid h-14 grid-cols-[52px_minmax(0,1fr)_92px] border-b border-[#E5E5E5] bg-[#F8FAFC] text-xs font-semibold uppercase tracking-[0.18em] text-[#737373]">
+                          <div className="sticky top-0 z-10 grid h-14 grid-cols-[52px_minmax(0,1fr)_112px] border-b border-[#E5E5E5] bg-[#F8FAFC] text-xs font-semibold uppercase tracking-[0.18em] text-[#737373]">
                             <div className="flex items-center justify-center border-r border-[#E5E5E5]">#</div>
                             <div className="flex items-center border-r border-[#E5E5E5] px-4">{t('manager.task')}</div>
                             <div className="flex items-center px-4">{t('manager.status')}</div>
                           </div>
+                          <div ref={taskTableBodyRef} onScroll={() => syncTaskScroll('table')} className="max-h-[566px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                           {filteredTasks.map((task) => {
                             const resource = selectedProject.gantt.resources.find((entry) => entry.id === task.resourceId);
 
                             return (
-                              <div key={task.id} className="grid h-14 grid-cols-[52px_minmax(0,1fr)_92px] border-b border-[#E5E5E5] last:border-b-0">
+                              <div key={task.id} className="grid h-14 grid-cols-[52px_minmax(0,1fr)_112px] border-b border-[#E5E5E5] last:border-b-0">
                                 <div className="flex items-center justify-center border-r border-[#E5E5E5] text-xs font-semibold text-[#525252]">
                                   {formatNumber(selectedProject.gantt.tasks.findIndex((entry) => entry.id === task.id) + 1)}
                                 </div>
@@ -622,43 +701,83 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                                   <p className="truncate text-xs text-[#737373]">{resource?.name ?? t('manager.unassigned')}</p>
                                 </div>
                                 <div className="flex items-center px-3">
-                                  <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${getStatusBadge(task.status)}`}>
-                                    {getStatusLabel(task.status)}
-                                  </span>
+                                  <select
+                                    value={task.status}
+                                    onChange={(event) => handleTaskStatusChange(task.id, event.target.value as GanttTask['status'])}
+                                    className={`w-full rounded-full border-0 px-2 py-1 text-[11px] font-medium ${getStatusBadgeClass(task.status)}`}
+                                  >
+                                    {statusOrder.map((status) => (
+                                      <option key={status} value={status}>{getStatusLabel(status)}</option>
+                                    ))}
+                                  </select>
                                 </div>
                               </div>
                             );
                           })}
+                          </div>
                         </div>
 
                         <div className="overflow-x-auto" dir="ltr">
-                          <div dir={isRTL ? 'rtl' : 'ltr'} style={{ width: timelineWidth }}>
+                          <div dir={isRTL ? 'rtl' : 'ltr'} style={{ width: previewTimelineWidth }}>
                             <div
-                              className="grid h-14 border-b border-[#E5E5E5] bg-[#F8FAFC]"
-                              style={{ gridTemplateColumns: `repeat(${previewTimelineDays.length}, minmax(${dayWidth}px, 1fr))` }}
+                              className="sticky top-0 z-10 grid h-14 border-b border-[#E5E5E5] bg-[#F8FAFC]"
+                              style={{ gridTemplateColumns: previewTimelineGridColumns }}
                             >
-                              {previewTimelineDays.map((day) => (
-                                <div key={day.toISOString()} className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#E5E5E5] px-1 py-2 text-center text-xs last:border-r-0">
-                                  <p className="max-w-full truncate whitespace-nowrap uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">{formatTimelineDayLabel(day)}</p>
-                                  <p className="max-w-full truncate whitespace-nowrap font-medium leading-tight text-[#171717]">{formatNumber(day.getDate())}</p>
-                                </div>
-                              ))}
+                              {previewZoom === 'month' ? (
+                                previewTimelineMonths.map((monthDays) => {
+                                  const monthStart = monthDays[0];
+                                  return (
+                                    <div key={monthStart.toISOString()} className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#E5E5E5] px-1 py-2 text-center text-xs last:border-r-0">
+                                      <p className="max-w-full truncate whitespace-nowrap uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">{monthStart.getFullYear()}</p>
+                                      <p className="max-w-full truncate whitespace-nowrap font-medium leading-tight text-[#171717]">{formatDate(monthStart, { month: 'short' })}</p>
+                                    </div>
+                                  );
+                                })
+                              ) : previewZoom === 'week' ? (
+                                previewTimelineWeeks.map((weekDays) => {
+                                  const weekStart = weekDays[0];
+                                  return (
+                                    <div key={weekStart.toISOString()} className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#E5E5E5] px-1 py-2 text-center text-xs last:border-r-0">
+                                      <p className="max-w-full truncate whitespace-nowrap uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">{formatWeekLabel(weekStart)}</p>
+                                      <p className="max-w-full truncate whitespace-nowrap font-medium leading-tight text-[#171717]">{formatDate(weekStart, { month: 'short', day: 'numeric' })}</p>
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                previewTimelineDays.map((day) => (
+                                  <div key={day.toISOString()} className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#E5E5E5] px-1 py-2 text-center text-xs last:border-r-0">
+                                    <p className="max-w-full truncate whitespace-nowrap uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">{formatTimelineDayLabel(day)}</p>
+                                    <p className="max-w-full truncate whitespace-nowrap font-medium leading-tight text-[#171717]">{formatNumber(day.getDate())}</p>
+                                  </div>
+                                ))
+                              )}
                             </div>
 
+                            <div ref={taskTimelineBodyRef} onScroll={() => syncTaskScroll('timeline')} className="max-h-[566px] overflow-y-auto">
                             {filteredTasks.map((task) => {
                               const resource = selectedProject.gantt.resources.find((entry) => entry.id === task.resourceId) ?? null;
-                              const barColor = resource?.color ?? getStatusBarColor(task.status);
+                              const barColor = resource?.color ?? getStatusColor(task.status);
                               const { left, width } = getPreviewTaskTimelineLayout(task);
 
                               return (
                                 <div key={task.id} className="relative h-14 border-b border-[#E5E5E5] last:border-b-0">
                                   <div
                                     className="absolute inset-0 grid"
-                                    style={{ gridTemplateColumns: `repeat(${previewTimelineDays.length}, minmax(${dayWidth}px, 1fr))` }}
+                                    style={{ gridTemplateColumns: previewTimelineGridColumns }}
                                   >
-                                    {previewTimelineDays.map((day) => (
-                                      <div key={`${task.id}-${day.toISOString()}`} className="border-r border-[#F1F5F9] last:border-r-0" />
-                                    ))}
+                                    {previewZoom === 'month' ? (
+                                      previewTimelineMonths.map((monthDays) => (
+                                        <div key={`${task.id}-month-${monthDays[0].toISOString()}`} className="border-r border-[#F1F5F9] last:border-r-0" />
+                                      ))
+                                    ) : previewZoom === 'week' ? (
+                                      previewTimelineWeeks.map((weekDays) => (
+                                        <div key={`${task.id}-week-${weekDays[0].toISOString()}`} className="border-r border-[#F1F5F9] last:border-r-0" />
+                                      ))
+                                    ) : (
+                                      previewTimelineDays.map((day) => (
+                                        <div key={`${task.id}-${day.toISOString()}`} className="border-r border-[#F1F5F9] last:border-r-0" />
+                                      ))
+                                    )}
                                   </div>
                                   <div
                                     className={`absolute top-1/2 -translate-y-1/2 ${
@@ -681,6 +800,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                                 </div>
                               );
                             })}
+                            </div>
                           </div>
                         </div>
                       </div>

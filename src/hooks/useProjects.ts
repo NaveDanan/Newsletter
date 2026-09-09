@@ -5,6 +5,7 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  updateProjectStatusOnly,
 } from '../lib/pocketbase/projects';
 import { normalizeProjectGantt } from '../lib/gantt';
 import type { Project, ProjectFormData, ProjectStatus } from '../types/project';
@@ -126,7 +127,7 @@ export function useProjects() {
       prev.map((p) => (p.id === id ? { ...p, status } : p)),
     );
     try {
-      const updated = await updateProject(id, { status });
+      const updated = await updateProjectStatusOnly(id, status);
       setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
       return updated;
     } catch (err) {

@@ -1,19 +1,23 @@
 {
   "name": "Newsletter",
   "private": true,
-  "version": "1.0.18",
+  "version": "1.0.19",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test:add-newsletter-fixture": "node tests/scripts/add-newsletter-fixture.mjs",
+    "docker:build": "node scripts/build-docker-image.mjs",
+    "test:docker-api": "node scripts/test-docker-api.mjs",
     "pb:setup-collections": "node scripts/setup-pocketbase-collections.mjs",
     "pb:sync-app-schema": "node scripts/sync-pocketbase-app-schema.mjs",
     "pb:sync-mail-settings": "node scripts/sync-pocketbase-mail-settings.mjs",
     "pb:sync-navigation-dropdowns": "node scripts/sync-navigation-dropdowns.mjs",
     "pb:sync-users-schema": "node scripts/sync-pocketbase-users-schema.mjs",
     "pb:sync-oidc-settings": "node scripts/sync-pocketbase-oidc-settings.mjs",
+    "pb:migrate-data": "node scripts/migrate-pocketbase-data.mjs",
     "pb:set-role": "node scripts/set-pocketbase-user-role.mjs"
   },
   "dependencies": {

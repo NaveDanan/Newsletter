@@ -1,3 +1,11 @@
+cronAdd('newsletterDigestScheduler', '* * * * *', function () {
+  var scheduled = require(__hooks + '/lib/scheduled-digest.js');
+  scheduled.tick($app);
+});
+
+var apiManager = require(__hooks + '/lib/api-manager.js');
+apiManager.registerApiManager(routerAdd, $apis);
+
 routerAdd('POST', '/api/newsletter/subscribe', function (e) {
   var helpers = require(__hooks + '/lib/newsletter-mail.js');
   var body = e.requestInfo().body || {};
@@ -118,29 +126,23 @@ routerAdd('POST', '/api/newsletter/send-update', function (e) {
   });
 }, $apis.bodyLimit(16384), $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
 
-onRecordAfterCreateSuccess(function (e) {
-  var helpers = require(__hooks + '/lib/newsletter-mail.js');
+routerAdd('GET', '/api/scheduled/newsletter-digest', function (e) {
+  var scheduled = require(__hooks + '/lib/scheduled-digest.js');
+  scheduled.ensureAdminAccess(e.auth);
+  return e.json(200, scheduled.serializeJob(e.app, scheduled.ensureJob(e.app)));
+}, $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
 
-  try {
-    helpers.sendNewsletterNotifications(e.app, e.record);
-  } catch (error) {
-    console.error('Newsletter notification send failed after create:', error);
-  }
+routerAdd('PATCH', '/api/scheduled/newsletter-digest', function (e) {
+  var scheduled = require(__hooks + '/lib/scheduled-digest.js');
+  scheduled.ensureAdminAccess(e.auth);
+  return e.json(200, scheduled.updateJobSettings(e.app, e.auth, e.requestInfo().body || {}));
+}, $apis.bodyLimit(16384), $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
 
-  return e.next();
-}, 'newsletters');
-
-onRecordAfterUpdateSuccess(function (e) {
-  var helpers = require(__hooks + '/lib/newsletter-mail.js');
-
-  try {
-    helpers.sendNewsletterNotifications(e.app, e.record);
-  } catch (error) {
-    console.error('Newsletter notification send failed after update:', error);
-  }
-
-  return e.next();
-}, 'newsletters');
+routerAdd('POST', '/api/scheduled/newsletter-digest/run', function (e) {
+  var scheduled = require(__hooks + '/lib/scheduled-digest.js');
+  scheduled.ensureAdminAccess(e.auth);
+  return e.json(200, scheduled.runJobNow(e.app, { force: true }));
+}, $apis.bodyLimit(16384), $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
 
 onRecordAfterCreateSuccess(function (e) {
   var helpers = require(__hooks + '/lib/newsletter-mail.js');
@@ -166,6 +168,22 @@ onMailerRecordPasswordResetSend(function (e) {
   }
 
   var mail = helpers.buildPasswordResetEmail(e.app, e.record, resetUrl);
+  e.message.subject = mail.subject;
+  e.message.html = mail.html;
+
+  return e.next();
+}, 'users');
+
+onMailerRecordVerificationSend(function (e) {
+  var helpers = require(__hooks + '/lib/newsletter-mail.js');
+  var token = e.meta && e.meta.token ? String(e.meta.token) : '';
+  var verificationUrl = helpers.buildVerificationUrl(token);
+
+  if (!verificationUrl) {
+    return e.next();
+  }
+
+  var mail = helpers.buildVerificationEmail(e.app, e.record, verificationUrl);
   e.message.subject = mail.subject;
   e.message.html = mail.html;
 

@@ -115,9 +115,9 @@ function getProjectDueDate(project: Project): string {
 function getStatusBadgeClass(status: Project['status']): string {
   switch (status) {
     case 'completed': return 'bg-green-100 text-green-700';
-    case 'in-progress': return 'bg-[#D93A3A]/10 text-[#D93A3A]';
+    case 'in-progress': return 'bg-yellow-100 text-yellow-700';
     case 'pending': return 'bg-[#F3F4F6] text-[#737373]';
-    case 'delayed': return 'bg-amber-100 text-amber-700';
+    case 'delayed': return 'bg-red-100 text-red-700';
   }
 }
 
@@ -169,8 +169,8 @@ function goalStatus(tasks: GanttTask[], ms: GanttTask): GoalStatus {
 function taskColors(t: GanttTask) {
   switch (t.status) {
     case 'completed': return { bg: '#059669', light: '#D1FAE5', text: '#065F46', argbBg: 'FF059669', argbLight: 'FFD1FAE5', argbText: 'FF065F46' };
-    case 'in-progress': return { bg: '#D93A3A', light: '#FEE2E2', text: '#991B1B', argbBg: 'FFD93A3A', argbLight: 'FFFEE2E2', argbText: 'FF991B1B' };
-    case 'delayed': return { bg: '#D97706', light: '#FEF3C7', text: '#92400E', argbBg: 'FFD97706', argbLight: 'FFFEF3C7', argbText: 'FF92400E' };
+    case 'in-progress': return { bg: '#EAB308', light: '#FEF3C7', text: '#92400E', argbBg: 'FFEAB308', argbLight: 'FFFEF3C7', argbText: 'FF92400E' };
+    case 'delayed': return { bg: '#D93A3A', light: '#FEE2E2', text: '#991B1B', argbBg: 'FFD93A3A', argbLight: 'FFFEE2E2', argbText: 'FF991B1B' };
     default: return { bg: '#9CA3AF', light: '#F3F4F6', text: '#374151', argbBg: 'FF9CA3AF', argbLight: 'FFF3F4F6', argbText: 'FF374151' };
   }
 }
@@ -936,7 +936,7 @@ export function SpreadsheetView() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-[#171717]">{t('manager.spreadsheetTitle')}</h2>
-          <p className="text-sm text-[#737373]">{t('manager.spreadsheetSummary', { count: formatNumber(projects.length), suffix: projects.length !== 1 ? 's' : '' })}</p>
+          <p className="text-sm text-[#737373]">{t('manager.spreadsheetSummary', { count: formatNumber(projects.length), suffix: projects.length !== 1 ? (isRTL ? 'ים' : 's') : '' })}</p>
         </div>
         <div className="flex items-center gap-2">
           <input ref={importRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />

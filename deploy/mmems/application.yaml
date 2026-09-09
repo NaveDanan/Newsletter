@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: newsletter
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/NaveDanan/Newsletter.git
+    targetRevision: gantt-editor
+    path: helm/newsletter
+    helm:
+      releaseName: newsletter
+      valueFiles:
+        - values.yaml
+        - values.mmems.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: newsletter
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

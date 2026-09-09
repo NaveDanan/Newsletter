@@ -1,0 +1,11 @@
+{
+  "title": "Newsletter test fixture",
+  "subtitle": "Synthetic content for development tests",
+  "content": "<p>This is a synthetic newsletter used to verify the API.</p>",
+  "excerpt": "Synthetic newsletter content.",
+  "author": "Test author",
+  "status": "draft",
+  "publishedAt": "",
+  "tags": ["test"],
+  "textAlignment": "left"
+}

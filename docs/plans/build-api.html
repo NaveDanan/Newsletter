@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Newsletter and Project API Implementation Plan</title>
+</head>
+<body>
+  <h1>Newsletter and Project API Implementation Plan</h1>
+
+  <section>
+    <h2>Summary</h2>
+    <p>
+      Add custom PocketBase hook API routes for newsletter and project-management workflows while keeping the
+      current database schema unchanged. Projects, tasks, subtasks, and milestones will continue to use the
+      existing <code>projects.gantt</code> JSON field. Newsletters will continue to use the existing
+      <code>newsletters</code> collection fields.
+    </p>
+    <p>
+      No schema migration is required for this plan. The implementation should only add server-side route handlers,
+      validation, authorization, and frontend API wrappers.
+    </p>
+  </section>
+
+  <section>
+    <h2>Database Compatibility</h2>
+    <ul>
+      <li>Do not add, remove, or rename PocketBase collections.</li>
+      <li>Do not change existing field names or field types in <code>projects</code> or <code>newsletters</code>.</li>
+      <li>Keep tasks, subtasks, and milestones embedded in <code>projects.gantt.tasks</code>.</li>
+      <li>Represent subtasks using existing <code>indentLevel</code>.</li>
+      <li>Represent milestones using existing <code>milestone: true</code>.</li>
+      <li>Use existing statuses: <code>pending</code>, <code>in-progress</code>, <code>completed</code>, <code>delayed</code>.</li>
+      <li>Use existing newsletter statuses: <code>draft</code> and <code>published</code>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Newsletter API Routes</h2>
+    <ul>
+      <li><code>GET /api/newsletters</code> - list newsletters with optional <code>status</code>, <code>page</code>, <code>perPage</code>, and <code>sort</code>.</li>
+      <li><code>POST /api/newsletters</code> - create a newsletter using existing newsletter fields.</li>
+      <li><code>GET /api/newsletters/:id</code> - fetch one newsletter.</li>
+      <li><code>PATCH /api/newsletters/:id</code> - update editable newsletter fields.</li>
+      <li><code>DELETE /api/newsletters/:id</code> - delete a newsletter. Admin only.</li>
+      <li><code>POST /api/newsletters/:id/make-public</code> - set <code>status</code> to <code>published</code>.</li>
+      <li><code>POST /api/newsletters/:id/make-draft</code> - set <code>status</code> to <code>draft</code>.</li>
+    </ul>
+    <p>
+      Existing routes such as <code>/api/newsletter/send-update</code>,
+      <code>/api/newsletter/presentation-upload</code>, <code>/api/newsletter/subscribe</code>, and
+      <code>/api/newsletter/unsubscribe</code> should remain unchanged.
+    </p>
+  </section>
+
+  <section>
+    <h2>Project and Task API Routes</h2>
+    <ul>
+      <li><code>GET /api/projects</code> - list projects visible to the authenticated user.</li>
+      <li><code>POST /api/projects</code> - create a project with an empty normalized <code>gantt</code> object.</li>
+      <li><code>GET /api/projects/:projectId</code> - fetch one project.</li>
+      <li><code>PATCH /api/projects/:projectId</code> - update project metadata and visibility.</li>
+      <li><code>PATCH /api/projects/:projectId/status</code> - update only project status.</li>
+      <li><code>GET /api/projects/:projectId/tasks</code> - list project tasks from <code>gantt.tasks</code>.</li>
+      <li><code>POST /api/projects/:projectId/tasks</code> - add a root task.</li>
+      <li><code>PATCH /api/projects/:projectId/tasks/:taskId</code> - update a task or subtask.</li>
+      <li><code>PATCH /api/projects/:projectId/tasks/:taskId/status</code> - update only task status.</li>
+      <li><code>DELETE /api/projects/:projectId/tasks/:taskId</code> - delete a task and its descendant subtasks.</li>
+      <li><code>GET /api/projects/:projectId/tasks/:taskId/subtasks</code> - list direct subtasks.</li>
+      <li><code>POST /api/projects/:projectId/tasks/:taskId/subtasks</code> - add a subtask under a task.</li>
+      <li><code>GET /api/projects/:projectId/milestones</code> - list milestone tasks.</li>
+      <li><code>POST /api/projects/:projectId/milestones</code> - add a milestone task.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Implementation Approach</h2>
+    <ul>
+      <li>Add a new PocketBase hook helper module, for example <code>pb_hooks/lib/api-manager.js</code>.</li>
+      <li>Register the new routes from <code>pb_hooks/main.pb.js</code>.</li>
+      <li>Use existing PocketBase auth with <code>$apis.requireAuth("users")</code> for protected routes.</li>
+      <li>Mirror the existing frontend normalization rules for newsletters and Gantt data.</li>
+      <li>Patch only existing collection fields, mainly <code>newsletters.status</code> and <code>projects.gantt</code>.</li>
+      <li>Update frontend PocketBase wrapper functions to call the new routes where useful.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Authorization Rules</h2>
+    <ul>
+      <li>Newsletter create: <code>author</code>, <code>manager</code>, <code>general_manager</code>, or <code>admin</code>.</li>
+      <li>Newsletter edit: admin can edit all; other allowed roles can edit their own records.</li>
+      <li>Newsletter delete: admin only.</li>
+      <li>Project access: preserve current collection rule behavior: admin, general manager, creator, or allowed user.</li>
+      <li>Project/task mutation: same as project update permission.</li>
+      <li>Login: keep PocketBase built-in <code>/api/collections/users/auth-with-password</code>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Validation Rules</h2>
+    <ul>
+      <li>Reject unknown statuses.</li>
+      <li>Normalize task dates, durations, progress, predecessor IDs, resource IDs, and milestone duration.</li>
+      <li>Prevent predecessor references to missing tasks.</li>
+      <li>When deleting a task, remove deleted task IDs from all remaining <code>predecessorIds</code>.</li>
+      <li>When creating a milestone, force <code>milestone: true</code> and <code>durationDays: 0</code>.</li>
+      <li>When creating a subtask, set <code>indentLevel</code> to parent <code>indentLevel + 1</code>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Test Plan</h2>
+    <ul>
+      <li>Run <code>npm run build</code>.</li>
+      <li>Create, list, publish, draft, update, and delete newsletters.</li>
+      <li>Verify public users only see published newsletters.</li>
+      <li>Create, list, update, and status-change projects.</li>
+      <li>Add root tasks, subtasks, and milestones without changing schema.</li>
+      <li>Update task status through the status-only route.</li>
+      <li>Delete parent tasks and verify descendant subtasks are removed from <code>gantt.tasks</code>.</li>
+      <li>Verify existing manager UI still loads existing project and newsletter records.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Assumptions</h2>
+    <ul>
+      <li><q>make-darft</q> means <q>make-draft</q>.</li>
+      <li><q>mailstone</q> means <q>milestone</q>.</li>
+      <li>The API will be implemented as PocketBase hook routes, not a separate backend service.</li>
+      <li>The current database schema must remain backward compatible.</li>
+    </ul>
+  </section>
+</body>
+</html>

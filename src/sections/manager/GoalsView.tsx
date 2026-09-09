@@ -1,13 +1,14 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { AnalyticsDownIcon, AnalyticsUpIcon, MinusSignIcon, Target01Icon } from "@hugeicons/core-free-icons";
-import { useMemo } from 'react';
+import { AnalyticsDownIcon, AnalyticsUpIcon, Clock01Icon, Coins01Icon, MinusSignIcon, Target01Icon } from "@hugeicons/core-free-icons";
+import { useMemo, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useProjects } from '@/hooks/useProjects';
-import { getTaskProgress, getTaskSpanDays } from '@/lib/gantt';
+import { estimateTasksCost, getTaskProgress, getTaskSpanDays } from '@/lib/gantt';
+import type { GanttRoleCost } from '@/lib/gantt';
 import { parseISO } from 'date-fns';
-import type { GanttTask } from '@/types/gantt';
+import type { GanttCurrency, GanttResource, GanttRole, GanttTask } from '@/types/gantt';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────
 
 type GoalStatus = 'ahead' | 'on-track' | 'behind';
 
@@ -18,9 +19,35 @@ interface ComputedGoal {
   milestoneDate: string;
   progress: number;        // 0-100, based on task-day completion up to this milestone
   status: GoalStatus;
+  manpowerHours: number;          // planned manpower hours to reach this milestone
+  remainingManpowerHours: number; // manpower hours still needed to reach this milestone
+  costsByCurrency: Partial<Record<GanttCurrency, number>>;
+  roleCosts: GanttRoleCost[];
 }
 
+const currencySymbols: Record<GanttCurrency, string> = {
+  ILS: '₪',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * For a given milestone task, collect all tasks in the project that end on or
+ * before the milestone's start date (i.e. tasks that are "leading up to" it),
+ * excluding other milestones and the milestone itself.
+ */
+function getGoalLeadingTasks(tasks: GanttTask[], milestone: GanttTask): GanttTask[] {
+  const milestoneDate = parseISO(milestone.startDate);
+
+  return tasks.filter((t) => {
+    if (t.id === milestone.id) return false;
+    if (t.milestone) return false;
+    return parseISO(t.endDate) <= milestoneDate;
+  });
+}
 
 /**
  * For a given milestone task, collect all tasks in the project that end on or
@@ -29,16 +56,7 @@ interface ComputedGoal {
  *   (sum of completed task-day units) / (sum of all task-day units) * 100
  */
 function computeGoalProgress(tasks: GanttTask[], milestone: GanttTask): number {
-  const milestoneDate = parseISO(milestone.startDate);
-
-  // Tasks that are scheduled to be done before or on the milestone date,
-  // excluding other milestones and the milestone itself.
-  const precedingTasks = tasks.filter((t) => {
-    if (t.id === milestone.id) return false;
-    if (t.milestone) return false;
-    const taskEnd = parseISO(t.endDate);
-    return taskEnd <= milestoneDate;
-  });
+  const precedingTasks = getGoalLeadingTasks(tasks, milestone);
 
   // Include the milestone itself so its completion state is considered.
   const allRelevantTasks = [...precedingTasks, milestone];
@@ -66,12 +84,7 @@ function computeGoalProgress(tasks: GanttTask[], milestone: GanttTask): number {
 function computeGoalStatus(tasks: GanttTask[], milestone: GanttTask): GoalStatus {
   if (milestone.status === 'completed') return 'ahead';
 
-  const milestoneDate = parseISO(milestone.startDate);
-  const precedingTasks = tasks.filter((t) => {
-    if (t.id === milestone.id) return false;
-    if (t.milestone) return false;
-    return parseISO(t.endDate) <= milestoneDate;
-  });
+  const precedingTasks = getGoalLeadingTasks(tasks, milestone);
 
   if (precedingTasks.some((t) => t.status === 'delayed')) return 'behind';
   if (precedingTasks.length > 0 && precedingTasks.every((t) => t.status === 'completed')) return 'ahead';
@@ -84,16 +97,38 @@ function computeGoalStatus(tasks: GanttTask[], milestone: GanttTask): GoalStatus
 export function GoalsView() {
   const { formatDate, formatNumber, t } = useLocale();
   const { projects } = useProjects();
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
 
-  // ── Build computed goals from every project's milestone tasks ──
+  // ── Projects to include based on the pill selection (empty = all) ──
+  const filteredProjects = useMemo(
+    () => (selectedProjectIds.length === 0
+      ? projects
+      : projects.filter((project) => selectedProjectIds.includes(project.id))),
+    [projects, selectedProjectIds],
+  );
+
+  const toggleProjectFilter = (projectId: string) => {
+    setSelectedProjectIds((current) => (
+      current.includes(projectId)
+        ? current.filter((id) => id !== projectId)
+        : [...current, projectId]
+    ));
+  };
+
+  // ── Build computed goals from every selected project's milestone tasks ──
   const goals = useMemo<ComputedGoal[]>(() => {
     const result: ComputedGoal[] = [];
 
-    for (const project of projects) {
+    for (const project of filteredProjects) {
       const tasks = project.gantt?.tasks ?? [];
+      const resources: GanttResource[] = project.gantt?.resources ?? [];
+      const roles: GanttRole[] = project.gantt?.roles ?? [];
       const milestones = tasks.filter((t) => t.milestone);
 
       for (const ms of milestones) {
+        const leadingTasks = getGoalLeadingTasks(tasks, ms);
+        const { manpowerHours, remainingManpowerHours, costsByCurrency, roleCosts } = estimateTasksCost(leadingTasks, resources, roles);
+
         result.push({
           id: `${project.id}-${ms.id}`,
           projectTitle: project.title || project.department,
@@ -101,12 +136,16 @@ export function GoalsView() {
           milestoneDate: ms.startDate,
           progress: computeGoalProgress(tasks, ms),
           status: computeGoalStatus(tasks, ms),
+          manpowerHours,
+          remainingManpowerHours,
+          costsByCurrency,
+          roleCosts,
         });
       }
     }
 
     return result;
-  }, [projects]);
+  }, [filteredProjects]);
 
   // ── Overall Progress ──
   // ((sum of completed MS across projects) / (sum of all MS across projects)) * 100
@@ -114,7 +153,7 @@ export function GoalsView() {
     let completedCount = 0;
     let totalCount = 0;
 
-    for (const project of projects) {
+    for (const project of filteredProjects) {
       const tasks = project.gantt?.tasks ?? [];
       const milestones = tasks.filter((t) => t.milestone);
       totalCount += milestones.length;
@@ -123,7 +162,34 @@ export function GoalsView() {
 
     if (totalCount === 0) return 0;
     return Math.round((completedCount / totalCount) * 100);
-  }, [projects]);
+  }, [filteredProjects]);
+
+  // ── Overall effort & cost across selected projects (all tasks) ──
+  const overallEffort = useMemo(() => {
+    let totalManpowerHours = 0;
+    let usedManpowerHours = 0;
+    const totalCostsByCurrency: Partial<Record<GanttCurrency, number>> = {};
+    const spentCostsByCurrency: Partial<Record<GanttCurrency, number>> = {};
+
+    for (const project of filteredProjects) {
+      const tasks = project.gantt?.tasks ?? [];
+      const resources: GanttResource[] = project.gantt?.resources ?? [];
+      const roles: GanttRole[] = project.gantt?.roles ?? [];
+      const estimate = estimateTasksCost(tasks, resources, roles);
+
+      totalManpowerHours += estimate.manpowerHours;
+      usedManpowerHours += estimate.manpowerHours - estimate.remainingManpowerHours;
+
+      for (const [currency, amount] of Object.entries(estimate.costsByCurrency) as [GanttCurrency, number][]) {
+        totalCostsByCurrency[currency] = (totalCostsByCurrency[currency] ?? 0) + amount;
+      }
+      for (const [currency, amount] of Object.entries(estimate.spentCostsByCurrency) as [GanttCurrency, number][]) {
+        spentCostsByCurrency[currency] = (spentCostsByCurrency[currency] ?? 0) + amount;
+      }
+    }
+
+    return { totalManpowerHours, usedManpowerHours, totalCostsByCurrency, spentCostsByCurrency };
+  }, [filteredProjects]);
 
   // ── Badge / icon helpers ──
   const getStatusIcon = (status: GoalStatus) => {
@@ -162,10 +228,67 @@ export function GoalsView() {
     }
   };
 
+  // ── Cost formatting ──
+  const formatCost = (costsByCurrency: Partial<Record<GanttCurrency, number>>) => {
+    const entries = (Object.entries(costsByCurrency) as [GanttCurrency, number][])
+      .filter(([, amount]) => amount > 0);
+
+    if (entries.length === 0) {
+      return `${currencySymbols.ILS}${formatNumber(0)}`;
+    }
+
+    return entries
+      .map(([currency, amount]) => `${currencySymbols[currency]}${formatNumber(Math.round(amount))}`)
+      .join(' + ');
+  };
+
+  // ── Overall usage percentages ──
+  const manpowerUsedPercent = overallEffort.totalManpowerHours > 0
+    ? Math.round((overallEffort.usedManpowerHours / overallEffort.totalManpowerHours) * 100)
+    : 0;
+  const overallTotalCost = Object.values(overallEffort.totalCostsByCurrency).reduce((sum, amount) => sum + (amount ?? 0), 0);
+  const overallSpentCost = Object.values(overallEffort.spentCostsByCurrency).reduce((sum, amount) => sum + (amount ?? 0), 0);
+  const costSpentPercent = overallTotalCost > 0
+    ? Math.round((overallSpentCost / overallTotalCost) * 100)
+    : 0;
+
+  // ── Project selector pills ──
+  const projectSelector = projects.length > 0 ? (
+    <div className="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        onClick={() => setSelectedProjectIds([])}
+        className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+          selectedProjectIds.length === 0
+            ? 'border-[#D93A3A] bg-[#FEF2F2] text-[#D93A3A]'
+            : 'border-[#E5E5E5] bg-white text-[#525252] hover:border-[#D4D4D4] hover:bg-[#FAFAFA]'
+        }`}
+      >
+        {t('manager.allProjects')}
+      </button>
+      {projects.map((project) => (
+        <button
+          key={project.id}
+          type="button"
+          onClick={() => toggleProjectFilter(project.id)}
+          className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+            selectedProjectIds.includes(project.id)
+              ? 'border-[#D93A3A] bg-[#FEF2F2] text-[#D93A3A]'
+              : 'border-[#E5E5E5] bg-white text-[#525252] hover:border-[#D4D4D4] hover:bg-[#FAFAFA]'
+          }`}
+          dir="auto"
+        >
+          {project.title || project.department}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
   // ── Empty state ──
   if (goals.length === 0) {
     return (
       <div className="space-y-6">
+        {projectSelector}
         <div className="dashboard-card flex flex-col items-center justify-center py-16 text-center">
           <HugeiconsIcon icon={Target01Icon} className="w-12 h-12 text-[#D93A3A]/40 mb-4" />
           <h2 className="text-lg font-bold text-[#171717] mb-1">{t('manager.noMilestonesFound')}</h2>
@@ -179,6 +302,8 @@ export function GoalsView() {
 
   return (
     <div className="space-y-6">
+      {projectSelector}
+
       {/* Overall Progress */}
       <div className="dashboard-card">
         <div className="flex items-center justify-between mb-4">
@@ -201,6 +326,51 @@ export function GoalsView() {
             className="h-full bg-gradient-to-r from-[#D93A3A] to-green-600 transition-all duration-500"
             style={{ width: `${overallProgress}%` }}
           />
+        </div>
+
+        {/* Manpower & cost usage */}
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          {/* Manpower hours used */}
+          <div className="rounded-xl bg-[#F8FAFC] px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-[#737373]">
+                <HugeiconsIcon icon={Clock01Icon} className="w-4 h-4" />
+                <span className="text-sm">{t('manager.manpowerUsage')}</span>
+              </div>
+              <span className="text-xs font-medium text-[#525252]">{formatNumber(manpowerUsedPercent)}%</span>
+            </div>
+            <p className="mt-1.5 text-sm font-semibold text-[#171717]" dir="ltr">
+              {formatNumber(Math.round(overallEffort.usedManpowerHours))}
+              <span className="text-[#A3A3A3]"> / {formatNumber(Math.round(overallEffort.totalManpowerHours))} {t('manager.hoursUnit')}</span>
+            </p>
+            <div className="mt-2 h-2 bg-[#E5E5E5] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#D93A3A] transition-all duration-500"
+                style={{ width: `${manpowerUsedPercent}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Cost spent */}
+          <div className="rounded-xl bg-[#F8FAFC] px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-[#737373]">
+                <HugeiconsIcon icon={Coins01Icon} className="w-4 h-4" />
+                <span className="text-sm">{t('manager.costUsage')}</span>
+              </div>
+              <span className="text-xs font-medium text-[#525252]">{formatNumber(costSpentPercent)}%</span>
+            </div>
+            <p className="mt-1.5 text-sm font-semibold text-[#171717] truncate" dir="ltr" title={`${formatCost(overallEffort.spentCostsByCurrency)} / ${formatCost(overallEffort.totalCostsByCurrency)}`}>
+              {formatCost(overallEffort.spentCostsByCurrency)}
+              <span className="text-[#A3A3A3]"> / {formatCost(overallEffort.totalCostsByCurrency)}</span>
+            </p>
+            <div className="mt-2 h-2 bg-[#E5E5E5] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#D93A3A] transition-all duration-500"
+                style={{ width: `${costSpentPercent}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -236,6 +406,47 @@ export function GoalsView() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[#737373]">{t('manager.targetDate')}</span>
                 <span className="text-sm text-[#171717]">{formatDate(goal.milestoneDate, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+              </div>
+
+              {/* Manpower & estimated cost */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="rounded-xl bg-[#F8FAFC] px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 text-[#737373]">
+                    <HugeiconsIcon icon={Clock01Icon} className="w-3.5 h-3.5" />
+                    <span className="text-xs">{t('manager.manpowerHours')}</span>
+                  </div>
+                  <p className="mt-1 text-sm font-semibold text-[#171717]">
+                    {formatNumber(Math.round(goal.manpowerHours))} {t('manager.hoursUnit')}
+                  </p>
+                  {goal.progress < 100 && goal.remainingManpowerHours > 0 ? (
+                    <p className="mt-0.5 text-xs font-medium text-[#D93A3A]">
+                      {t('manager.manpowerHoursRemaining', {
+                        hours: `${formatNumber(Math.round(goal.remainingManpowerHours))} ${t('manager.hoursUnit')}`,
+                      })}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="rounded-xl bg-[#F8FAFC] px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 text-[#737373]">
+                    <HugeiconsIcon icon={Coins01Icon} className="w-3.5 h-3.5" />
+                    <span className="text-xs">{t('manager.estimatedCost')}</span>
+                  </div>
+                  <p className="mt-1 text-sm font-semibold text-[#171717] truncate" dir="ltr" title={formatCost(goal.costsByCurrency)}>
+                    {formatCost(goal.costsByCurrency)}
+                  </p>
+                  {goal.roleCosts.length > 0 ? (
+                    <div className="mt-1.5 space-y-1">
+                      {goal.roleCosts.map((roleCost) => (
+                        <div key={roleCost.roleId} className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="min-w-0 truncate text-[#737373]" dir="auto">
+                            {roleCost.roleName || t('manager.role')}
+                          </span>
+                          <span className="shrink-0 font-medium text-[#525252]">{formatNumber(roleCost.percent)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               {/* Progress bar */}

@@ -2,9 +2,13 @@ import type { RecordModel } from 'pocketbase';
 import { getPocketBase } from './client';
 import { normalizeProjectGantt } from '../gantt';
 import type { Project, ProjectFormData, ProjectStatus } from '../../types/project';
-import type { ProjectGantt } from '../../types/gantt';
+import type { GanttTask, ProjectGantt } from '../../types/gantt';
 
 export const PROJECTS_COLLECTION = 'projects';
+
+interface ApiListResponse<T> {
+  items?: T[];
+}
 
 // ---------------------------------------------------------------------------
 // Mapping
@@ -37,7 +41,11 @@ export function mapPBRecordToProject(record: RecordModel): Project {
 
 export async function fetchProjects(): Promise<Project[]> {
   const pb = getPocketBase();
-  const records = await pb.collection(PROJECTS_COLLECTION).getFullList({ sort: '-created' });
+  const response = await pb.send<ApiListResponse<RecordModel>>('/api/projects', {
+    method: 'GET',
+    requestKey: null,
+  });
+  const records = response.items ?? [];
   return records.map(mapPBRecordToProject);
 }
 
@@ -46,7 +54,12 @@ export async function createProject(
   gantt?: ProjectGantt,
 ): Promise<Project> {
   const pb = getPocketBase();
-  const record = await pb.collection(PROJECTS_COLLECTION).create({
+  const record = await pb.send<RecordModel>('/api/projects', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
     title: data.title,
     description: data.description,
     department: data.department,
@@ -57,6 +70,8 @@ export async function createProject(
     gantt: gantt ?? { tasks: [], resources: [], roles: [], zoom: 'week', lastEditedAt: null },
     createdBy: pb.authStore.record?.id ?? '',
     allowedUserIds: [],
+    }),
+    requestKey: null,
   });
   return mapPBRecordToProject(record);
 }
@@ -66,11 +81,141 @@ export async function updateProject(
   data: Partial<ProjectFormData & { status: ProjectStatus; isVisibleInGantt: boolean; gantt: ProjectGantt }>,
 ): Promise<Project> {
   const pb = getPocketBase();
-  const record = await pb.collection(PROJECTS_COLLECTION).update(id, data);
+  const record = await pb.send<RecordModel>(`/api/projects/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+    requestKey: null,
+  });
   return mapPBRecordToProject(record);
 }
 
 export async function deleteProject(id: string): Promise<void> {
   const pb = getPocketBase();
   await pb.collection(PROJECTS_COLLECTION).delete(id);
+}
+
+export async function updateProjectStatusOnly(id: string, status: ProjectStatus): Promise<Project> {
+  const pb = getPocketBase();
+  const record = await pb.send<RecordModel>(`/api/projects/${id}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ status }),
+    requestKey: null,
+  });
+  return mapPBRecordToProject(record);
+}
+
+export async function fetchProjectTasks(projectId: string): Promise<GanttTask[]> {
+  const pb = getPocketBase();
+  const response = await pb.send<ApiListResponse<GanttTask>>(`/api/projects/${projectId}/tasks`, {
+    method: 'GET',
+    requestKey: null,
+  });
+  return response.items ?? [];
+}
+
+export async function createProjectTask(projectId: string, task: Partial<GanttTask>): Promise<GanttTask> {
+  const pb = getPocketBase();
+  return pb.send<GanttTask>(`/api/projects/${projectId}/tasks`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(task),
+    requestKey: null,
+  });
+}
+
+export async function updateProjectTask(
+  projectId: string,
+  taskId: string,
+  task: Partial<GanttTask>,
+): Promise<GanttTask> {
+  const pb = getPocketBase();
+  return pb.send<GanttTask>(`/api/projects/${projectId}/tasks/${taskId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(task),
+    requestKey: null,
+  });
+}
+
+export async function updateProjectTaskStatus(
+  projectId: string,
+  taskId: string,
+  status: ProjectStatus,
+): Promise<GanttTask> {
+  const pb = getPocketBase();
+  return pb.send<GanttTask>(`/api/projects/${projectId}/tasks/${taskId}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ status }),
+    requestKey: null,
+  });
+}
+
+export async function deleteProjectTask(
+  projectId: string,
+  taskId: string,
+): Promise<{ status: string; deletedTaskIds: string[] }> {
+  const pb = getPocketBase();
+  return pb.send<{ status: string; deletedTaskIds: string[] }>(`/api/projects/${projectId}/tasks/${taskId}`, {
+    method: 'DELETE',
+    requestKey: null,
+  });
+}
+
+export async function fetchProjectSubtasks(projectId: string, taskId: string): Promise<GanttTask[]> {
+  const pb = getPocketBase();
+  const response = await pb.send<ApiListResponse<GanttTask>>(`/api/projects/${projectId}/tasks/${taskId}/subtasks`, {
+    method: 'GET',
+    requestKey: null,
+  });
+  return response.items ?? [];
+}
+
+export async function createProjectSubtask(
+  projectId: string,
+  taskId: string,
+  task: Partial<GanttTask>,
+): Promise<GanttTask> {
+  const pb = getPocketBase();
+  return pb.send<GanttTask>(`/api/projects/${projectId}/tasks/${taskId}/subtasks`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(task),
+    requestKey: null,
+  });
+}
+
+export async function fetchProjectMilestones(projectId: string): Promise<GanttTask[]> {
+  const pb = getPocketBase();
+  const response = await pb.send<ApiListResponse<GanttTask>>(`/api/projects/${projectId}/milestones`, {
+    method: 'GET',
+    requestKey: null,
+  });
+  return response.items ?? [];
+}
+
+export async function createProjectMilestone(projectId: string, task: Partial<GanttTask>): Promise<GanttTask> {
+  const pb = getPocketBase();
+  return pb.send<GanttTask>(`/api/projects/${projectId}/milestones`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(task),
+    requestKey: null,
+  });
 }

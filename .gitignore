@@ -4,3 +4,16 @@ dist
 *.tar
 .venv
 .tmp
+outputs/
+.codex-work/
+.docker/
+pb_data/
+*.log
+*.tar.gz
+__pycache__/
+*.pyc
+.env.*
+!.env.example
+!.env.docker.example
+/manager-roadmap-gantts-import*.xlsx
+/tests/geektime-ai-newsletter-2026-07-13.json

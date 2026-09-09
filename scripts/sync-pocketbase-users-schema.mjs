@@ -2,6 +2,7 @@ import PocketBase from 'pocketbase';
 import { loadProjectEnv, resolvePocketBaseUrl } from './pocketbase/load-env.mjs';
 
 const USER_ROLES = ['viewer', 'author', 'manager', 'general_manager', 'admin'];
+const USER_LOCALES = ['he', 'en'];
 
 function escapeFilterValue(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -44,6 +45,32 @@ function ensureRoleField(fields) {
   return nextFields;
 }
 
+function ensureLocaleField(fields) {
+  const localeField = {
+    name: 'locale',
+    type: 'select',
+    required: false,
+    hidden: false,
+    maxSelect: 1,
+    values: USER_LOCALES,
+  };
+
+  const existingIndex = fields.findIndex((field) => field.name === 'locale');
+  if (existingIndex === -1) {
+    return [...fields, localeField];
+  }
+
+  const existingField = fields[existingIndex];
+  const nextFields = [...fields];
+  nextFields[existingIndex] = {
+    ...existingField,
+    ...localeField,
+    id: existingField.id,
+  };
+
+  return nextFields;
+}
+
 async function syncRoleByEmail(pb, email, role) {
   const normalizedEmail = email.trim().toLowerCase();
   if (!normalizedEmail) {
@@ -77,7 +104,7 @@ async function main() {
   await pb.collection('_superusers').authWithPassword(superuserEmail, superuserPassword);
 
   const usersCollection = await pb.collections.getOne('users');
-  const nextFields = ensureRoleField(usersCollection.fields);
+  const nextFields = ensureLocaleField(ensureRoleField(usersCollection.fields));
 
   await pb.collections.update('users', {
     fields: nextFields,

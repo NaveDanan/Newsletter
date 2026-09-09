@@ -1,0 +1,51 @@
+# Example only: replace Docker and Helm repository names with Set Me Up values.
+# The wizard generates this configuration from your actual answers.
+# Prerequisites: namespace, pull secret, ArgoCD Helm repository credentials,
+# CA trust and prepared Linux nodes. See longhorn-airgap.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: longhorn
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # OCI Helm source: no oci:// prefix here. The repository Secret uses enableOCI=true.
+    # Legacy alternative: https://artifactory.rafael.co.il/artifactory/api/helm/HELM_REPO
+    repoURL: artifactory.rafael.co.il/REPLACE_WITH_HELM_OCI_REPO
+    chart: longhorn
+    targetRevision: "1.11.2"
+    helm:
+      releaseName: longhorn
+      valuesObject:
+        global:
+          imageRegistry: artifactory.rafael.co.il/REPLACE_WITH_DOCKER_REPO
+        privateRegistry:
+          createSecret: false
+          registryUrl: artifactory.rafael.co.il/REPLACE_WITH_DOCKER_REPO
+          registrySecret: longhorn-artifactory-pull
+        image:
+          pullPolicy: Always
+        preUpgradeChecker:
+          jobEnabled: false
+        persistence:
+          defaultClass: false
+          defaultClassReplicaCount: 2
+          reclaimPolicy: Retain
+        defaultSettings:
+          defaultDataPath: /var/lib/longhorn
+          defaultReplicaCount:
+            v1: "2"
+            v2: "2"
+          upgradeChecker: false
+          v2DataEngine: false
+          systemManagedPodsImagePullPolicy: always
+        ingress:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: longhorn-system
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+# Intentionally no automated sync/prune or cascading-deletion finalizer.

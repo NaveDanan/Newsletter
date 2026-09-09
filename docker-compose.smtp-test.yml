@@ -9,7 +9,7 @@ services:
     depends_on:
       - mailpit
     environment:
-      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8080}
+      APP_PUBLIC_URL: ${SMTP_TEST_APP_PUBLIC_URL:-http://localhost:7080}
       POCKETBASE_APP_NAME: ${POCKETBASE_APP_NAME:-}
       POCKETBASE_SUPERUSER_EMAIL: ${POCKETBASE_SUPERUSER_EMAIL}
       POCKETBASE_SUPERUSER_PASSWORD: ${POCKETBASE_SUPERUSER_PASSWORD}
@@ -38,16 +38,16 @@ services:
       POCKETBASE_SSO_OIDC_PKCE: ${POCKETBASE_SSO_OIDC_PKCE:-}
       POCKETBASE_RECREATE_COLLECTIONS: ${POCKETBASE_RECREATE_COLLECTIONS:-0}
     ports:
-      - "${FRONTEND_PORT:-8080}:8080"
-      - "${POCKETBASE_PORT:-8090}:8090"
+      - "${SMTP_TEST_FRONTEND_PORT:-7080}:8080"
+      - "${SMTP_TEST_POCKETBASE_PORT:-7090}:8090"
     volumes:
       - pocketbase_data:/pb_data
 
   mailpit:
     image: axllent/mailpit:v1.27
     ports:
-      - "${MAILPIT_SMTP_PORT:-1025}:1025"
-      - "${MAILPIT_WEB_PORT:-8025}:8025"
+      - "${SMTP_TEST_MAILPIT_SMTP_PORT:-7025}:1025"
+      - "${SMTP_TEST_MAILPIT_WEB_PORT:-7026}:8025"
 
 volumes:
   pocketbase_data:

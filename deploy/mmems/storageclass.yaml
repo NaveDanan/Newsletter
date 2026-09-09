@@ -1,0 +1,14 @@
+# Dedicated, retained filesystem volumes with replicas on the new local disks.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: newsletter-longhorn
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "2"
+  fsType: ext4
+  diskSelector: newsletter
+  staleReplicaTimeout: "30"

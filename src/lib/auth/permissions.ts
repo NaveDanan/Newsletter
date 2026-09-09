@@ -14,6 +14,10 @@ export function canAccessManagerTab(role: UserRole | null | undefined, tab: stri
     return role === 'admin';
   }
 
+  if (tab === 'scheduled') {
+    return role === 'admin';
+  }
+
   return role === 'manager' || role === 'general_manager' || role === 'admin';
 }
 

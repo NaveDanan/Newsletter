@@ -22,6 +22,10 @@ service:
   ports:
     frontend: 80
     pocketbase: 8090
+  # Optional fixed ports when type is NodePort or LoadBalancer.
+  nodePorts:
+    frontend: null
+    pocketbase: null
 
 persistence:
   enabled: true

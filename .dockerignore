@@ -8,4 +8,15 @@ docs
 *.log
 pb_data
 .venv
-*.tar 
+*.tar
+*.tar.gz
+.env
+.env.*
+outputs
+.codex-work
+.docker
+.tmp
+**/__pycache__
+**/.longhorn-airgap
+*.xlsx
+tests

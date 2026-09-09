@@ -10,6 +10,7 @@ import { GoalsView } from './manager/GoalsView';
 import { GanttView } from './manager/GanttView';
 import { LinksView } from './manager/LinksView';
 import { SpreadsheetView } from './manager/SpreadsheetView';
+import { ScheduledView } from './manager/ScheduledView';
 import { NewsletterList } from './manager/NewsletterList';
 import { NewsletterEditor, type NewsletterEditorHandle } from './manager/NewsletterEditor';
 import { NewsletterViewer } from './NewsletterViewer';
@@ -32,7 +33,7 @@ import {
 import type { PocketBaseUser, UserRole } from '@/lib/pocketbase/client';
 import type { Newsletter, NewsletterComment, NewsletterFormData } from '../types/newsletter';
 
-export type Tab = 'newsletters' | 'projects' | 'goals' | 'gantt' | 'spreadsheet' | 'links';
+export type Tab = 'newsletters' | 'projects' | 'goals' | 'gantt' | 'spreadsheet' | 'links' | 'scheduled';
 type ViewMode = 'list' | 'editor' | 'viewer';
 
 interface ManagerDashboardProps {
@@ -95,6 +96,7 @@ export function ManagerDashboard({
     { id: 'gantt' as Tab, label: t('manager.gantt'), icon: BarChartIcon },
     { id: 'spreadsheet' as Tab, label: t('manager.spreadsheet'), icon: FileSpreadsheetIcon },
     { id: 'links' as Tab, label: t('manager.links'), icon: Link01Icon },
+    { id: 'scheduled' as Tab, label: t('manager.scheduled'), icon: Calendar01Icon },
   ].filter((tab) => canAccessManagerTab(currentUserRole, tab.id));
 
   const handleCreateNewsletter = () => {
@@ -280,6 +282,8 @@ export function ManagerDashboard({
         return <SpreadsheetView />;
       case 'links':
         return <LinksView currentUserRole={currentUserRole} />;
+      case 'scheduled':
+        return <ScheduledView currentUserRole={currentUserRole} />;
       default:
         return null;
     }

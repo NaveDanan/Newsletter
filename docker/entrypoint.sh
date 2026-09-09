@@ -139,6 +139,7 @@ if [ -z "${POCKETBASE_SUPERUSER_EMAIL:-}" ] || [ -z "${POCKETBASE_SUPERUSER_PASS
 fi
 
 export POCKETBASE_URL
+export APP_ROOT
 
 write_app_config
 start_pocketbase

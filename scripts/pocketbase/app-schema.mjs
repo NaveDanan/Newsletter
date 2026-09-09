@@ -247,6 +247,32 @@ export const LINKS_SCHEMA = {
   deleteRule: '@request.auth.role = "admin"',
 };
 
+export const SCHEDULED_JOBS_SCHEMA = {
+  name: 'scheduled_jobs',
+  type: 'base',
+  fields: [
+    autodate('created', true, false),
+    autodate('updated', true, true),
+    text('key', 255, { required: true }),
+    bool('enabled'),
+    number('intervalMinutes', 60, { onlyInt: true }),
+    number('maxNewsletters', 1, { onlyInt: true }),
+    text('lastRunAt', 255),
+    text('lastSuccessAt', 255),
+    text('lastError', 2000000),
+    json('lastResult'),
+    text('updatedBy', 255),
+  ],
+  indexes: [
+    'CREATE UNIQUE INDEX idx_scheduled_jobs_key ON scheduled_jobs (key)',
+  ],
+  listRule: '@request.auth.role = "admin"',
+  viewRule: '@request.auth.role = "admin"',
+  createRule: '@request.auth.role = "admin"',
+  updateRule: '@request.auth.role = "admin"',
+  deleteRule: '@request.auth.role = "admin"',
+};
+
 export const APP_COLLECTION_SCHEMAS = [
   PROJECTS_SCHEMA,
   NEWSLETTERS_SCHEMA,
@@ -256,4 +282,5 @@ export const APP_COLLECTION_SCHEMAS = [
   VALID_EMAIL_DOMAINS_SCHEMA,
   NEWSLETTER_UNSUBSCRIBES_SCHEMA,
   LINKS_SCHEMA,
+  SCHEDULED_JOBS_SCHEMA,
 ];

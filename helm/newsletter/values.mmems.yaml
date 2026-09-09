@@ -1,0 +1,34 @@
+# MMEMS deployment. Credentials are held in a separately provisioned Secret.
+fullnameOverride: newsletter
+replicaCount: 1
+image:
+  repository: newsletter
+  tag: 1.0.19-20260909.1
+  pullPolicy: IfNotPresent
+credentials:
+  existingSecret: newsletter-env
+service:
+  type: NodePort
+  nodePorts:
+    frontend: 32280
+    pocketbase: 32290
+persistence:
+  enabled: true
+  storageClass: newsletter-longhorn
+  accessModes: [ReadWriteOnce]
+  size: 5Gi
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+    helm.sh/resource-policy: keep
+env:
+  appPublicUrl: http://10.40.240.3:32280
+  pocketbasePublicUrl: http://10.40.240.3:32290
+  pocketbaseRecreateCollections: false
+  pocketbaseSmtpEnabled: false
+  pocketbaseSsoOidcEnabled: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 2Gi

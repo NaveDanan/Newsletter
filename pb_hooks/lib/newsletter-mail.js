@@ -289,6 +289,14 @@ function normalizeLocale(value) {
   return value === 'he' ? 'he' : 'en';
 }
 
+function getRecordLocale(record, fallback) {
+  try {
+    return normalizeLocale(record && record.getString ? record.getString('locale') : fallback);
+  } catch (_) {
+    return normalizeLocale(fallback);
+  }
+}
+
 function getSubscribeErrorMessage(code, locale) {
   var isHebrew = normalizeLocale(locale) === 'he';
 
@@ -438,7 +446,7 @@ function upsertSubscriberForUser(app, user) {
   }
 
   return upsertSubscriber(app, email, {
-    locale: 'en',
+    locale: getRecordLocale(user, 'he'),
     source: 'registered_account',
   });
 }
@@ -478,6 +486,15 @@ function buildPasswordResetUrl(token) {
   return baseUrl + '/reset-password/' + encodeURIComponent(token);
 }
 
+function buildVerificationUrl(token) {
+  var baseUrl = getFrontendPublicUrl();
+  if (!baseUrl || !token) {
+    return '';
+  }
+
+  return baseUrl + '/verify-email/' + encodeURIComponent(token);
+}
+
 function buildUnsubscribeUrl(subscriber) {
   var baseUrl = getFrontendPublicUrl();
   var subscriberId = subscriber && subscriber.id ? String(subscriber.id) : '';
@@ -509,6 +526,56 @@ function buildUnsubscribeFooter(locale, unsubscribeUrl) {
     + unsubscribeCopy
     + ' <a href="' + escapeHtml(unsubscribeUrl) + '" style="color:#D93A3A;text-decoration:underline;font-weight:600">' + unsubscribeLabel + '</a>'
     + '</p>';
+}
+
+function buildEmailButton(url, label, align) {
+  if (!url) {
+    return '';
+  }
+
+  return ''
+    + '<table role="presentation" border="0" cellspacing="0" cellpadding="0" align="' + align + '" style="border-collapse:collapse;margin:0">'
+    + '<tr>'
+    + '<td bgcolor="#D93A3A" style="background:#D93A3A;padding:14px 22px;font-family:Arial,sans-serif;font-size:15px;line-height:18px;font-weight:800">'
+    + '<a href="' + escapeHtml(url) + '" style="color:#ffffff;text-decoration:none;display:inline-block">' + label + '</a>'
+    + '</td>'
+    + '</tr>'
+    + '</table>';
+}
+
+function appendImageOptimizationParams(url, thumb) {
+  url = String(url || '').trim();
+  if (!url) {
+    return '';
+  }
+
+  var separator = url.indexOf('?') === -1 ? '?' : '&';
+  return url + separator + 'thumb=' + encodeURIComponent(thumb || '420x180') + '&quality=72';
+}
+
+function buildEmailShell(options) {
+  var direction = options.direction || 'ltr';
+  var textAlign = options.textAlign || 'left';
+  var width = options.width || 640;
+  var preheader = options.preheader || '';
+  var footerBrand = options.footerBrand || '';
+
+  return ''
+    + '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+    + '<body style="margin:0;padding:0;background:#F3F4F6;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">'
+    + '<div style="display:none;max-height:0;overflow:hidden;color:transparent;opacity:0;mso-hide:all">' + preheader + '</div>'
+    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#F3F4F6" style="border-collapse:collapse;background:#F3F4F6;width:100%">'
+    + '<tr>'
+    + '<td align="center" style="padding:28px 12px">'
+    + '<table role="presentation" width="' + width + '" border="0" cellspacing="0" cellpadding="0" dir="' + direction + '" style="border-collapse:collapse;width:100%;max-width:' + width + 'px;background:#ffffff;border:1px solid #E5E5E5;text-align:' + textAlign + ';font-family:Arial,sans-serif;color:#171717">'
+    + '<tr><td bgcolor="#D93A3A" height="6" style="height:6px;line-height:6px;font-size:1px;background:#D93A3A">&nbsp;</td></tr>'
+    + options.body
+    + '</table>'
+    + (footerBrand ? '<table role="presentation" width="' + width + '" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;max-width:' + width + 'px"><tr><td align="center" style="padding:18px 12px 0;color:#A3A3A3;font-family:Arial,sans-serif;font-size:12px;line-height:18px">' + footerBrand + '</td></tr></table>' : '')
+    + '</td>'
+    + '</tr>'
+    + '</table>'
+    + '</body></html>';
 }
 
 function buildNewsletterEmail(app, record, subscriber) {
@@ -579,38 +646,123 @@ function buildNewsletterUpdateEmail(app, record, subscriber) {
     ? '\u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8 \u05d7\u05d3\u05e9 \u05e2\u05dc\u05d4 \u05dc\u05d0\u05ea\u05e8 \u05e2\u05dd \u05ea\u05d5\u05d1\u05e0\u05d5\u05ea \u05d5\u05e2\u05d3\u05db\u05d5\u05e0\u05d9\u05dd \u05e9\u05db\u05d3\u05d0\u05d9 \u05dc\u05e4\u05ea\u05d5\u05d7.'
     : 'A new newsletter is live on the site, with the latest signals and practical takeaways.';
   var meta = [publishedAt, readTime].filter(function (value) { return Boolean(value); }).join(' / ');
-  var calloutStyle = textAlign === 'center'
-    ? 'padding-top:18px;border-top:4px solid #D93A3A;text-align:center'
-    : 'padding-' + accentSide + ':18px;border-' + accentSide + ':4px solid #D93A3A;text-align:' + textAlign;
+  var calloutBorder = textAlign === 'right' ? 'border-right:4px solid #D93A3A;padding-right:18px' : 'border-left:4px solid #D93A3A;padding-left:18px';
+  var buttonAlign = textAlign === 'right' ? 'right' : textAlign === 'center' ? 'center' : 'left';
   var unsubscribeUrl = buildUnsubscribeUrl(subscriber);
+  var body = ''
+    + '<tr><td style="padding:30px 32px 24px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
+    + '<p style="margin:0 0 12px;color:#D93A3A;font-size:12px;line-height:16px;font-weight:800;letter-spacing:2px;text-transform:uppercase">' + escapeHtml(appName) + '</p>'
+    + '<p style="margin:0 0 20px;color:#737373;font-size:13px;line-height:18px;font-weight:600">' + latestLabel + (meta ? ' / ' + meta : '') + '</p>'
+    + '<h1 style="margin:0 0 18px;color:#171717;font-size:38px;line-height:42px;font-weight:800">' + title + '</h1>'
+    + (subtitle ? '<p style="margin:0;color:#404040;font-size:18px;line-height:28px;font-weight:500">' + subtitle + '</p>' : '')
+    + '</td></tr>'
+    + (coverImage
+      ? '<tr><td style="padding:0 32px 28px"><img src="' + coverImage + '" alt="' + title + '" width="656" style="display:block;width:100%;max-width:656px;height:auto;border:0;outline:none;text-decoration:none" /></td></tr>'
+      : '<tr><td style="padding:0 32px 28px"><table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td height="1" bgcolor="#E5E5E5" style="height:1px;line-height:1px;font-size:1px;background:#E5E5E5">&nbsp;</td></tr></table></td></tr>')
+    + '<tr><td style="padding:0 32px 34px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
+    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td style="' + calloutBorder + ';text-align:' + textAlign + ';font-family:Arial,sans-serif">'
+    + '<p style="margin:0 0 16px;color:#171717;font-size:17px;line-height:28px">' + intro + '</p>'
+    + (excerpt ? '<p style="margin:0;color:#525252;font-size:16px;line-height:28px">' + excerpt + '</p>' : '')
+    + '</td></tr></table>'
+    + (articleUrl ? '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td align="' + buttonAlign + '" style="padding:30px 0 34px">' + buildEmailButton(articleUrl, ctaLabel, buttonAlign) + '</td></tr></table>' : '')
+    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td height="1" bgcolor="#E5E5E5" style="height:1px;line-height:1px;font-size:1px;background:#E5E5E5">&nbsp;</td></tr></table>'
+    + '<p style="margin:18px 0 0;color:#737373;font-size:13px;line-height:21px">' + footerText + '</p>'
+    + buildUnsubscribeFooter(locale, unsubscribeUrl)
+    + '</td></tr>';
 
   return {
     subject: subject,
-    html: ''
-      + '<div dir="' + direction + '" style="margin:0;background:#ffffff;color:#171717;font-family:Inter,Arial,sans-serif;line-height:1.6;text-align:' + textAlign + '">'
-      + '<div style="height:6px;background:#D93A3A;line-height:6px;font-size:1px">&nbsp;</div>'
-      + '<div style="max-width:680px;margin:0 auto;padding:28px 24px 0">'
-      + '<p style="margin:0 0 12px;color:#D93A3A;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase">' + escapeHtml(appName) + '</p>'
-      + '<p style="margin:0 0 22px;color:#737373;font-size:13px;font-weight:600">' + latestLabel + (meta ? ' / ' + meta : '') + '</p>'
-      + '<h1 style="margin:0 0 18px;color:#171717;font-size:42px;line-height:1.05;font-weight:800;letter-spacing:0">' + title + '</h1>'
-      + (subtitle ? '<p style="margin:0 0 26px;color:#404040;font-size:20px;line-height:1.45;font-weight:500">' + subtitle + '</p>' : '')
-      + '</div>'
-      + (coverImage
-        ? '<div style="max-width:880px;margin:0 auto 28px"><img src="' + coverImage + '" alt="' + title + '" width="880" style="display:block;width:100%;height:auto;border:0" /></div>'
-        : '<div style="height:1px;max-width:680px;margin:0 auto 28px;background:#E5E5E5;line-height:1px;font-size:1px">&nbsp;</div>')
-      + '<div style="max-width:680px;margin:0 auto;padding:0 24px 32px">'
-      + '<div style="' + calloutStyle + '">'
-      + '<p style="margin:0 0 16px;color:#171717;font-size:17px;line-height:1.65">' + intro + '</p>'
-      + (excerpt ? '<p style="margin:0;color:#525252;font-size:16px;line-height:1.75">' + excerpt + '</p>' : '')
-      + '</div>'
-      + (articleUrl
-        ? '<p style="margin:30px 0 34px"><a href="' + escapeHtml(articleUrl) + '" style="display:inline-block;background:#D93A3A;color:#ffffff;text-decoration:none;padding:14px 22px;border-radius:6px;font-size:15px;font-weight:800">' + ctaLabel + '</a></p>'
-        : '')
-      + '<div style="height:1px;background:#E5E5E5;line-height:1px;font-size:1px">&nbsp;</div>'
-      + '<p style="margin:18px 0 0;color:#737373;font-size:13px;line-height:1.6">' + footerText + '</p>'
-      + buildUnsubscribeFooter(locale, unsubscribeUrl)
-      + '</div>'
-      + '</div>',
+    html: buildEmailShell({
+      direction: direction,
+      textAlign: textAlign,
+      width: 720,
+      preheader: intro,
+      body: body,
+    }),
+  };
+}
+
+function buildDigestNewsletterItem(record, locale) {
+  var title = escapeHtml(record.getString('title'));
+  var subtitle = escapeHtml(record.getString('subtitle'));
+  var excerptSource = stripHtml(record.getString('excerpt') || record.getString('content'));
+  var excerpt = escapeHtml(excerptSource.slice(0, 220));
+  var articleUrl = buildArticleUrl(record);
+  var coverImage = escapeHtml(appendImageOptimizationParams(record.getString('coverImage'), '420x180'));
+  var publishedAt = escapeHtml(record.getString('publishedAt'));
+  var readTime = escapeHtml(record.getString('readTime'));
+  var meta = [publishedAt, readTime].filter(function (value) { return Boolean(value); }).join(' / ');
+  var ctaLabel = locale === 'he'
+    ? '\u05dc\u05e7\u05e8\u05d9\u05d0\u05ea \u05d4\u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8'
+    : 'Read newsletter';
+  var bannerLabel = title || 'AI-BREAK';
+  var banner = coverImage
+    ? '<tr><td align="center" style="padding:0 0 12px"><img src="' + coverImage + '" alt="' + title + '" width="420" style="display:block;width:100%;max-width:420px;height:auto;border:0;outline:none;text-decoration:none" /></td></tr>'
+    : '<tr><td align="center" style="padding:0 0 12px"><table role="presentation" width="420" border="0" cellspacing="0" cellpadding="0" bgcolor="#171717" style="border-collapse:collapse;background:#171717;width:100%;max-width:420px"><tr><td align="center" height="92" style="height:92px;color:#ffffff;font-family:Arial,sans-serif;font-size:12px;line-height:17px;font-weight:800;letter-spacing:2px;text-transform:uppercase">' + bannerLabel + '</td></tr></table></td></tr>';
+
+  return ''
+    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border-top:1px solid #E5E5E5">'
+    + '<tr><td style="padding:22px 0;font-family:Arial,sans-serif">'
+    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse">'
+    + banner
+    + '</table>'
+    + (meta ? '<p style="margin:0 0 8px;color:#737373;font-size:12px;line-height:17px;font-weight:700">' + meta + '</p>' : '')
+    + '<h2 style="margin:0 0 10px;color:#171717;font-size:22px;line-height:28px;font-weight:800">' + title + '</h2>'
+    + (subtitle ? '<p style="margin:0 0 10px;color:#404040;font-size:15px;line-height:23px;font-weight:600">' + subtitle + '</p>' : '')
+    + (excerpt ? '<p style="margin:0 0 14px;color:#525252;font-size:14px;line-height:24px">' + excerpt + '</p>' : '')
+    + (articleUrl
+      ? '<p style="margin:0"><a href="' + escapeHtml(articleUrl) + '" style="color:#D93A3A;text-decoration:underline;font-size:14px;font-weight:800">' + ctaLabel + '</a></p>'
+      : '')
+    + '</td></tr>'
+    + '</table>';
+}
+
+function buildNewsletterDigestEmail(app, records, subscriber) {
+  var locale = 'he';
+  var appName = getAppName(app);
+  var direction = locale === 'he' ? 'rtl' : 'ltr';
+  var textAlign = locale === 'he' ? 'right' : 'left';
+  var count = records.length;
+  var subject = locale === 'he'
+    ? '\u05e2\u05d3\u05db\u05d5\u05e0\u05d9 \u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8 \u05d7\u05d3\u05e9\u05d9\u05dd \u05de-' + appName
+    : 'New newsletter updates from ' + appName;
+  var title = locale === 'he'
+    ? '\u05e2\u05d3\u05db\u05d5\u05e0\u05d9 \u05d4\u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8 \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd'
+    : 'Latest newsletter updates';
+  var intro = locale === 'he'
+    ? '\u05e8\u05d9\u05db\u05d6\u05e0\u05d5 \u05e2\u05d1\u05d5\u05e8\u05db\u05dd ' + count + ' \u05e4\u05e8\u05e1\u05d5\u05de\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd \u05e9\u05e2\u05dc\u05d5 \u05dc\u05d0\u05ea\u05e8.'
+    : 'Here are ' + count + ' new newsletter publications now available on the site.';
+  var footerText = locale === 'he'
+    ? '\u05e7\u05d9\u05d1\u05dc\u05ea\u05dd \u05d0\u05ea \u05d4\u05d4\u05d5\u05d3\u05e2\u05d4 \u05db\u05d9 \u05e0\u05e8\u05e9\u05de\u05ea\u05dd \u05dc\u05e2\u05d3\u05db\u05d5\u05e0\u05d9 \u05d4\u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8.'
+    : 'You received this email because you subscribed to newsletter updates.';
+  var unsubscribeUrl = buildUnsubscribeUrl(subscriber);
+  var items = '';
+
+  for (var i = 0; i < records.length; i += 1) {
+    items += buildDigestNewsletterItem(records[i], locale);
+  }
+  var body = ''
+    + '<tr><td style="padding:30px 32px 18px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
+    + '<p style="margin:0 0 12px;color:#D93A3A;font-size:12px;line-height:16px;font-weight:800;letter-spacing:2px;text-transform:uppercase">' + escapeHtml(appName) + '</p>'
+    + '<h1 style="margin:0 0 14px;color:#171717;font-size:34px;line-height:39px;font-weight:800">' + title + '</h1>'
+    + '<p style="margin:0;color:#404040;font-size:16px;line-height:27px">' + intro + '</p>'
+    + '</td></tr>'
+    + '<tr><td style="padding:0 32px 34px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
+    + items
+    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td height="1" bgcolor="#E5E5E5" style="height:1px;line-height:1px;font-size:1px;background:#E5E5E5">&nbsp;</td></tr></table>'
+    + '<p style="margin:18px 0 0;color:#737373;font-size:13px;line-height:21px">' + footerText + '</p>'
+    + buildUnsubscribeFooter(locale, unsubscribeUrl)
+    + '</td></tr>';
+
+  return {
+    subject: subject,
+    html: buildEmailShell({
+      direction: direction,
+      textAlign: textAlign,
+      width: 720,
+      preheader: intro,
+      body: body,
+    }),
   };
 }
 
@@ -655,17 +807,152 @@ function unsubscribeSubscriber(app, subscriberId, email) {
 function buildPasswordResetEmail(app, record, resetUrl) {
   var appName = getAppName(app);
   var displayName = record.getString('name') || record.email();
+  var locale = getRecordLocale(record, 'he');
+  var isHebrew = locale === 'he';
+
+  return buildTransactionalEmailTable(app, {
+    subject: isHebrew ? 'איפוס סיסמה ב-' + appName : 'Reset your ' + appName + ' password',
+    title: isHebrew ? 'איפוס סיסמה' : 'Reset your password',
+    eyebrow: isHebrew ? 'אבטחת החשבון' : 'Account security',
+    greeting: isHebrew ? 'שלום ' + displayName + ',' : 'Hello ' + displayName + ',',
+    body: isHebrew
+      ? 'קיבלנו בקשה לאיפוס הסיסמה לחשבון שלכם ב-' + appName + '. השתמשו בקישור המאובטח כדי לבחור סיסמה חדשה.'
+      : 'We received a request to reset your ' + appName + ' password. Use the secure link below to choose a new one.',
+    actionUrl: resetUrl,
+    actionLabel: isHebrew ? 'בחירת סיסמה חדשה' : 'Set a new password',
+    note: isHebrew
+      ? 'אם לא ביקשתם את השינוי הזה, אפשר להתעלם מהאימייל. הקישור יפוג בהתאם להגדרות האבטחה של החשבון.'
+      : 'If you did not request this change, you can ignore this email. The link expires according to your account security settings.',
+    locale: locale,
+  });
+}
+
+function buildVerificationEmail(app, record, verificationUrl) {
+  var appName = getAppName(app);
+  var displayName = record.getString('name') || record.email();
+  var locale = getRecordLocale(record, 'he');
+  var isHebrew = locale === 'he';
+
+  return buildTransactionalEmailTable(app, {
+    subject: isHebrew ? 'אימות אימייל ב-' + appName : 'Verify your ' + appName + ' email',
+    title: isHebrew ? 'אימות כתובת האימייל' : 'Verify your email',
+    eyebrow: isHebrew ? 'ברוכים הבאים ל-' + appName : 'Welcome to ' + appName,
+    greeting: isHebrew ? 'שלום ' + displayName + ',' : 'Hello ' + displayName + ',',
+    body: isHebrew
+      ? 'תודה שהצטרפתם ל-' + appName + '. אשרו את כתובת האימייל כדי להשלים את הפעלת החשבון.'
+      : 'Thanks for joining ' + appName + '. Confirm your email address so your account is ready to use.',
+    actionUrl: verificationUrl,
+    actionLabel: isHebrew ? 'אימות האימייל' : 'Verify email',
+    note: isHebrew
+      ? 'אם לא יצרתם את החשבון הזה, אפשר להתעלם מהאימייל.'
+      : 'If you did not create this account, you can ignore this email.',
+    locale: locale,
+  });
+}
+
+function buildTransactionalEmail(app, options) {
+  var appName = getAppName(app);
+  var locale = normalizeLocale(options.locale);
+  var isHebrew = locale === 'he';
+  var direction = isHebrew ? 'rtl' : 'ltr';
+  var textAlign = isHebrew ? 'right' : 'left';
+  var accentStyle = isHebrew
+    ? 'padding-right:18px;border-right:4px solid #D93A3A'
+    : 'padding-left:18px;border-left:4px solid #D93A3A';
+  var fallbackCopy = isHebrew
+    ? 'אם הכפתור לא נפתח, אפשר להשתמש בקישור הזה:'
+    : 'If the button does not work, open this link:';
+  var subject = String(options.subject || appName);
+  var title = escapeHtml(options.title || appName);
+  var eyebrow = escapeHtml(options.eyebrow || appName);
+  var greeting = escapeHtml(options.greeting || 'Hello,');
+  var body = escapeHtml(options.body || '');
+  var actionUrl = escapeHtml(options.actionUrl || '');
+  var actionLabel = escapeHtml(options.actionLabel || 'Open');
+  var note = escapeHtml(options.note || '');
 
   return {
-    subject: 'Reset your ' + appName + ' password',
+    subject: subject,
     html: ''
-      + '<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#171717;line-height:1.6">'
-      + '<p style="margin:0 0 16px">Hello ' + escapeHtml(displayName) + ',</p>'
-      + '<p style="margin:0 0 16px">We received a request to reset your ' + escapeHtml(appName) + ' password.</p>'
-      + '<p style="margin:0 0 24px"><a href="' + escapeHtml(resetUrl) + '" style="display:inline-block;background:#d93a3a;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px">Set a new password</a></p>'
-      + '<p style="margin:0 0 12px;color:#404040">If you did not request this change, you can ignore this email.</p>'
-      + '<p style="margin:0;color:#737373;font-size:14px">This link will expire according to your PocketBase auth settings.</p>'
+      + '<div dir="' + direction + '" style="margin:0;background:#F3F4F6;color:#171717;font-family:Inter,Arial,sans-serif;line-height:1.6;text-align:' + textAlign + '">'
+      + '<div style="display:none;max-height:0;overflow:hidden;color:transparent;opacity:0">' + body + '</div>'
+      + '<div style="max-width:640px;margin:0 auto;padding:28px 18px">'
+      + '<div style="background:#ffffff;border:1px solid #E5E5E5;border-radius:16px;overflow:hidden">'
+      + '<div style="height:6px;background:#D93A3A;line-height:6px;font-size:1px">&nbsp;</div>'
+      + '<div style="padding:30px 32px 12px">'
+      + '<p style="margin:0 0 12px;color:#D93A3A;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase">' + escapeHtml(appName) + '</p>'
+      + '<p style="margin:0 0 18px;color:#737373;font-size:13px;font-weight:700">' + eyebrow + '</p>'
+      + '<h1 style="margin:0;color:#171717;font-size:34px;line-height:1.14;font-weight:800;letter-spacing:0">' + title + '</h1>'
+      + '</div>'
+      + '<div style="padding:14px 32px 34px">'
+      + '<div style="' + accentStyle + '">'
+      + '<p style="margin:0 0 12px;color:#171717;font-size:16px;font-weight:700">' + greeting + '</p>'
+      + '<p style="margin:0;color:#404040;font-size:16px;line-height:1.75">' + body + '</p>'
+      + '</div>'
+      + (actionUrl
+        ? '<p style="margin:28px 0 28px"><a href="' + actionUrl + '" style="display:inline-block;background:#D93A3A;color:#ffffff;text-decoration:none;padding:14px 22px;border-radius:6px;font-size:15px;font-weight:800">' + actionLabel + '</a></p>'
+        : '')
+      + (actionUrl
+        ? '<p style="margin:0 0 20px;color:#737373;font-size:12px;line-height:1.7">' + fallbackCopy + '<br><a href="' + actionUrl + '" style="color:#D93A3A;text-decoration:underline;word-break:break-all">' + actionUrl + '</a></p>'
+        : '')
+      + '<div style="height:1px;background:#E5E5E5;line-height:1px;font-size:1px">&nbsp;</div>'
+      + (note ? '<p style="margin:18px 0 0;color:#737373;font-size:13px;line-height:1.7">' + note + '</p>' : '')
+      + '</div>'
+      + '</div>'
+      + '<p style="margin:18px 0 0;text-align:center;color:#A3A3A3;font-size:12px;line-height:1.6">' + escapeHtml(appName) + '</p>'
+      + '</div>'
       + '</div>',
+  };
+}
+
+function buildTransactionalEmailTable(app, options) {
+  var appName = getAppName(app);
+  var locale = normalizeLocale(options.locale);
+  var isHebrew = locale === 'he';
+  var direction = isHebrew ? 'rtl' : 'ltr';
+  var textAlign = isHebrew ? 'right' : 'left';
+  var accentStyle = isHebrew
+    ? 'padding-right:18px;border-right:4px solid #D93A3A'
+    : 'padding-left:18px;border-left:4px solid #D93A3A';
+  var buttonAlign = isHebrew ? 'right' : 'left';
+  var fallbackCopy = isHebrew
+    ? '\u05d0\u05dd \u05d4\u05db\u05e4\u05ea\u05d5\u05e8 \u05dc\u05d0 \u05e0\u05e4\u05ea\u05d7, \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05e9\u05ea\u05de\u05e9 \u05d1\u05e7\u05d9\u05e9\u05d5\u05e8 \u05d4\u05d6\u05d4:'
+    : 'If the button does not work, open this link:';
+  var subject = String(options.subject || appName);
+  var title = escapeHtml(options.title || appName);
+  var eyebrow = escapeHtml(options.eyebrow || appName);
+  var greeting = escapeHtml(options.greeting || 'Hello,');
+  var body = escapeHtml(options.body || '');
+  var actionUrl = escapeHtml(options.actionUrl || '');
+  var actionLabel = escapeHtml(options.actionLabel || 'Open');
+  var note = escapeHtml(options.note || '');
+  var bodyHtml = ''
+    + '<tr><td style="padding:30px 32px 12px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
+    + '<p style="margin:0 0 12px;color:#D93A3A;font-size:12px;line-height:16px;font-weight:800;letter-spacing:2px;text-transform:uppercase">' + escapeHtml(appName) + '</p>'
+    + '<p style="margin:0 0 18px;color:#737373;font-size:13px;line-height:18px;font-weight:700">' + eyebrow + '</p>'
+    + '<h1 style="margin:0;color:#171717;font-size:34px;line-height:39px;font-weight:800">' + title + '</h1>'
+    + '</td></tr>'
+    + '<tr><td style="padding:14px 32px 34px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
+    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td style="' + accentStyle + ';font-family:Arial,sans-serif;text-align:' + textAlign + '">'
+    + '<p style="margin:0 0 12px;color:#171717;font-size:16px;line-height:23px;font-weight:700">' + greeting + '</p>'
+    + '<p style="margin:0;color:#404040;font-size:16px;line-height:28px">' + body + '</p>'
+    + '</td></tr></table>'
+    + (actionUrl ? '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td align="' + buttonAlign + '" style="padding:28px 0">' + buildEmailButton(options.actionUrl || '', actionLabel, buttonAlign) + '</td></tr></table>' : '')
+    + (actionUrl ? '<p style="margin:0 0 20px;color:#737373;font-size:12px;line-height:20px">' + fallbackCopy + '<br><a href="' + actionUrl + '" style="color:#D93A3A;text-decoration:underline;word-break:break-all">' + actionUrl + '</a></p>' : '')
+    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td height="1" bgcolor="#E5E5E5" style="height:1px;line-height:1px;font-size:1px;background:#E5E5E5">&nbsp;</td></tr></table>'
+    + (note ? '<p style="margin:18px 0 0;color:#737373;font-size:13px;line-height:22px">' + note + '</p>' : '')
+    + '</td></tr>';
+
+  return {
+    subject: subject,
+    html: buildEmailShell({
+      direction: direction,
+      textAlign: textAlign,
+      width: 640,
+      preheader: body,
+      body: bodyHtml,
+      footerBrand: escapeHtml(appName),
+    }),
   };
 }
 
@@ -680,10 +967,61 @@ function createNewsletterMessage(app, record, subscriber) {
   });
 }
 
+function createNewsletterDigestMessage(app, records, subscriber) {
+  var mail = buildNewsletterDigestEmail(app, records, subscriber);
+
+  return new MailerMessage({
+    from: getSender(app),
+    to: [{ address: subscriber.getString('email') }],
+    subject: mail.subject,
+    html: mail.html,
+  });
+}
+
 function markNotificationSent(app, record, sentCount) {
   record.set('notificationSentAt', new Date().toISOString());
   record.set('notificationRecipientCount', sentCount);
   app.save(record);
+}
+
+function sendNewsletterDigestNotifications(app, records, subscribers) {
+  var mailClient = app.newMailClient();
+  var sentCount = 0;
+  var newsletterIds = [];
+
+  records = records || [];
+  subscribers = subscribers || [];
+
+  for (var i = 0; i < records.length; i += 1) {
+    newsletterIds.push(records[i].id);
+  }
+
+  for (var j = 0; j < subscribers.length; j += 1) {
+    var subscriber = subscribers[j];
+    var email = normalizeEmail(subscriber.getString('email'));
+
+    if (!isValidEmail(email)) {
+      continue;
+    }
+
+    try {
+      mailClient.send(createNewsletterDigestMessage(app, records, subscriber));
+      sentCount += 1;
+    } catch (error) {
+      console.error('Failed to send newsletter digest to ' + email + ':', error);
+    }
+  }
+
+  for (var k = 0; k < records.length; k += 1) {
+    markNotificationSent(app, records[k], sentCount);
+  }
+
+  return {
+    recipientCount: sentCount,
+    sentCount: sentCount,
+    newsletterCount: records.length,
+    newsletterIds: newsletterIds,
+  };
 }
 
 function sendNewsletterNotifications(app, record, options) {
@@ -735,6 +1073,8 @@ function sendNewsletterNotifications(app, record, options) {
 module.exports = {
   buildPasswordResetEmail: buildPasswordResetEmail,
   buildPasswordResetUrl: buildPasswordResetUrl,
+  buildVerificationEmail: buildVerificationEmail,
+  buildVerificationUrl: buildVerificationUrl,
   getFrontendPublicUrl: getFrontendPublicUrl,
   getSubscribeErrorMessage: getSubscribeErrorMessage,
   isValidEmail: isValidEmail,
@@ -742,6 +1082,7 @@ module.exports = {
   normalizeLocale: normalizeLocale,
   normalizeSource: normalizeSource,
   sendMailWithInsecureTlsVerification: sendMailWithInsecureTlsVerification,
+  sendNewsletterDigestNotifications: sendNewsletterDigestNotifications,
   sendNewsletterNotifications: sendNewsletterNotifications,
   shouldSkipSmtpTlsVerification: shouldSkipSmtpTlsVerification,
   subscribeEmail: subscribeEmail,

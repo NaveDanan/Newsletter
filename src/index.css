@@ -311,8 +311,13 @@ input::placeholder {
 }
 
 .status-progress {
-  background: #DBEAFE;
-  color: #2563EB;
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.status-delayed {
+  background: #FEE2E2;
+  color: #B91C1C;
 }
 
 .status-pending {

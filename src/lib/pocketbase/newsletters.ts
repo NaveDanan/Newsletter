@@ -10,6 +10,10 @@ interface NewsletterUpdateEmailResponse {
   recipientCount?: number;
 }
 
+interface ApiListResponse<T> {
+  items?: T[];
+}
+
 // ---------------------------------------------------------------------------
 // Mapping
 // ---------------------------------------------------------------------------
@@ -197,7 +201,11 @@ export function mapPBRecordToNewsletter(record: RecordModel): Newsletter {
 
 export async function fetchNewsletters(): Promise<Newsletter[]> {
   const pb = getPocketBase();
-  const records = await pb.collection(NEWSLETTERS_COLLECTION).getFullList({ sort: '-created' });
+  const response = await pb.send<ApiListResponse<RecordModel>>('/api/newsletters?sort=-created', {
+    method: 'GET',
+    requestKey: null,
+  });
+  const records = response.items ?? [];
   return records.map(mapPBRecordToNewsletter);
 }
 
@@ -209,7 +217,14 @@ export async function createNewsletter(
   const payload = buildNewsletterCreatePayload(data, extra);
 
   try {
-    const record = await pb.collection(NEWSLETTERS_COLLECTION).create(payload);
+    const record = await pb.send<RecordModel>('/api/newsletters', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      requestKey: null,
+    });
     return mapPBRecordToNewsletter(record);
   } catch (error) {
     if (!isClientResponseError(error) || error.status !== 400) {
@@ -218,7 +233,14 @@ export async function createNewsletter(
 
     const fallbackPayload = stripUnsupportedNewsletterFields(payload);
     try {
-      const record = await pb.collection(NEWSLETTERS_COLLECTION).create(fallbackPayload);
+      const record = await pb.send<RecordModel>('/api/newsletters', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(fallbackPayload),
+        requestKey: null,
+      });
       return mapPBRecordToNewsletter(record);
     } catch (fallbackError) {
       const message = getPocketBaseErrorMessage(fallbackError);
@@ -240,7 +262,14 @@ export async function patchNewsletter(
   }
 
   try {
-    const record = await pb.collection(NEWSLETTERS_COLLECTION).update(id, patch);
+    const record = await pb.send<RecordModel>(`/api/newsletters/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patch),
+      requestKey: null,
+    });
     return mapPBRecordToNewsletter(record);
   } catch (error) {
     if (!isClientResponseError(error) || error.status !== 400) {
@@ -249,7 +278,14 @@ export async function patchNewsletter(
 
     const fallbackPatch = stripUnsupportedNewsletterFields(patch);
     try {
-      const record = await pb.collection(NEWSLETTERS_COLLECTION).update(id, fallbackPatch);
+      const record = await pb.send<RecordModel>(`/api/newsletters/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(fallbackPatch),
+        requestKey: null,
+      });
       return mapPBRecordToNewsletter(record);
     } catch (fallbackError) {
       const message = getPocketBaseErrorMessage(fallbackError);
@@ -260,7 +296,28 @@ export async function patchNewsletter(
 
 export async function removeNewsletter(id: string): Promise<void> {
   const pb = getPocketBase();
-  await pb.collection(NEWSLETTERS_COLLECTION).delete(id);
+  await pb.send(`/api/newsletters/${id}`, {
+    method: 'DELETE',
+    requestKey: null,
+  });
+}
+
+export async function makeNewsletterPublic(id: string): Promise<Newsletter> {
+  const pb = getPocketBase();
+  const record = await pb.send<RecordModel>(`/api/newsletters/${id}/make-public`, {
+    method: 'POST',
+    requestKey: null,
+  });
+  return mapPBRecordToNewsletter(record);
+}
+
+export async function makeNewsletterDraft(id: string): Promise<Newsletter> {
+  const pb = getPocketBase();
+  const record = await pb.send<RecordModel>(`/api/newsletters/${id}/make-draft`, {
+    method: 'POST',
+    requestKey: null,
+  });
+  return mapPBRecordToNewsletter(record);
 }
 
 export async function sendNewsletterUpdateEmail(id: string): Promise<number> {

@@ -156,6 +156,8 @@ Then open:
 
 The chart mounts `/pb_data` from a PVC.
 
+For Longhorn, add `-f ./helm/newsletter/values.longhorn.yaml` after your environment values. This selects a 20Gi `ReadWriteOnce` volume and keeps one PocketBase replica with `Recreate`. See [Longhorn setup and migration](longhorn.md) for the one-time cluster installation, ArgoCD configuration and moving existing NFS data. The application image needs no changes. An existing claim must be migrated separately.
+
 By default it creates a new PVC. If you already have one, set:
 
 ```yaml
@@ -176,3 +178,20 @@ env:
 ```
 
 Only set it to `true` if you explicitly want startup to drop and recreate the app collections.
+
+## Post-Deploy PocketBase Migration
+
+When updating an existing ArgoCD deployment, keep `env.pocketbaseRecreateCollections: false`.
+After the new pod is running, execute the idempotent migration once against the live pod:
+
+```bash
+kubectl exec -n newsletter deploy/newsletter -- node /app/scripts/migrate-pocketbase-data.mjs
+```
+
+For a read-only check before applying changes:
+
+```bash
+kubectl exec -n newsletter deploy/newsletter -- node /app/scripts/migrate-pocketbase-data.mjs --dry-run
+```
+
+The migration syncs additive PocketBase schema changes, adds `users.locale` where missing, backfills missing user locales to `he`, preserves existing records, and creates the disabled newsletter digest schedule row if it does not already exist.

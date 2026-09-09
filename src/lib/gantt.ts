@@ -58,6 +58,31 @@ function addWorkdays(startDate: Date, workdays: number): Date {
   return current;
 }
 
+function countWorkdaysInclusive(startDate: Date, endDate: Date): number {
+  const start = toWorkday(startDate);
+  const end = startOfDay(endDate);
+
+  if (isBefore(end, start)) {
+    return 1;
+  }
+
+  let count = 0;
+  let current = start;
+
+  while (!isAfter(current, end)) {
+    if (!isRestDay(current)) {
+      count += 1;
+    }
+    current = addDays(current, 1);
+  }
+
+  return Math.max(1, count);
+}
+
+export function getWorkdayDuration(startDate: Date, endDate: Date): number {
+  return countWorkdaysInclusive(startDate, endDate);
+}
+
 function getNextWorkday(date: Date): Date {
   return toWorkday(addDays(startOfDay(date), 1));
 }
@@ -182,7 +207,7 @@ export function normalizeProjectGantt(rawGantt: unknown): ProjectGantt {
     tasks,
     resources,
     roles,
-    zoom: candidate.zoom === 'week' ? 'week' : 'day',
+    zoom: candidate.zoom === 'week' || candidate.zoom === 'month' ? candidate.zoom : 'day',
     lastEditedAt: typeof candidate.lastEditedAt === 'string' ? candidate.lastEditedAt : null,
   };
 }
@@ -240,6 +265,109 @@ export function alignTaskDates(task: GanttTask): GanttTask {
     ...normalized,
     endDate: formatGanttDate(end),
   };
+}
+
+export function updateTaskDeadline(task: GanttTask, deadline: string): GanttTask {
+  const start = getTaskStart(task);
+  const parsedDeadline = toDate(deadline, getTaskEnd(task));
+  const durationDays = countWorkdaysInclusive(start, parsedDeadline);
+  const nextTask = {
+    ...task,
+    milestone: task.milestone && sameDateValue(start, parsedDeadline),
+    durationDays: task.milestone && sameDateValue(start, parsedDeadline) ? 0 : durationDays,
+    endDate: formatGanttDate(parsedDeadline),
+  };
+
+  return alignTaskDates(nextTask);
+}
+
+function sameDateValue(left: Date, right: Date): boolean {
+  return formatGanttDate(left) === formatGanttDate(right);
+}
+
+export function taskHasChildren(tasks: GanttTask[], taskId: string): boolean {
+  const taskIndex = tasks.findIndex((task) => task.id === taskId);
+  if (taskIndex < 0) {
+    return false;
+  }
+
+  return (tasks[taskIndex + 1]?.indentLevel ?? -1) > tasks[taskIndex].indentLevel;
+}
+
+export function getDescendantTaskIds(tasks: GanttTask[], parentTaskId: string): string[] {
+  const parentIndex = tasks.findIndex((task) => task.id === parentTaskId);
+  if (parentIndex < 0) {
+    return [];
+  }
+
+  const parentIndentLevel = tasks[parentIndex].indentLevel;
+  const descendantTaskIds: string[] = [];
+
+  for (let index = parentIndex + 1; index < tasks.length; index += 1) {
+    const candidate = tasks[index];
+    if (candidate.indentLevel <= parentIndentLevel) {
+      break;
+    }
+
+    descendantTaskIds.push(candidate.id);
+  }
+
+  return descendantTaskIds;
+}
+
+export function getDefaultCollapsedTaskIds(tasks: GanttTask[]): Set<string> {
+  return new Set(tasks.filter((task) => taskHasChildren(tasks, task.id)).map((task) => task.id));
+}
+
+function rollupParentTasks(tasks: GanttTask[]): GanttTask[] {
+  const nextTasks = tasks.map((task) => ({ ...task }));
+  const taskById = new Map(nextTasks.map((task) => [task.id, task]));
+
+  for (let index = nextTasks.length - 1; index >= 0; index -= 1) {
+    const task = nextTasks[index];
+    const descendantIds = getDescendantTaskIds(nextTasks, task.id);
+    if (descendantIds.length === 0) {
+      continue;
+    }
+
+    const descendants = descendantIds
+      .map((id) => taskById.get(id))
+      .filter((candidate): candidate is GanttTask => Boolean(candidate));
+    if (descendants.length === 0) {
+      continue;
+    }
+
+    const latestEnd = descendants
+      .map(getTaskEnd)
+      .reduce((latest, current) => (isAfter(current, latest) ? current : latest));
+    const start = getTaskStart(task);
+    const durationDays = countWorkdaysInclusive(start, latestEnd);
+    const status = descendants.some((descendant) => descendant.status === 'delayed')
+      ? 'delayed'
+      : descendants.every((descendant) => descendant.status === 'completed')
+        ? 'completed'
+        : descendants.some((descendant) => descendant.status === 'in-progress' || descendant.status === 'completed' || descendant.progress > 0)
+          ? 'in-progress'
+          : 'pending';
+    const progress = status === 'completed'
+      ? 100
+      : status === 'pending' || status === 'delayed'
+        ? 0
+        : Math.round(descendants.reduce((total, descendant) => total + getTaskProgress(descendant), 0) / descendants.length);
+    const rolledUpTask = alignTaskDates({
+      ...task,
+      milestone: false,
+      durationDays,
+      status,
+      progress,
+      endDate: formatGanttDate(latestEnd),
+    });
+
+    nextTasks[index] = rolledUpTask;
+    taskById.set(task.id, rolledUpTask);
+  }
+
+  return nextTasks;
 }
 
 function getMinimumStartFromPredecessors(task: GanttTask, taskMap: Map<string, GanttTask>): Date | null {
@@ -305,7 +433,7 @@ export function hasDependencyCycle(tasks: GanttTask[]): boolean {
   return tasks.some((task) => visit(task.id));
 }
 
-export function applyDependencyScheduling(tasks: GanttTask[], changedTaskId?: string): GanttTask[] {
+function scheduleDependentTasks(tasks: GanttTask[], changedTaskId?: string): GanttTask[] {
   const nextTasks = tasks.map((task) => alignTaskDates(task));
   const taskMap = new Map(nextTasks.map((task) => [task.id, task]));
   const dependentsMap = new Map<string, string[]>();
@@ -357,6 +485,62 @@ export function applyDependencyScheduling(tasks: GanttTask[], changedTaskId?: st
   }
 
   return nextTasks.map((task) => taskMap.get(task.id) ?? task);
+}
+
+export function applyDependencyScheduling(tasks: GanttTask[], changedTaskId?: string): GanttTask[] {
+  let scheduledTasks = scheduleDependentTasks(tasks, changedTaskId);
+
+  for (let iteration = 0; iteration < Math.max(tasks.length, 1); iteration += 1) {
+    const rolledUpTasks = rollupParentTasks(scheduledTasks);
+    const nextTasks = rollupParentTasks(scheduleDependentTasks(rolledUpTasks));
+
+    if (JSON.stringify(nextTasks) === JSON.stringify(scheduledTasks)) {
+      return nextTasks;
+    }
+
+    scheduledTasks = nextTasks;
+  }
+
+  return scheduledTasks;
+}
+
+export function getStatusBadgeClass(status: GanttTask['status']): string {
+  switch (status) {
+    case 'completed':
+      return 'bg-green-100 text-green-700';
+    case 'in-progress':
+      return 'bg-yellow-100 text-yellow-700';
+    case 'pending':
+      return 'bg-[#F3F4F6] text-[#737373]';
+    case 'delayed':
+      return 'bg-red-100 text-red-700';
+  }
+}
+
+export function getStatusColor(status: GanttTask['status']): string {
+  switch (status) {
+    case 'completed':
+      return '#16A34A';
+    case 'in-progress':
+      return '#EAB308';
+    case 'pending':
+      return '#A3A3A3';
+    case 'delayed':
+      return '#D93A3A';
+  }
+}
+
+export function getStatusBarClass(status: GanttTask['status']): string {
+  switch (status) {
+    case 'completed':
+      return 'bg-green-600';
+    case 'in-progress':
+      return 'bg-yellow-500';
+    case 'pending':
+      return 'bg-[#D4D4D4]';
+    case 'delayed':
+      return 'bg-[#D93A3A]';
+  }
 }
 
 export function getTimelineRange(tasks: GanttTask[]) {
@@ -420,6 +604,142 @@ export function getProjectProgress(tasks: GanttTask[]): number {
   ), 0);
 
   return Math.round((completedDuration / totalDuration) * 100);
+}
+
+export const HOURS_PER_WORKDAY = 8;
+const WORKDAYS_PER_WEEK = 5;
+const WORKDAYS_PER_MONTH = 22;
+const WORKDAYS_PER_YEAR = 260;
+
+export interface GanttRoleCost {
+  roleId: string;
+  roleName: string;
+  currency: GanttCurrency;
+  cost: number;
+  percent: number; // share of the total cost within the same currency (0-100)
+}
+
+export interface GanttCostEstimate {
+  manpowerHours: number;
+  remainingManpowerHours: number;
+  costsByCurrency: Partial<Record<GanttCurrency, number>>;
+  spentCostsByCurrency: Partial<Record<GanttCurrency, number>>;
+  roleCosts: GanttRoleCost[];
+}
+
+function computeRoleCost(
+  role: GanttRole,
+  effectiveDays: number,
+  effectiveHours: number,
+  oneTimeFraction: number,
+): number {
+  switch (role.paidBy) {
+    case 'hourly':
+      return role.budget * effectiveHours;
+    case 'daily':
+      return role.budget * effectiveDays;
+    case 'weekly':
+      return role.budget * (effectiveDays / WORKDAYS_PER_WEEK);
+    case 'monthly':
+      return role.budget * (effectiveDays / WORKDAYS_PER_MONTH);
+    case 'yearly':
+      return role.budget * (effectiveDays / WORKDAYS_PER_YEAR);
+    case 'one-time':
+      return role.budget * oneTimeFraction;
+  }
+}
+
+/**
+ * Estimate the manpower hours and the monetary cost required for a given set of
+ * tasks. Effort is scaled by each resource's capacity to the project, and cost
+ * is derived from the resource role's rate and billing unit
+ * (hourly/daily/weekly/monthly/yearly/one-time). Costs are grouped by currency
+ * since different roles may bill in different currencies, and broken down per
+ * role with each role's percentage share of the total cost. The spent cost
+ * reflects the completed portion of the work based on task progress.
+ */
+export function estimateTasksCost(
+  tasks: GanttTask[],
+  resources: GanttResource[],
+  roles: GanttRole[],
+): GanttCostEstimate {
+  const resourcesById = new Map(resources.map((resource) => [resource.id, resource]));
+  const rolesById = new Map(roles.map((role) => [role.id, role]));
+
+  const workdaysByResource = new Map<string, { total: number; remaining: number }>();
+  tasks.forEach((task) => {
+    if (!task.resourceId) {
+      return;
+    }
+
+    const spanDays = getTaskSpanDays(task);
+    if (spanDays === 0) {
+      return;
+    }
+
+    const remainingDays = spanDays * (1 - (getTaskProgress(task) / 100));
+    const entry = workdaysByResource.get(task.resourceId) ?? { total: 0, remaining: 0 };
+    entry.total += spanDays;
+    entry.remaining += remainingDays;
+    workdaysByResource.set(task.resourceId, entry);
+  });
+
+  let manpowerHours = 0;
+  let remainingManpowerHours = 0;
+  const costsByCurrency: Partial<Record<GanttCurrency, number>> = {};
+  const spentCostsByCurrency: Partial<Record<GanttCurrency, number>> = {};
+  const costByRole = new Map<string, number>();
+
+  workdaysByResource.forEach(({ total, remaining }, resourceId) => {
+    const resource = resourcesById.get(resourceId);
+    if (!resource) {
+      return;
+    }
+
+    const completed = Math.max(0, total - remaining);
+    const capacity = Math.max(0, Math.min(100, resource.capacityPercent)) / 100;
+    const effectiveDays = total * capacity;
+    const effectiveHours = effectiveDays * HOURS_PER_WORKDAY;
+    const effectiveCompletedDays = completed * capacity;
+    const effectiveCompletedHours = effectiveCompletedDays * HOURS_PER_WORKDAY;
+    manpowerHours += effectiveHours;
+    remainingManpowerHours += remaining * capacity * HOURS_PER_WORKDAY;
+
+    const role = resource.roleId ? rolesById.get(resource.roleId) ?? null : null;
+    if (!role || role.budget <= 0) {
+      return;
+    }
+
+    const cost = computeRoleCost(role, effectiveDays, effectiveHours, 1);
+    const spent = computeRoleCost(
+      role,
+      effectiveCompletedDays,
+      effectiveCompletedHours,
+      total > 0 ? completed / total : 0,
+    );
+
+    costsByCurrency[role.currency] = (costsByCurrency[role.currency] ?? 0) + cost;
+    spentCostsByCurrency[role.currency] = (spentCostsByCurrency[role.currency] ?? 0) + spent;
+    costByRole.set(role.id, (costByRole.get(role.id) ?? 0) + cost);
+  });
+
+  const roleCosts: GanttRoleCost[] = Array.from(costByRole.entries())
+    .map(([roleId, cost]) => {
+      const role = rolesById.get(roleId) ?? null;
+      const currency = role?.currency ?? 'ILS';
+      const currencyTotal = costsByCurrency[currency] ?? 0;
+
+      return {
+        roleId,
+        roleName: role?.name ?? '',
+        currency,
+        cost,
+        percent: currencyTotal > 0 ? Math.round((cost / currencyTotal) * 100) : 0,
+      };
+    })
+    .sort((left, right) => right.cost - left.cost);
+
+  return { manpowerHours, remainingManpowerHours, costsByCurrency, spentCostsByCurrency, roleCosts };
 }
 
 export function getResourceSummary(gantt: ProjectGantt) {

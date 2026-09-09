@@ -17,7 +17,13 @@ spec:
       protocol: TCP
       port: {{ .Values.service.ports.frontend }}
       targetPort: frontend
+      {{- if and (or (eq .Values.service.type "NodePort") (eq .Values.service.type "LoadBalancer")) .Values.service.nodePorts.frontend }}
+      nodePort: {{ .Values.service.nodePorts.frontend }}
+      {{- end }}
     - name: pocketbase
       protocol: TCP
       port: {{ .Values.service.ports.pocketbase }}
       targetPort: pocketbase
+      {{- if and (or (eq .Values.service.type "NodePort") (eq .Values.service.type "LoadBalancer")) .Values.service.nodePorts.pocketbase }}
+      nodePort: {{ .Values.service.nodePorts.pocketbase }}
+      {{- end }}

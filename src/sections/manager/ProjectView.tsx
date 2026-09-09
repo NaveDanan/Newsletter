@@ -18,11 +18,11 @@ export function ProjectView() {
       case 'completed':
         return <HugeiconsIcon icon={CheckmarkCircle02Icon} className="w-5 h-5 text-green-600" />;
       case 'in-progress':
-        return <HugeiconsIcon icon={Clock01Icon} className="w-5 h-5 text-[#D93A3A]" />;
+        return <HugeiconsIcon icon={Clock01Icon} className="w-5 h-5 text-yellow-600" />;
       case 'pending':
         return <HugeiconsIcon icon={CircleIcon} className="w-5 h-5 text-[#A3A3A3]" />;
       case 'delayed':
-        return <HugeiconsIcon icon={Clock01Icon} className="w-5 h-5 text-yellow-600" />;
+        return <HugeiconsIcon icon={Clock01Icon} className="w-5 h-5 text-[#D93A3A]" />;
     }
   };
 
@@ -31,11 +31,11 @@ export function ProjectView() {
       case 'completed':
         return 'bg-green-100 text-green-700';
       case 'in-progress':
-        return 'bg-[#D93A3A]/10 text-[#D93A3A]';
+        return 'bg-yellow-100 text-yellow-700';
       case 'pending':
         return 'bg-[#F3F4F6] text-[#737373]';
       case 'delayed':
-        return 'bg-yellow-100 text-yellow-700';
+        return 'bg-red-100 text-red-700';
     }
   };
 
@@ -133,9 +133,9 @@ export function ProjectView() {
         <div className="grid grid-cols-5 gap-4 h-5 w-full">
           <p className="text-lg font-bold text-[#171717] text-center">{formatNumber(stats.total)}</p>
           <p className="text-lg font-bold text-green-600 text-center">{formatNumber(stats.completed)}</p>
-          <p className="text-lg font-bold text-[#D93A3A] text-center">{formatNumber(stats.inProgress)}</p>
+          <p className="text-lg font-bold text-yellow-600 text-center">{formatNumber(stats.inProgress)}</p>
           <p className="text-lg font-bold text-[#A3A3A3] text-center">{formatNumber(stats.pending)}</p>
-          <p className="text-lg font-bold text-yellow-600 text-center">{formatNumber(stats.delayed)}</p>
+          <p className="text-lg font-bold text-[#D93A3A] text-center">{formatNumber(stats.delayed)}</p>
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { parseDocx } from '../../scripts/pocketbase/docx-import.mjs';
 import { collectDocuments, repositoryUrls } from '../../scripts/pocketbase/artifactory-import.mjs';
 import { repairImportedPublicationDate, sourcePublicationDate } from '../../scripts/pocketbase/import-publication-date.mjs';
+import { repairImportedLayout } from '../../scripts/pocketbase/imported-layout.mjs';
 
 const image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j1xoAAAAASUVORK5CYII=';
 const p = (text, style = '', props = '') => `<w:p><w:pPr>${style ? `<w:pStyle w:val="${style}"/>` : ''}${props}</w:pPr><w:r><w:t>${text}</w:t></w:r></w:p>`;
@@ -54,6 +55,38 @@ test('uses the source publication date as article metadata instead of body text'
     assert.doesNotMatch(article.content, /פורסם:/);
     assert.doesNotMatch(article.excerpt, /פורסם:/);
   }
+});
+
+test('extracts the source subtitle before metadata and aligns bidi paragraphs right', async () => {
+  const rtlLeft = '<w:bidi w:val="1"/><w:jc w:val="left"/>';
+  const [article] = await parseDocx(await fixture(p('כותרת', 'Heading1', rtlLeft) + p('תקציר הכתבה', '', rtlLeft) + p('פורסם: 2026-06-29 07:45:18 +0000') + p('מאת: כותב') + p('תוכן הכתבה', '', rtlLeft) + p('כותרת פנימית', 'Heading2')));
+  assert.equal(article.subtitle, 'תקציר הכתבה');
+  assert.equal(article.textAlignment, 'right');
+  assert.match(article.content, /dir="rtl" style="text-align:right"/);
+  assert.doesNotMatch(article.content, /תקציר הכתבה|text-align:left/);
+  assert.match(article.content, /כותרת פנימית/);
+});
+
+test('recognizes Subtitle styles without mistaking an ordinary opening paragraph for a subtitle', async () => {
+  const zip = await JSZip.loadAsync(await fixture(p('Title', 'Heading1') + p('Deck', 'Subtitle') + p('Body')));
+  const styles = await zip.file('word/styles.xml').async('string');
+  zip.file('word/styles.xml', styles.replace('</w:styles>', '<w:style w:styleId="Subtitle"><w:name w:val="Subtitle"/></w:style></w:styles>'));
+  const [article] = await parseDocx(await zip.generateAsync({ type: 'nodebuffer' }));
+  assert.equal(article.subtitle, 'Deck');
+  assert.doesNotMatch(article.content, /Deck/);
+  const [ordinary] = await parseDocx(await fixture(p('Title', 'Heading1') + p('Ordinary opening') + p('More body')));
+  assert.equal(ordinary.subtitle, '');
+  assert.match(ordinary.content, /Ordinary opening/);
+});
+
+test('repairs existing imported subtitles and RTL alignment without altering remaining prose', () => {
+  const article = { title: 'כותרת', subtitle: '', textAlignment: 'left', content: '<p dir="rtl" style="text-align:left"><strong>תקציר &amp; עוד</strong></p><p dir="rtl" style="text-align:left">מאת: כותב</p><p>Edited body</p>' };
+  const patch = repairImportedLayout(article);
+  assert.equal(patch.subtitle, 'תקציר & עוד');
+  assert.equal(patch.textAlignment, 'right');
+  assert.equal(patch.content, '<p dir="rtl" style="text-align:right">מאת: כותב</p><p>Edited body</p>');
+  assert.equal(repairImportedLayout({ ...article, ...patch }), null);
+  assert.equal(repairImportedLayout({ title: 'English', subtitle: '', textAlignment: 'left', content: '<p>Opening</p><p>Body</p>' }), null);
 });
 
 test('repairs old date paragraphs without changing article content and is safe to repeat', () => {

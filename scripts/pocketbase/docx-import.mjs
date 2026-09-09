@@ -62,13 +62,14 @@ export async function parseDocx(buffer, filename = 'Newsletter.docx') {
     const text = all(p, 't').map((n) => n.textContent).join('');
     const rtl = props.bidi ? enabled(props.bidi) : hebrew(text);
     const alignment = { both: 'justify', start: rtl ? 'right' : 'left', end: rtl ? 'left' : 'right' }[attr(props.jc)] || attr(props.jc);
-    const align = ['left', 'right', 'center', 'justify'].includes(alignment) ? alignment : rtl ? 'right' : 'left';
+    const align = rtl && alignment === 'left' ? 'right' : ['left', 'right', 'center', 'justify'].includes(alignment) ? alignment : rtl ? 'right' : 'left';
     const names = chain.flatMap((s) => [attr(s, 'styleId'), val(s, 'name')]);
     const title = names.some((name) => /^title$/i.test(name));
+    const subtitle = names.some((name) => /^sub\s*title$/i.test(name));
     const headingName = names.map((name) => name.match(/^heading\s*([1-6])$/i)).filter(Boolean).at(-1);
     const outline = props.outlineLvl ? Number(attr(props.outlineLvl)) + 1 : 0;
     const heading = headingName ? Number(headingName[1]) : outline >= 1 && outline <= 6 ? outline : 0;
-    return { props, chain, text, rtl, align, title, heading };
+    return { props, chain, text, rtl, align, title, subtitle, heading };
   }
   function renderInline(node, baseProps = []) {
     if (node.localName === 'del' || node.localName === 'instrText') return '';
@@ -178,9 +179,16 @@ export async function parseDocx(buffer, filename = 'Newsletter.docx') {
     const infos = nodes.filter((n) => n.localName === 'p').map(paragraphInfo);
     const titleInfo = infos.find((i) => i.text.trim() && (useTitles ? i.title : useHeadings ? i.heading === 1 : i.title || i.heading === 1));
     const titleNode = nodes.find((n) => n.localName === 'p' && paragraphInfo(n).text === titleInfo?.text);
+    const afterTitle = nodes.slice(nodes.indexOf(titleNode) + 1).filter((n) => n.localName === 'p' && paragraphInfo(n).text.trim());
+    const first = afterTitle[0] && paragraphInfo(afterTitle[0]);
+    const next = afterTitle[1] && paragraphInfo(afterTitle[1]);
+    const isMetadata = (text) => Boolean(sourcePublicationDate(text)) || /^(מאת\s*:?|By\s|כתובת כתבה:)/i.test(text.trim());
+    const subtitleNode = first && !first.heading && !first.title && !isMetadata(first.text)
+      && (first.subtitle || (titleNode && next && isMetadata(next.text))) ? afterTitle[0] : null;
+    const subtitle = subtitleNode ? paragraphInfo(subtitleNode).text.trim() : '';
     const publishedAt = infos.map((info) => sourcePublicationDate(info.text)).find(Boolean) || '';
     const contentNodes = nodes.filter((n) => {
-      if (n === titleNode) return false;
+      if (n === titleNode || n === subtitleNode) return false;
       const text = n.localName === 'p' ? paragraphInfo(n).text.trim() : '';
       return !sourcePublicationDate(text) && !/^\{\s*[^{}]+\s*\}$/.test(text) && !/^כתובת תמונה:/.test(text);
     });
@@ -190,12 +198,12 @@ export async function parseDocx(buffer, filename = 'Newsletter.docx') {
     const title = titleInfo?.text.trim() || infos.find((i) => i.text.trim())?.text.trim() || filename.replace(/\.docx$/i, '') + (index ? ` ${index + 1}` : '');
     const rtl = titleInfo?.rtl ?? hebrew(text);
     return {
-      title: title.slice(0, 10000), content: html, excerpt: text.slice(0, 300), subtitle: '',
+      title: title.slice(0, 10000), content: html, excerpt: (subtitle || text).slice(0, 300), subtitle,
       publishedAt,
       textAlignment: ['left', 'center', 'right'].includes(titleInfo?.align) ? titleInfo.align : rtl ? 'right' : 'left',
       coverImage: html.match(/<img src="([^"]+)"/)?.[1] || '',
       readTime: `${Math.max(1, Math.ceil(text.split(/\s+/).length / 200))} min`,
-      author: infos.find((i) => /^מאת\s+/.test(i.text.trim()))?.text.trim().replace(/^מאת\s+/, '') || '',
+      author: infos.find((i) => /^מאת\s*:?\s+/.test(i.text.trim()))?.text.trim().replace(/^מאת\s*:?\s+/, '') || '',
     };
   }).filter(Boolean);
   if (!articles.length) throw new Error('DOCX has no article content.');

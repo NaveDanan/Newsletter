@@ -22,13 +22,24 @@ function ensureJob(app) {
 }
 
 function serializeJob(job) {
+  var result = readJson(job, 'lastResult', {});
+  delete result.visited;
   return {
     enabled: job.getBool('enabled'), repositoryUrl: job.getString('repositoryUrl'), username: job.getString('username'),
     hasToken: Boolean(job.getString('token')), intervalMinutes: job.getInt('intervalMinutes'),
     lastRunAt: job.getString('lastRunAt'), lastSuccessAt: job.getString('lastSuccessAt'),
-    lastError: job.getString('lastError'), lastResult: job.get('lastResult') || {},
-    isRunning: new Date(job.getString('lockedUntil')).getTime() > Date.now(),
+    lastError: job.getString('lastError'), lastResult: result,
+    isRunning: isRunning(job),
   };
+}
+
+function isRunning(job) {
+  return new Date(job.getString('lockedUntil')).getTime() > Date.now() || readJson(job, 'lastResult', {}).status === 'running';
+}
+
+function readJson(record, key, fallback) {
+  // PocketBase JSON fields are Go byte slices inside hooks, not JS objects.
+  try { return JSON.parse(toString(record.get(key))); } catch (_) { return fallback; }
 }
 
 function invokeWorker(settings) {
@@ -45,7 +56,7 @@ function invokeWorker(settings) {
 
 function updateJobSettings(app, auth, body) {
   var job = ensureJob(app);
-  if (new Date(job.getString('lockedUntil')).getTime() > Date.now()) throw new BadRequestError('Wait for the current import to finish before changing settings.');
+  if (isRunning(job)) throw new BadRequestError('Wait for the current import to finish before changing settings.');
   ['repositoryUrl', 'username', 'token'].forEach(function (key) {
     if (!Object.prototype.hasOwnProperty.call(body, key)) return;
     if (typeof body[key] !== 'string') throw new BadRequestError(key + ' must be text.');
@@ -74,7 +85,7 @@ function updateJobSettings(app, auth, body) {
   // Re-read within the transaction so a concurrent scheduler cannot lose its lock.
   app.runInTransaction(function (tx) {
     var current = ensureJob(tx);
-    if (new Date(current.getString('lockedUntil')).getTime() > Date.now()) throw new BadRequestError('An import is running. Try saving again after it finishes.');
+    if (isRunning(current)) throw new BadRequestError('An import is running. Try saving again after it finishes.');
     ['repositoryUrl', 'username', 'token', 'enabled', 'intervalMinutes', 'updatedBy'].forEach(function (key) { current.set(key, job.get(key)); });
     tx.save(current);
   });
@@ -83,28 +94,34 @@ function updateJobSettings(app, auth, body) {
 
 function runJobNow(app, scheduled) {
   var job;
+  var result;
+  var startedAt = Date.now();
   var acquired = false;
   app.runInTransaction(function (tx) {
     job = ensureJob(tx);
     var now = Date.now();
     if (new Date(job.getString('lockedUntil')).getTime() > now) return;
-    if (scheduled && (!job.getBool('enabled') || now - (new Date(job.getString('lastRunAt')).getTime() || 0) < job.getInt('intervalMinutes') * 60000)) return;
+    var previous = readJson(job, 'lastResult', {});
+    var continuing = previous.status === 'running';
+    if (scheduled && !continuing && (!job.getBool('enabled') || now - (new Date(job.getString('lastRunAt')).getTime() || 0) < job.getInt('intervalMinutes') * 60000)) return;
+    result = continuing ? previous : { status: 'running', importedFiles: 0, articleCount: 0, skipped: 0, deferred: 0, errors: [], visited: [] };
     job.set('lockedUntil', new Date(now + 5 * 60000).toISOString());
-    job.set('lastRunAt', new Date(now).toISOString());
+    if (!continuing) job.set('lastRunAt', new Date(now).toISOString());
+    job.set('lastResult', result);
     tx.save(job);
     acquired = true;
   });
   if (!acquired) return serializeJob(ensureJob(app));
-  var result = { status: 'ok', importedFiles: 0, articleCount: 0, skipped: 0, deferred: 0, errors: [] };
   try {
     if (!job.getString('repositoryUrl') || !job.getString('username') || !job.getString('token')) throw new Error('Save an Artifactory repository URL, username and token first.');
+    do {
     var known = app.findRecordsByFilter('newsletter_imports', '', '', 0, 0).map(function (record) { return record.getString('sourceKey'); });
-    var previous = job.get('lastResult') || {};
-    var output = invokeWorker({ repositoryUrl: job.getString('repositoryUrl'), username: job.getString('username'), token: job.getString('token'), known: known, cursor: previous.cursor || '' });
+    var output = invokeWorker({ repositoryUrl: job.getString('repositoryUrl'), username: job.getString('username'), token: job.getString('token'), known: known, visited: result.visited || [], cursor: result.cursor || '' });
     result.cursor = output.cursor;
-    result.skipped = output.skipped;
+    result.skipped += output.skipped;
     result.deferred = output.deferred;
-    result.errors = output.errors;
+    result.errors = result.errors.concat(output.errors);
+    result.visited = (result.visited || []).concat(output.processed || []);
     output.documents.forEach(function (document) {
       try {
         var imported = false;
@@ -133,12 +150,19 @@ function runJobNow(app, scheduled) {
         else result.skipped++;
       } catch (_) { result.errors.push({ file: document.file, message: 'Could not save articles. The file will be retried on the next import.' }); }
     });
-    if (result.errors.length) result.status = result.importedFiles ? 'partial' : 'error';
+    // Commit progress between batches. A later cron tick resumes this same run,
+    // even when the page closes or the normal schedule is disabled.
+    var progress = ensureJob(app);
+    progress.set('lastResult', result);
+    app.save(progress);
+    } while (result.deferred > 0 && Date.now() - startedAt < 60000);
+    result.status = result.deferred > 0 ? 'running' : result.errors.length ? (result.importedFiles ? 'partial' : 'error') : 'ok';
   } catch (error) {
     result.status = 'error';
     // Worker errors never include request headers or remote response bodies.
     result.errors.push({ file: '', message: error.message || 'Newsletter import failed. Check server configuration.' });
   } finally {
+    if (result.status !== 'running') delete result.visited;
     var current = ensureJob(app);
     current.set('lockedUntil', '');
     current.set('lastResult', result);
@@ -152,8 +176,38 @@ function runJobNow(app, scheduled) {
 function tick(app) {
   try { app.findCollectionByNameOrId('newsletter_import_jobs'); } catch (_) { return; }
   var job = findJob(app);
-  if (!job || !job.getBool('enabled')) return;
+  if (!job || (!job.getBool('enabled') && readJson(job, 'lastResult', {}).status !== 'running')) return;
   try { runJobNow(app, true); } catch (_) { console.error('Scheduled newsletter import could not run.'); }
 }
 
-module.exports = { ensureAdminAccess: ensureAdminAccess, ensureJob: ensureJob, serializeJob: serializeJob, updateJobSettings: updateJobSettings, runJobNow: runJobNow, tick: tick };
+function serializeTrackedFile(record) {
+  return { id: record.id, sourceUrl: record.getString('sourceUrl'), checksum: record.getString('checksum'), importedAt: record.getString('created'), newsletterIds: readJson(record, 'newsletterIds', []) };
+}
+
+function listTrackedFiles(app, query) {
+  var page = Math.max(1, Math.floor(Number(query.page) || 1));
+  var records = app.findRecordsByFilter('newsletter_imports', '', '-created,-id', 51, (page - 1) * 50);
+  return { items: records.slice(0, 50).map(serializeTrackedFile), page: page, hasMore: records.length > 50 };
+}
+
+function changeTrackedFile(app, id, body, remove) {
+  var validated;
+  if (!remove) {
+    try { validated = invokeWorker({ validateTracking: true, sourceUrl: body.sourceUrl, checksum: body.checksum }); }
+    catch (error) { throw new BadRequestError(error.message || 'Invalid tracked file.'); }
+  }
+  var result;
+  app.runInTransaction(function (tx) {
+    if (isRunning(ensureJob(tx))) throw new BadRequestError('Wait for the current import to finish before editing tracked files.');
+    var record = tx.findRecordById('newsletter_imports', id);
+    if (remove) { tx.delete(record); return; }
+    var duplicate = tx.findRecordsByFilter('newsletter_imports', 'sourceKey = {:key} && id != {:id}', '', 1, 0, { key: validated.sourceKey, id: id });
+    if (duplicate.length) throw new BadRequestError('This file version is already tracked.');
+    ['sourceUrl', 'checksum', 'sourceKey'].forEach(function (key) { record.set(key, validated[key]); });
+    tx.save(record);
+    result = serializeTrackedFile(record);
+  });
+  return remove ? { removed: true } : result;
+}
+
+module.exports = { ensureAdminAccess: ensureAdminAccess, ensureJob: ensureJob, serializeJob: serializeJob, updateJobSettings: updateJobSettings, runJobNow: runJobNow, tick: tick, listTrackedFiles: listTrackedFiles, changeTrackedFile: changeTrackedFile };

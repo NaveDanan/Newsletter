@@ -39,17 +39,21 @@ export async function collectDocuments(settings, fetcher = fetch) {
   const documents = [], errors = [];
   let skipped = 0, deferred = 0, attempts = 0, bytes = 0, cursor = settings.cursor || '';
   const known = new Set(settings.known || []);
+  const visited = new Set(settings.visited || []);
+  const processed = [];
   for (const file of candidates) {
+    if (visited.has(file.uri)) continue;
     const segments = String(file.uri).replace(/^\//, '').split('/');
     // File-list URIs are repository paths, never independently supplied download hosts.
     if (segments.some((s) => !s || s === '.' || s === '..' || /[\\\x00-\x1f]/.test(s))) {
-      errors.push({ file: file.uri, message: 'Invalid artifact path.' }); continue;
+      processed.push(file.uri); errors.push({ file: file.uri, message: 'Invalid artifact path.' }); continue;
     }
     const sourceUrl = `${urls.root}/${segments.map(encodeURIComponent).join('/')}`;
     const fingerprint = (checksum) => createHash('sha256').update(`${sourceUrl}\n${checksum}`).digest('hex');
-    if (file.sha1 && known.has(fingerprint(file.sha1))) { skipped++; continue; }
+    if (file.sha1 && known.has(fingerprint(file.sha1))) { processed.push(file.uri); skipped++; continue; }
     if (attempts >= 3 || bytes >= 25 * 1024 * 1024) { deferred++; continue; }
     attempts++;
+    processed.push(file.uri);
     cursor = file.uri;
     try {
       if (Number(file.size) > 20 * 1024 * 1024) throw new Error('DOCX exceeds the 20 MB limit.');
@@ -63,7 +67,15 @@ export async function collectDocuments(settings, fetcher = fetch) {
       documents.push({ sourceKey, sourceUrl, checksum, file: file.uri, articles });
     } catch (error) { errors.push({ file: file.uri, message: error.message }); }
   }
-  return { documents, errors, skipped, deferred, found: candidates.length, cursor };
+  return { documents, errors, skipped, deferred, found: candidates.length, cursor, processed };
+}
+
+export function validateTracking(settings) {
+  const url = new URL(settings.sourceUrl);
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || !/\.docx$/i.test(url.pathname)) throw new Error('Use the HTTPS URL of a DOCX file, without credentials or query parameters.');
+  const checksum = String(settings.checksum || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{40}$/.test(checksum)) throw new Error('Enter the 40-character SHA-1 checksum from Artifactory.');
+  return { sourceUrl: url.href, checksum, sourceKey: createHash('sha256').update(`${url.href}\n${checksum}`).digest('hex') };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -71,7 +83,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const watchdog = setTimeout(() => process.exit(1), 120000);
   try {
     const settings = JSON.parse(await readFile(process.argv[2], 'utf8'));
-    const result = settings.validateOnly ? repositoryUrls(settings.repositoryUrl) : await collectDocuments(settings);
+    const result = settings.validateOnly ? repositoryUrls(settings.repositoryUrl) : settings.validateTracking ? validateTracking(settings) : await collectDocuments(settings);
     process.stdout.write(JSON.stringify({ ok: true, ...result }));
   } catch (error) {
     process.stdout.write(JSON.stringify({ ok: false, message: error instanceof SyntaxError ? 'Artifactory returned invalid JSON.' : error.message }));

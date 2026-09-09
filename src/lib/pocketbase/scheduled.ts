@@ -89,7 +89,7 @@ export interface NewsletterImportSchedule {
   lastSuccessAt: string;
   lastError: string;
   lastResult: {
-    status?: 'ok' | 'partial' | 'error';
+    status?: 'ok' | 'partial' | 'error' | 'running';
     importedFiles?: number;
     articleCount?: number;
     skipped?: number;
@@ -117,4 +117,30 @@ export function updateNewsletterImportSchedule(patch: NewsletterImportPatch): Pr
 
 export function runNewsletterImportNow(): Promise<NewsletterImportSchedule> {
   return getPocketBase().send('/api/scheduled/newsletter-import/run', { method: 'POST', body: {}, requestKey: null });
+}
+
+export interface TrackedNewsletterFile {
+  id: string;
+  sourceUrl: string;
+  checksum: string;
+  importedAt: string;
+  newsletterIds: string[];
+}
+
+export interface TrackedNewsletterFilesPage {
+  items: TrackedNewsletterFile[];
+  page: number;
+  hasMore: boolean;
+}
+
+export function fetchTrackedNewsletterFiles(page = 1): Promise<TrackedNewsletterFilesPage> {
+  return getPocketBase().send('/api/scheduled/newsletter-import/files', { method: 'GET', query: { page }, requestKey: null });
+}
+
+export function updateTrackedNewsletterFile(id: string, patch: Pick<TrackedNewsletterFile, 'sourceUrl' | 'checksum'>): Promise<TrackedNewsletterFile> {
+  return getPocketBase().send(`/api/scheduled/newsletter-import/files/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch, requestKey: null });
+}
+
+export function removeTrackedNewsletterFile(id: string): Promise<{ removed: boolean }> {
+  return getPocketBase().send(`/api/scheduled/newsletter-import/files/${encodeURIComponent(id)}`, { method: 'DELETE', requestKey: null });
 }

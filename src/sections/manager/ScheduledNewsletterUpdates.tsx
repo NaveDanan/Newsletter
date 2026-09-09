@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { useLocale } from '@/contexts/LocaleContext';
 import { fetchNewsletterImportSchedule, updateNewsletterImportSchedule, runNewsletterImportNow, type NewsletterImportSchedule } from '@/lib/pocketbase/scheduled';
+import { TrackedNewsletterFiles } from './TrackedNewsletterFiles';
 
 export function ScheduledNewsletterUpdates() {
   const { t, formatDate, formatNumber } = useLocale();
@@ -57,6 +58,7 @@ export function ScheduledNewsletterUpdates() {
 
   async function run() {
     setBusy('run');
+    setSchedule((current) => current ? { ...current, isRunning: true } : current);
     try {
       const data = await runNewsletterImportNow();
       setSchedule(data);
@@ -131,6 +133,7 @@ export function ScheduledNewsletterUpdates() {
           </div>
         </div>
       )}
+      {schedule && <TrackedNewsletterFiles disabled={disabled} revision={`${schedule.lastRunAt}:${schedule.lastResult.importedFiles}:${schedule.isRunning}`} />}
     </section>
   );
 }

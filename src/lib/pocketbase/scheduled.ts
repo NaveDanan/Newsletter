@@ -77,3 +77,44 @@ export async function runNewsletterDigestNow(): Promise<NewsletterDigestSchedule
     requestKey: null,
   });
 }
+
+export interface NewsletterImportSchedule {
+  enabled: boolean;
+  repositoryUrl: string;
+  username: string;
+  hasToken: boolean;
+  intervalMinutes: number;
+  isRunning: boolean;
+  lastRunAt: string;
+  lastSuccessAt: string;
+  lastError: string;
+  lastResult: {
+    status?: 'ok' | 'partial' | 'error';
+    importedFiles?: number;
+    articleCount?: number;
+    skipped?: number;
+    deferred?: number;
+    errors?: { file: string; message: string }[];
+  };
+}
+
+export interface NewsletterImportPatch {
+  enabled?: boolean;
+  repositoryUrl?: string;
+  username?: string;
+  token?: string;
+  clearToken?: boolean;
+  intervalMinutes?: number;
+}
+
+export function fetchNewsletterImportSchedule(): Promise<NewsletterImportSchedule> {
+  return getPocketBase().send('/api/scheduled/newsletter-import', { method: 'GET', requestKey: null });
+}
+
+export function updateNewsletterImportSchedule(patch: NewsletterImportPatch): Promise<NewsletterImportSchedule> {
+  return getPocketBase().send('/api/scheduled/newsletter-import', { method: 'PATCH', body: patch, requestKey: null });
+}
+
+export function runNewsletterImportNow(): Promise<NewsletterImportSchedule> {
+  return getPocketBase().send('/api/scheduled/newsletter-import/run', { method: 'POST', body: {}, requestKey: null });
+}

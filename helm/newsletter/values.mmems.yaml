@@ -3,7 +3,7 @@ fullnameOverride: newsletter
 replicaCount: 1
 image:
   repository: newsletter
-  tag: 1.0.19-20260909.1
+  tag: 1.0.20-20260909.1
   pullPolicy: IfNotPresent
 credentials:
   existingSecret: newsletter-env

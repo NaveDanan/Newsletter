@@ -216,6 +216,7 @@ function App() {
   const {
     newsletters,
     isLoaded: areNewslettersLoaded,
+    refreshNewsletters,
     addNewsletter,
     upsertDraftNewsletter,
     updateNewsletter,
@@ -414,8 +415,9 @@ function App() {
   };
 
   const handleManagerTabChange = useCallback((tab: ManagerTab) => {
+    if (tab === 'newsletters') void refreshNewsletters();
     navigateTo(tab === 'newsletters' ? '/manager' : `/manager/${tab}`);
-  }, [navigateTo]);
+  }, [navigateTo, refreshNewsletters]);
 
   const handleOpenGanttEditor = useCallback((projectId: string) => {
     navigateTo(`/gantt-editor/${encodeURIComponent(projectId)}`);

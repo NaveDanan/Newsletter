@@ -273,6 +273,28 @@ export const SCHEDULED_JOBS_SCHEMA = {
   deleteRule: '@request.auth.role = "admin"',
 };
 
+// Credentials and import checkpoints are only accessible through the admin-only hooks.
+export const NEWSLETTER_IMPORT_JOBS_SCHEMA = {
+  name: 'newsletter_import_jobs', type: 'base',
+  fields: [
+    autodate('created'), autodate('updated', true, true),
+    text('key', 255, { required: true }), bool('enabled'),
+    text('repositoryUrl', 4000), text('username', 1000), text('token', 10000, { hidden: true }),
+    number('intervalMinutes', 60, { onlyInt: true }), text('updatedBy', 255),
+    text('lastRunAt', 255), text('lastSuccessAt', 255), text('lastError', 10000), json('lastResult'),
+    text('lockedUntil', 255),
+  ],
+  indexes: ['CREATE UNIQUE INDEX idx_newsletter_import_jobs_key ON newsletter_import_jobs (key)'],
+  listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
+};
+
+export const NEWSLETTER_IMPORTS_SCHEMA = {
+  name: 'newsletter_imports', type: 'base',
+  fields: [autodate('created'), text('sourceKey', 64, { required: true }), text('sourceUrl', 8000), text('checksum', 64), json('newsletterIds')],
+  indexes: ['CREATE UNIQUE INDEX idx_newsletter_imports_source_key ON newsletter_imports (sourceKey)'],
+  listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
+};
+
 export const APP_COLLECTION_SCHEMAS = [
   PROJECTS_SCHEMA,
   NEWSLETTERS_SCHEMA,
@@ -283,4 +305,6 @@ export const APP_COLLECTION_SCHEMAS = [
   NEWSLETTER_UNSUBSCRIBES_SCHEMA,
   LINKS_SCHEMA,
   SCHEDULED_JOBS_SCHEMA,
+  NEWSLETTER_IMPORT_JOBS_SCHEMA,
+  NEWSLETTER_IMPORTS_SCHEMA,
 ];

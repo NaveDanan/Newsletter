@@ -77,6 +77,18 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
     };
   }, [enabled]);
 
+  const refreshNewsletters = useCallback(async () => {
+    if (!enabled) return;
+    try {
+      setNewsletters(await fetchNewsletters());
+      setError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to refresh newsletters';
+      setError(message);
+      toast.error(message);
+    }
+  }, [enabled]);
+
   // ---------------------------------------------------------------------------
   // Add (publish immediately)
   // ---------------------------------------------------------------------------
@@ -401,6 +413,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
   return {
     newsletters,
     isLoading,
+    refreshNewsletters,
     isLoaded: !isLoading,   // backwards-compat alias used in App.tsx
     error,
     addNewsletter,

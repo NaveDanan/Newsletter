@@ -118,7 +118,7 @@ function runJobNow(app, scheduled) {
             record.set('status', 'draft');
             record.set('author', article.author || '');
             record.set('createdById', job.getString('updatedBy'));
-            record.set('publishedAt', new Date().toISOString().slice(0, 10));
+            record.set('publishedAt', article.publishedAt || new Date().toISOString().slice(0, 10));
             ['tags', 'likedByUserIds', 'bookmarkedByUserIds', 'commentItems'].forEach(function (key) { record.set(key, []); });
             tx.save(record);
             ids.push(record.id);

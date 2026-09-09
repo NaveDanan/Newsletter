@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { DOMParser } from '@xmldom/xmldom';
 import path from 'node:path';
+import { sourcePublicationDate } from './import-publication-date.mjs';
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -177,10 +178,11 @@ export async function parseDocx(buffer, filename = 'Newsletter.docx') {
     const infos = nodes.filter((n) => n.localName === 'p').map(paragraphInfo);
     const titleInfo = infos.find((i) => i.text.trim() && (useTitles ? i.title : useHeadings ? i.heading === 1 : i.title || i.heading === 1));
     const titleNode = nodes.find((n) => n.localName === 'p' && paragraphInfo(n).text === titleInfo?.text);
+    const publishedAt = infos.map((info) => sourcePublicationDate(info.text)).find(Boolean) || '';
     const contentNodes = nodes.filter((n) => {
       if (n === titleNode) return false;
       const text = n.localName === 'p' ? paragraphInfo(n).text.trim() : '';
-      return !/^\{\s*[^{}]+\s*\}$/.test(text) && !/^כתובת תמונה:/.test(text);
+      return !sourcePublicationDate(text) && !/^\{\s*[^{}]+\s*\}$/.test(text) && !/^כתובת תמונה:/.test(text);
     });
     const text = contentNodes.map((n) => all(n, 't').map((t) => t.textContent).join('')).join(' ').trim();
     const html = renderBlocks(contentNodes);
@@ -189,6 +191,7 @@ export async function parseDocx(buffer, filename = 'Newsletter.docx') {
     const rtl = titleInfo?.rtl ?? hebrew(text);
     return {
       title: title.slice(0, 10000), content: html, excerpt: text.slice(0, 300), subtitle: '',
+      publishedAt,
       textAlignment: ['left', 'center', 'right'].includes(titleInfo?.align) ? titleInfo.align : rtl ? 'right' : 'left',
       coverImage: html.match(/<img src="([^"]+)"/)?.[1] || '',
       readTime: `${Math.max(1, Math.ceil(text.split(/\s+/).length / 200))} min`,

@@ -4,6 +4,7 @@ import JSZip from 'jszip';
 import { createHash } from 'node:crypto';
 import { parseDocx } from '../../scripts/pocketbase/docx-import.mjs';
 import { collectDocuments, repositoryUrls } from '../../scripts/pocketbase/artifactory-import.mjs';
+import { repairImportedPublicationDate, sourcePublicationDate } from '../../scripts/pocketbase/import-publication-date.mjs';
 
 const image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j1xoAAAAASUVORK5CYII=';
 const p = (text, style = '', props = '') => `<w:p><w:pPr>${style ? `<w:pStyle w:val="${style}"/>` : ''}${props}</w:pPr><w:r><w:t>${text}</w:t></w:r></w:p>`;
@@ -34,6 +35,26 @@ test('splits repeated Title styles and handles a single article without headings
   const articles = await parseDocx(await fixture(p('One', 'Title') + p('Body one') + p('Two', 'Title') + p('Body two')));
   assert.deepEqual(articles.map((a) => a.title), ['One', 'Two']);
   assert.equal((await parseDocx(await fixture(p('Standalone text')))).length, 1);
+});
+
+test('uses the source publication date as article metadata instead of body text', async () => {
+  const articles = await parseDocx(await fixture(p('One', 'Heading1') + p('פורסם: 2026-06-16 11:35:52 +0000') + p('Body one') + p('Two', 'Heading1') + p('פורסם: 2026-06-23 23:35:52 -0400') + p('Body two')));
+  assert.equal(articles[0].publishedAt, '2026-06-16');
+  assert.equal(articles[1].publishedAt, '2026-06-23');
+  for (const article of articles) {
+    assert.doesNotMatch(article.content, /פורסם:/);
+    assert.doesNotMatch(article.excerpt, /פורסם:/);
+  }
+});
+
+test('repairs old date paragraphs without changing article content and is safe to repeat', () => {
+  const body = '<p dir="rtl"><span>פורסם: 2026-06-16 11:35:52 +0000</span></p><p>Edited body</p><img src="data:image/png;base64,abc">';
+  const repaired = repairImportedPublicationDate(body);
+  assert.deepEqual(repaired, { publishedAt: '2026-06-16', content: '<p>Edited body</p><img src="data:image/png;base64,abc">' });
+  assert.equal(repairImportedPublicationDate(repaired.content), null);
+  assert.equal(repairImportedPublicationDate('<p>Intro</p>' + body), null);
+  assert.equal(sourcePublicationDate('פורסם: 2026-02-30 11:35:52 +0000'), '');
+  assert.equal(sourcePublicationDate('פורסם: yesterday'), '');
 });
 
 test('escapes document text, rejects active links and XML entities', async () => {

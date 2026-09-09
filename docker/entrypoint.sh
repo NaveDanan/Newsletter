@@ -83,6 +83,9 @@ run_safe_bootstrap() {
   echo 'Syncing PocketBase app schema...'
   node "$APP_ROOT/scripts/sync-pocketbase-app-schema.mjs"
 
+  echo 'Repairing publication dates on previously imported newsletters...'
+  node "$APP_ROOT/scripts/repair-imported-newsletter-dates.mjs"
+
   echo 'Syncing PocketBase navigation dropdowns...'
   node "$APP_ROOT/scripts/sync-navigation-dropdowns.mjs"
 

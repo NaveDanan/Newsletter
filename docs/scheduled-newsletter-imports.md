@@ -15,7 +15,7 @@ The implementation was checked against the three DOCX files in `mems-generic-loc
 - A document without those boundaries becomes one article.
 - The article heading becomes its title, without repeating it in the body. Embedded PNG, JPEG, GIF and WebP images remain inline; the first image also becomes the cover.
 - Paragraph direction and alignment, common text styles, hyperlinks, lists and basic tables are converted into article HTML. Hebrew direction is inferred only when the paragraph has no explicit direction.
-- The observed collection markers and redundant image URL lines are omitted. Source publication metadata and image captions remain in the body. Hebrew bylines populate the author field.
+- The observed collection markers and redundant image URL lines are omitted. A valid source publication date becomes the article's `publishedAt` date and is omitted from the body; the article header uses its existing localized date format. Image captions remain in the body. Hebrew bylines populate the author field.
 
 This is an article conversion, not a Word page-layout renderer. Floating objects are placed inline. Unsupported or missing image formats fail that file with an actionable error instead of silently losing the image.
 
@@ -28,6 +28,8 @@ Each run processes up to three pending files. The saved cursor rotates batches s
 A unique checkpoint combines the artifact URL and content checksum. Article creation and its checkpoint commit in one transaction per file. Repeat checks skip imported file versions. A changed file creates new drafts; existing articles and editorial changes are preserved. Successful files remain imported even when another file fails. A database lease prevents overlapping manual and scheduled runs, and expires after five minutes if the process stops unexpectedly.
 
 ## Runtime and verification
+
+Startup also runs `scripts/repair-imported-newsletter-dates.mjs`. It corrects the leading publication-date paragraph only on articles referenced by import checkpoints. It updates `publishedAt`, removes that paragraph and its excerpt prefix, and preserves other article fields. Articles with no valid leading date are unchanged, so repeated runs are safe.
 
 The normal container startup schema sync creates `newsletter_import_jobs` and `newsletter_imports`. Existing deployments need the updated app image, including hooks, scripts and dependencies. For a standalone PocketBase deployment, run `pnpm pb:sync-app-schema`, install production dependencies and set `APP_ROOT` to the project directory so the hook can locate `scripts/pocketbase/artifactory-import.mjs`. Node must be available on PATH, or through `NODE_BINARY`.
 

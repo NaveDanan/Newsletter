@@ -25,7 +25,7 @@ Every one of them has `createRule`, `updateRule` and `deleteRule` set to null, s
 
 No relation fields and no `expand` are used anywhere. Author identity is denormalized onto each post and each notification, because the `users` collection restricts list and view to the record owner and a reader could never resolve another account through it. The cost of that choice is that a profile edit has to rewrite its copies; `updateProfile` does so on the 500 most recent posts of that author, and older posts keep the name they were published under.
 
-Post bodies are stored as plain text. `src/lib/comment-formatting.ts` forbids anchors and strips every attribute, so links, hashtags and mentions are persisted as offset ranges in the post's `entities` field and rendered as React nodes. `pb_hooks/lib/community-core.js` and `src/lib/community-text.ts` implement the same scanner twice — once for Goja and once for the browser — and both spell out the Hebrew and Arabic character blocks by hand, because Goja does not support unicode property escapes. `tests/scripts/community-api.mjs` asserts that the offsets the server stores match the offsets the client computes for the same body.
+Post bodies are stored as plain text. `src/lib/comment-formatting.ts` forbids anchors and strips every attribute, so links, hashtags and mentions are persisted as offset ranges in the post's `entities` field and rendered as React nodes. `pb_hooks/lib/community-core.js` and `src/lib/community-text.ts` implement the same scanner twice — once for Goja and once for the browser — and both spell out the Hebrew and Arabic character blocks by hand, because Goja does not support unicode property escapes. The client half also mirrors `normalizeUrl`, `normalizeHandle`, `isValidHandle`, `normalizeHashtag` and `trimBody`, because a composer that highlights a link the post will not carry, or counts characters the server is about to trim away, is wrong in a way the author sees. `npm run test:community-mirror` runs both implementations over one corpus and asserts they answer identically, and `tests/scripts/community-api.mjs` re-checks the offsets against a live server.
 
 ## API surface
 
@@ -85,6 +85,14 @@ npm run test:community-core
 ```
 
 They load `pb_hooks/lib/community-core.js` in a `node:vm` sandbox and exercise the section that touches no PocketBase globals: entity scanning, handle validation and suggestion, URL normalization and the private-host refusal, cursor encoding, page-size clamping, filter building and post validation.
+
+Run the mirror checks with:
+
+```sh
+npm run test:community-mirror
+```
+
+They load both implementations — the hook in the same sandbox, `src/lib/community-text.ts` through Node's type stripping — and assert they answer identically over one corpus of bodies, whitespace cases, URLs, handles and hashtags, rather than asserting fixed expectations twice. Every case exists because the two sides could plausibly disagree there: a numeric handle, a host with no dot, credentials, a default port, an emoji's surrogate pair, an already-trimmed body the server must leave alone.
 
 Run the end-to-end checks against a disposable local PocketBase instance with:
 

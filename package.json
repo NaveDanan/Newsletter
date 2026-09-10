@@ -11,6 +11,7 @@
     "test:add-newsletter-fixture": "node tests/scripts/add-newsletter-fixture.mjs",
     "test:scheduled-import": "node --test tests/scripts/scheduled-import.test.mjs",
     "test:community-core": "node scripts/test-community-core.cjs",
+    "test:community-mirror": "node scripts/test-community-mirror.cjs",
     "test:community-api": "node tests/scripts/community-api.mjs",
     "docker:build": "node scripts/build-docker-image.mjs",
     "test:docker-api": "node scripts/test-docker-api.mjs",

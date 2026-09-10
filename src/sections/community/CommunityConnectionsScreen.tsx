@@ -81,12 +81,11 @@ export function CommunityConnectionsScreen({ handle, direction }: CommunityConne
         >
           <HugeiconsIcon icon={ArrowLeft01Icon} className="size-5 rtl:rotate-180" />
         </button>
-        <div>
-          <h1 className="text-lg font-bold text-[#171717]">
-            {t(direction === 'followers' ? 'community.profile.followersTitle' : 'community.profile.followingTitle')}
-          </h1>
-          <p className="text-sm text-[#737373]">@{handle}</p>
-        </div>
+        {/* The heading interpolates the handle, so a second line repeating it
+            would only say the same thing twice. */}
+        <h1 className="text-lg font-bold text-[#171717]">
+          {t(direction === 'followers' ? 'community.profile.followersTitle' : 'community.profile.followingTitle', { handle })}
+        </h1>
       </div>
 
       {isLoading && profiles.length === 0 ? (

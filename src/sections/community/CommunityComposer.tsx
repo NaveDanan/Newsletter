@@ -17,7 +17,7 @@ import {
   isCommunityMediaTooLarge,
   probeCommunityMedia,
 } from '@/lib/community-media';
-import { communityBodyLength, firstCommunityUrl } from '@/lib/community-text';
+import { firstCommunityUrl, normalizeCommunityBody } from '@/lib/community-text';
 import {
   createCommunityPost,
   fetchCommunityLinkPreview,
@@ -104,13 +104,17 @@ export function CommunityComposer({
   const itemsRef = useRef<PendingMedia[]>(items);
   itemsRef.current = items;
 
-  const length = communityBodyLength(body);
+  // Normalized the way the server's trimBody normalizes, so the counter, the
+  // submit gate and the payload all describe one and the same string and the
+  // composer can never accept a body the post route will reject.
+  const normalizedBody = useMemo(() => normalizeCommunityBody(body), [body]);
+  const length = normalizedBody.length;
   const remaining = COMMUNITY_MAX_BODY_LENGTH - length;
   const isOverLimit = remaining < 0;
   const isUploading = items.some((item) => item.isUploading);
   const hasMedia = items.length > 0;
   const canSubmit = !isSubmitting && !isUploading && !isOverLimit
-    && (body.trim().length > 0 || hasMedia || Boolean(quoted));
+    && (length > 0 || hasMedia || Boolean(quoted));
 
   useEffect(() => {
     if (autoFocus) {
@@ -132,7 +136,7 @@ export function CommunityComposer({
   // A link preview only appears when there is no attached media, matching how
   // the card renders it, and it is debounced so typing a URL does not fire a
   // request per keystroke.
-  const url = useMemo(() => firstCommunityUrl(body), [body]);
+  const url = useMemo(() => firstCommunityUrl(normalizedBody), [normalizedBody]);
 
   useEffect(() => {
     if (!url || hasMedia || quoted || previewDismissed) {
@@ -236,7 +240,7 @@ export function CommunityComposer({
     setIsSubmitting(true);
     try {
       const post = await createCommunityPost({
-        body: body.trim(),
+        body: normalizedBody,
         mediaIds: items.map((item) => (item.media ? item.media.id : '')).filter(Boolean),
         parentId: parent ? parent.id : '',
         quotedPostId: quoted ? quoted.id : '',
@@ -263,7 +267,7 @@ export function CommunityComposer({
     } finally {
       setIsSubmitting(false);
     }
-  }, [body, canSubmit, isAuthenticated, items, onPosted, parent, quoted, requireAuth, sensitive, t]);
+  }, [canSubmit, isAuthenticated, items, normalizedBody, onPosted, parent, quoted, requireAuth, sensitive, t]);
 
   const placeholderKey = parent
     ? 'community.composer.replyPlaceholder'
@@ -338,6 +342,7 @@ export function CommunityComposer({
         {preview && !hasMedia && !quoted ? (
           <CommunityLinkPreviewCard
             preview={preview}
+            removeLabel={t('community.composer.removePreview')}
             onRemove={() => {
               setPreview(null);
               setPreviewDismissed(true);

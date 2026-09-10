@@ -207,7 +207,9 @@ export function normalizeProjectGantt(rawGantt: unknown): ProjectGantt {
     tasks,
     resources,
     roles,
-    zoom: candidate.zoom === 'week' || candidate.zoom === 'month' ? candidate.zoom : 'day',
+    zoom: candidate.zoom === 'week' || candidate.zoom === 'month' || candidate.zoom === 'quarter'
+      ? candidate.zoom
+      : 'day',
     lastEditedAt: typeof candidate.lastEditedAt === 'string' ? candidate.lastEditedAt : null,
   };
 }

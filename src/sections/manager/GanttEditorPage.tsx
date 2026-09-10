@@ -10,6 +10,8 @@ import {
   Delete02Icon,
   ListIndentDecreaseIcon,
   ListIndentIncreaseIcon,
+  Maximize01Icon,
+  Minimize01Icon,
   PlusSignIcon,
   ResourcesAddIcon,
   ScissorIcon,
@@ -18,7 +20,7 @@ import {
   Tick01Icon,
 } from '@hugeicons/core-free-icons';
 import { faDollarSign, faEuroSign, faPoundSign, faShekelSign } from '@fortawesome/free-solid-svg-icons';
-import { addDays, compareAsc, format, parseISO, startOfMonth } from 'date-fns';
+import { addDays, compareAsc, format, parseISO, startOfDay, startOfMonth, startOfQuarter } from 'date-fns';
 import { enUS, he as heLocale } from 'date-fns/locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -207,6 +209,48 @@ function buildTimelineMonths(days: Date[]) {
   });
 
   return months;
+}
+
+function buildTimelineQuarters(days: Date[]) {
+  const quarters: Date[][] = [];
+
+  days.forEach((day) => {
+    const lastQuarter = quarters[quarters.length - 1];
+    if (!lastQuarter || startOfQuarter(lastQuarter[0]).getTime() !== startOfQuarter(day).getTime()) {
+      quarters.push([day]);
+      return;
+    }
+
+    lastQuarter.push(day);
+  });
+
+  return quarters;
+}
+
+function getQuarterNumber(date: Date) {
+  return Math.floor(date.getMonth() / 3) + 1;
+}
+
+function findTodayTimelineIndex(days: Date[]) {
+  if (days.length === 0) {
+    return -1;
+  }
+
+  const today = startOfDay(new Date()).getTime();
+  const exactIndex = days.findIndex((day) => startOfDay(day).getTime() === today);
+  if (exactIndex >= 0) {
+    return exactIndex;
+  }
+
+  if (startOfDay(days[0]).getTime() > today) {
+    return 0;
+  }
+
+  if (startOfDay(days[days.length - 1]).getTime() < today) {
+    return days.length - 1;
+  }
+
+  return -1;
 }
 
 function getBlankTaskNameCount(tasks: GanttTask[]) {
@@ -399,8 +443,8 @@ const currencyOptions: GanttCurrency[] = ['ILS', 'USD', 'EUR', 'GBP'];
 const timelineHeaderHeight = 56;
 const taskMainRowHeight = 56;
 const taskDetailRowHeight = 84;
-const taskBubbleWidth = 248;
-const taskBubbleHeight = 164;
+const taskBubbleWidth = 296;
+const taskBubbleHeight = 332;
 const minimumVisibleRows = 10;
 const defaultTaskGridWidth = 556;
 const minTaskGridWidth = 380;
@@ -511,6 +555,18 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
         return value;
     }
   }, [t]);
+  const formatZoomLabel = useCallback((value: GanttZoom) => {
+    switch (value) {
+      case 'day':
+        return t('ganttEditor.daily');
+      case 'week':
+        return t('ganttEditor.weekly');
+      case 'month':
+        return t('ganttEditor.monthly');
+      default:
+        return t('ganttEditor.quarterly');
+    }
+  }, [t]);
   const formatWeekLabel = useCallback((value: Date) => {
     const weekNumber = Number.parseInt(format(value, 'w'), 10);
     return `${t('editor.weekShort')} ${formatNumber(Number.isFinite(weekNumber) ? weekNumber : 0)}`;
@@ -541,11 +597,15 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
   const [emptyTaskNameWarningCount, setEmptyTaskNameWarningCount] = useState(0);
   const [isTimelineCalendarOpen, setIsTimelineCalendarOpen] = useState(false);
   const [showTimelineYears, setShowTimelineYears] = useState(false);
+  const [isTimelineFullscreen, setIsTimelineFullscreen] = useState(false);
   const suppressNextGridDismissRef = useRef(false);
   const suppressNextEmptyRowClickRef = useRef(false);
   const lastExpandedTaskGridWidthRef = useRef(defaultTaskGridWidth);
   const draftGanttRef = useRef<ProjectGantt>(draftGantt);
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const timelineScrollbarRef = useRef<HTMLDivElement | null>(null);
+  const isSyncingTimelineScrollRef = useRef(false);
+  const hasScrolledToTodayRef = useRef(false);
   const [timelineViewportWidth, setTimelineViewportWidth] = useState(0);
 
   useEffect(() => {
@@ -594,18 +654,89 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     return weeks;
   }, [timelineDays]);
   const timelineMonths = useMemo(() => buildTimelineMonths(timelineDays), [timelineDays]);
-  const baseDayWidth = draftGantt.zoom === 'month' ? 8 : draftGantt.zoom === 'week' ? 18 : 30;
+  const timelineQuarters = useMemo(() => buildTimelineQuarters(timelineDays), [timelineDays]);
+  const baseDayWidth = draftGantt.zoom === 'quarter'
+    ? 3
+    : draftGantt.zoom === 'month'
+      ? 8
+      : draftGantt.zoom === 'week'
+        ? 18
+        : 30;
   const dayWidth = timelineDays.length > 0 && timelineViewportWidth > 0
     ? Math.max(baseDayWidth, timelineViewportWidth / timelineDays.length)
     : baseDayWidth;
   const timelineStart = useMemo(() => timelineDays[0] ?? new Date(), [timelineDays]);
   const timelineWidth = Math.max(timelineDays.length * dayWidth, timelineViewportWidth, 680);
   const timelineCellWidth = timelineDays.length > 0 ? timelineWidth / timelineDays.length : dayWidth;
-  const timelineGridColumns = draftGantt.zoom === 'month'
-    ? timelineMonths.map((monthDays) => `minmax(${monthDays.length * dayWidth}px, ${monthDays.length}fr)`).join(' ')
-    : draftGantt.zoom === 'week'
-      ? `repeat(${timelineWeeks.length}, minmax(${7 * dayWidth}px, 1fr))`
-      : `repeat(${timelineDays.length}, minmax(${dayWidth}px, 1fr))`;
+  const timelineSegments = useMemo(() => {
+    if (draftGantt.zoom === 'quarter') {
+      return timelineQuarters.map((days) => ({ key: `quarter-${days[0].toISOString()}`, days }));
+    }
+
+    if (draftGantt.zoom === 'month') {
+      return timelineMonths.map((days) => ({ key: `month-${days[0].toISOString()}`, days }));
+    }
+
+    if (draftGantt.zoom === 'week') {
+      return timelineWeeks.map((days) => ({ key: `week-${days[0].toISOString()}`, days }));
+    }
+
+    return timelineDays.map((day) => ({ key: `day-${day.toISOString()}`, days: [day] }));
+  }, [draftGantt.zoom, timelineDays, timelineMonths, timelineQuarters, timelineWeeks]);
+  const timelineGridColumns = draftGantt.zoom === 'day'
+    ? `repeat(${timelineDays.length}, minmax(${dayWidth}px, 1fr))`
+    : timelineSegments
+      .map((segment) => `minmax(${segment.days.length * dayWidth}px, ${segment.days.length}fr)`)
+      .join(' ');
+  const timelineBackgroundCells = useMemo(() => timelineSegments.map((segment) => ({
+    key: segment.key,
+    isRest: draftGantt.zoom === 'day' && isRestDay(segment.days[0]),
+  })), [draftGantt.zoom, timelineSegments]);
+  const timelineHeaderCells = useMemo(() => timelineSegments.map((segment) => {
+    const segmentStart = segment.days[0];
+
+    if (draftGantt.zoom === 'quarter') {
+      return {
+        key: segment.key,
+        caption: String(segmentStart.getFullYear()),
+        label: `${t('ganttEditor.quarterShort')}${formatNumber(getQuarterNumber(segmentStart))}`,
+        isRest: false,
+      };
+    }
+
+    if (draftGantt.zoom === 'month') {
+      return {
+        key: segment.key,
+        caption: String(segmentStart.getFullYear()),
+        label: formatDate(segmentStart, { month: 'short' }),
+        isRest: false,
+      };
+    }
+
+    if (draftGantt.zoom === 'week') {
+      return {
+        key: segment.key,
+        caption: formatWeekLabel(segmentStart),
+        label: formatDate(segmentStart, { month: 'short', day: 'numeric' }),
+        isRest: false,
+      };
+    }
+
+    return {
+      key: segment.key,
+      caption: formatTimelineDayLabel(segmentStart),
+      label: formatNumber(segmentStart.getDate()),
+      isRest: isRestDay(segmentStart),
+    };
+  }), [
+    draftGantt.zoom,
+    formatDate,
+    formatNumber,
+    formatTimelineDayLabel,
+    formatWeekLabel,
+    t,
+    timelineSegments,
+  ]);
   const completion = getProjectProgress(orderedTasks);
   const visibleRowCount = Math.max(visibleTasks.length, minimumVisibleRows);
   const fillerRowCount = Math.max(minimumVisibleRows - visibleTasks.length, 0);
@@ -631,6 +762,12 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     () => Array.from(new Set(timelineDays.map((day) => day.getFullYear()))),
     [timelineDays],
   );
+  const todayTimelineIndex = useMemo(() => findTodayTimelineIndex(timelineDays), [timelineDays]);
+  const todayMarkerOffset = todayTimelineIndex >= 0
+    ? isRTL
+      ? timelineWidth - ((todayTimelineIndex * timelineCellWidth) + (timelineCellWidth / 2))
+      : (todayTimelineIndex * timelineCellWidth) + (timelineCellWidth / 2)
+    : null;
   const [visibleTimelineDate, setVisibleTimelineDate] = useState<Date>(timelineStart);
   const [timelineCalendarMonth, setTimelineCalendarMonth] = useState<Date>(startOfMonth(timelineStart));
   const activeVisibleTimelineDate = useMemo(() => {
@@ -721,6 +858,28 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     timelineWidth,
   ]);
 
+  const scrollTimelineToIndex = useCallback((index: number, behavior: ScrollBehavior = 'smooth') => {
+    const scrollContainer = timelineScrollRef.current;
+    if (!scrollContainer || timelineDays.length === 0 || index < 0) {
+      return;
+    }
+
+    const targetCenter = isRTL
+      ? timelineWidth - ((index * timelineCellWidth) + (timelineCellWidth / 2))
+      : (index * timelineCellWidth) + (timelineCellWidth / 2);
+    const targetLeft = clamp(
+      targetCenter - (scrollContainer.clientWidth / 2),
+      0,
+      Math.max(0, scrollContainer.scrollWidth - scrollContainer.clientWidth),
+    );
+
+    scrollContainer.scrollTo({ left: targetLeft, behavior });
+  }, [isRTL, timelineCellWidth, timelineDays.length, timelineWidth]);
+
+  const handleScrollToToday = useCallback(() => {
+    scrollTimelineToIndex(todayTimelineIndex);
+  }, [scrollTimelineToIndex, todayTimelineIndex]);
+
   const scrollTimelineToDate = useCallback((date: Date, behavior: ScrollBehavior = 'smooth') => {
     if (!timelineScrollRef.current || timelineDays.length === 0) {
       return;
@@ -778,6 +937,15 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     const scrollContainer = timelineScrollRef.current;
     const handleScroll = () => {
       updateVisibleTimelineDate();
+
+      const scrollbar = timelineScrollbarRef.current;
+      if (scrollbar && !isSyncingTimelineScrollRef.current) {
+        isSyncingTimelineScrollRef.current = true;
+        scrollbar.scrollLeft = scrollContainer.scrollLeft;
+        window.requestAnimationFrame(() => {
+          isSyncingTimelineScrollRef.current = false;
+        });
+      }
     };
 
     handleScroll();
@@ -787,6 +955,29 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
       scrollContainer.removeEventListener('scroll', handleScroll);
     };
   }, [updateVisibleTimelineDate]);
+
+  useEffect(() => {
+    if (hasScrolledToTodayRef.current || timelineViewportWidth === 0 || timelineDays.length === 0) {
+      return;
+    }
+
+    hasScrolledToTodayRef.current = true;
+    scrollTimelineToIndex(todayTimelineIndex, 'auto');
+  }, [scrollTimelineToIndex, timelineDays.length, timelineViewportWidth, todayTimelineIndex]);
+
+  const handleTimelineScrollbarScroll = useCallback(() => {
+    const scrollContainer = timelineScrollRef.current;
+    const scrollbar = timelineScrollbarRef.current;
+    if (!scrollContainer || !scrollbar || isSyncingTimelineScrollRef.current) {
+      return;
+    }
+
+    isSyncingTimelineScrollRef.current = true;
+    scrollContainer.scrollTo({ left: scrollbar.scrollLeft, behavior: 'auto' });
+    window.requestAnimationFrame(() => {
+      isSyncingTimelineScrollRef.current = false;
+    });
+  }, []);
 
   useEffect(() => {
     if (!selectedTask || dragState || !timelineScrollRef.current) {
@@ -977,6 +1168,17 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     ));
     commitTasks(nextTasks, taskId);
   };
+
+  const handleTaskDeadlineChange = useCallback((taskId: string, deadline: string) => {
+    if (!deadline) {
+      return;
+    }
+
+    const nextTasks = draftGanttRef.current.tasks.map((task) => (
+      task.id === taskId ? updateTaskDeadline(task, deadline) : task
+    ));
+    commitTasks(nextTasks, taskId);
+  }, [commitTasks]);
 
   const handlePredecessorCommit = (taskId: string, rawValue: string) => {
     const trimmed = rawValue.trim();
@@ -1593,6 +1795,21 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     handleAddTask();
   }, [handleAddTask, managedTaskId]);
 
+  useEffect(() => {
+    if (!isTimelineFullscreen) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsTimelineFullscreen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isTimelineFullscreen]);
+
   const handleTimelineCalendarOpenChange = useCallback((open: boolean) => {
     setIsTimelineCalendarOpen(open);
     if (open) {
@@ -2100,7 +2317,13 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                 <p className="text-xs text-[#737373] text-center py-2">{t('ganttEditor.storedLocally')}</p>
               </div>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col border-y border-[#E5E7EB] bg-white/95">
+          <div
+            className={`flex min-h-0 flex-col bg-white/95 ${
+              isTimelineFullscreen
+                ? 'fixed inset-0 z-[90] h-screen w-screen border-0 shadow-[0_24px_80px_rgba(23,23,23,0.24)]'
+                : 'flex-1 border-y border-[#E5E7EB]'
+            }`}
+          >
             <div className="flex flex-col gap-4 border-b border-[#EEF2F6] px-4 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-6">
               <div>
                 <h2 className="text-lg font-semibold text-[#171717]">{t('ganttEditor.taskGridTimeline')}</h2>
@@ -2188,7 +2411,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
 
               <div className="flex flex-wrap items-center gap-2">
                 <div className="rounded-full border border-[#E5E7EB] bg-[#F8FAFC] p-1">
-                  {(['day', 'week', 'month'] as GanttZoom[]).map((zoom) => (
+                  {(['day', 'week', 'month', 'quarter'] as GanttZoom[]).map((zoom) => (
                     <button
                       key={zoom}
                       type="button"
@@ -2196,10 +2419,30 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                       className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${draftGantt.zoom === zoom ? 'bg-[#171717] text-white' : 'text-[#525252] hover:bg-white'
                         }`}
                     >
-                      {zoom === 'day' ? t('ganttEditor.daily') : zoom === 'week' ? t('ganttEditor.weekly') : t('ganttEditor.monthly')}
+                      {formatZoomLabel(zoom)}
                     </button>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={handleScrollToToday}
+                  disabled={todayTimelineIndex < 0}
+                  className="btn-secondary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  title={t('ganttEditor.jumpToToday')}
+                >
+                  <HugeiconsIcon icon={Calendar01Icon} className="h-4 w-4 text-[#D93A3A]" />
+                  {t('ganttEditor.today')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTimelineFullscreen((current) => !current)}
+                  className="btn-secondary inline-flex items-center gap-2"
+                  aria-pressed={isTimelineFullscreen}
+                  title={isTimelineFullscreen ? t('ganttEditor.exitFullscreen') : t('ganttEditor.enterFullscreen')}
+                >
+                  <HugeiconsIcon icon={isTimelineFullscreen ? Minimize01Icon : Maximize01Icon} className="h-4 w-4" />
+                  {isTimelineFullscreen ? t('ganttEditor.exitFullscreen') : t('ganttEditor.fullscreen')}
+                </button>
                 <button
                   type="button"
                   onClick={handleAddTask}
@@ -2603,10 +2846,10 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                     </div>
                   </div>
 
-                  <div className="flex min-h-0 flex-col">
+                  <div className="relative flex min-h-0 flex-col">
                     <div
                       ref={timelineScrollRef}
-                      className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scroll-smooth overscroll-x-contain"
+                      className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scroll-smooth overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                       onWheel={handleTimelineWheel}
                       dir="ltr"
                     >
@@ -2616,59 +2859,33 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                       style={{ width: `max(100%, ${timelineWidth}px)`, minHeight: timelineGridMinHeight }}
                     >
                       <div className="sticky top-0 z-10 grid h-14 border-b border-[#EEF2F6] bg-[#F8FAFC]" style={{ gridTemplateColumns: timelineGridColumns }}>
-                        {draftGantt.zoom === 'month' ? (
-                          timelineMonths.map((monthDays) => {
-                            const monthStart = monthDays[0];
-                            return (
-                              <div
-                                key={monthStart.toISOString()}
-                                className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#EEF2F6] px-1 py-2 text-center last:border-r-0"
-                              >
-                                <p className="max-w-full truncate whitespace-nowrap text-[10px] uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">
-                                  {monthStart.getFullYear()}
-                                </p>
-                                <p className="max-w-full truncate whitespace-nowrap text-sm font-medium leading-tight text-[#171717]">
-                                  {formatDate(monthStart, { month: 'short' })}
-                                </p>
-                              </div>
-                            );
-                          })
-                        ) : draftGantt.zoom === 'week' ? (
-                          timelineWeeks.map((weekDays) => {
-                            const weekStart = weekDays[0];
-                            return (
-                              <div
-                                key={weekStart.toISOString()}
-                                className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#EEF2F6] px-1 py-2 text-center last:border-r-0"
-                              >
-                                <p className="max-w-full truncate whitespace-nowrap text-[10px] uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">
-                                  {formatWeekLabel(weekStart)}
-                                </p>
-                                <p className="max-w-full truncate whitespace-nowrap text-sm font-medium leading-tight text-[#171717]">
-                                  {formatDate(weekStart, { month: 'short', day: 'numeric' })}
-                                </p>
-                              </div>
-                            );
-                          })
-                        ) : (
-                          timelineDays.map((day) => (
-                            <div
-                              key={day.toISOString()}
-                              className={`flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r px-1 py-2 text-center last:border-r-0 ${
-                                isRestDay(day) ? 'border-[#E9E3D7] bg-[#FAF6EE]' : 'border-[#EEF2F6]'
-                              }`}
-                              title={isRestDay(day) ? t('ganttEditor.restDay') : undefined}
-                            >
-                              <p className={`max-w-full truncate whitespace-nowrap text-[10px] uppercase leading-none tracking-[0.12em] ${isRestDay(day) ? 'text-[#B45309]' : 'text-[#A3A3A3]'}`}>
-                                {formatTimelineDayLabel(day)}
-                              </p>
-                              <p className={`max-w-full truncate whitespace-nowrap text-sm font-medium leading-tight ${isRestDay(day) ? 'text-[#92400E]' : 'text-[#171717]'}`}>
-                                {formatNumber(day.getDate())}
-                              </p>
-                            </div>
-                          ))
-                        )}
+                        {timelineHeaderCells.map((cell) => (
+                          <div
+                            key={cell.key}
+                            className={`flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r px-1 py-2 text-center last:border-r-0 ${
+                              cell.isRest ? 'border-[#E9E3D7] bg-[#FAF6EE]' : 'border-[#EEF2F6]'
+                            }`}
+                            title={cell.isRest ? t('ganttEditor.restDay') : undefined}
+                          >
+                            <p className={`max-w-full truncate whitespace-nowrap text-[10px] uppercase leading-none tracking-[0.12em] ${cell.isRest ? 'text-[#B45309]' : 'text-[#A3A3A3]'}`}>
+                              {cell.caption}
+                            </p>
+                            <p className={`max-w-full truncate whitespace-nowrap text-sm font-medium leading-tight ${cell.isRest ? 'text-[#92400E]' : 'text-[#171717]'}`}>
+                              {cell.label}
+                            </p>
+                          </div>
+                        ))}
                       </div>
+                      {todayMarkerOffset !== null ? (
+                        <div
+                          className="pointer-events-none absolute bottom-0 z-[15] w-px bg-[#D93A3A]/70"
+                          style={{ left: `${todayMarkerOffset}px`, top: timelineHeaderHeight }}
+                        >
+                          <span className="absolute -top-6 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#D93A3A] px-2 py-[2px] text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-sm">
+                            {t('ganttEditor.today')}
+                          </span>
+                        </div>
+                      ) : null}
                       {visibleTasks.map((task) => {
                         const resource = draftGantt.resources.find((entry) => entry.id === task.resourceId) ?? null;
                         const barColor = resource?.color ?? '#D93A3A';
@@ -2683,28 +2900,12 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                                 }`}
                             >
                               <div className="absolute inset-0 grid" style={{ gridTemplateColumns: timelineGridColumns }}>
-                                {draftGantt.zoom === 'month' ? (
-                                  timelineMonths.map((monthDays) => (
-                                    <div
-                                      key={`${task.id}-month-${monthDays[0].toISOString()}`}
-                                      className="border-r border-[#F1F5F9] last:border-r-0"
-                                    />
-                                  ))
-                                ) : draftGantt.zoom === 'week' ? (
-                                  timelineWeeks.map((weekDays) => (
-                                    <div
-                                      key={`${task.id}-week-${weekDays[0].toISOString()}`}
-                                      className="border-r border-[#F1F5F9] last:border-r-0"
-                                    />
-                                  ))
-                                ) : (
-                                  timelineDays.map((day) => (
-                                    <div
-                                      key={`${task.id}-${day.toISOString()}`}
-                                      className={`border-r last:border-r-0 ${isRestDay(day) ? 'border-[#EEE5D6] bg-[#FCFAF5]' : 'border-[#F1F5F9]'}`}
-                                    />
-                                  ))
-                                )}
+                                {timelineBackgroundCells.map((cell) => (
+                                  <div
+                                    key={`${task.id}-${cell.key}`}
+                                    className={`border-r last:border-r-0 ${cell.isRest ? 'border-[#EEE5D6] bg-[#FCFAF5]' : 'border-[#F1F5F9]'}`}
+                                  />
+                                ))}
                               </div>
 
                               <div
@@ -2807,28 +3008,12 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                           onClick={handleEmptyRowClick}
                         >
                           <div className="absolute inset-0 grid" style={{ gridTemplateColumns: timelineGridColumns }}>
-                            {draftGantt.zoom === 'month' ? (
-                              timelineMonths.map((monthDays) => (
-                                <div
-                                  key={`timeline-filler-${row}-month-${monthDays[0].toISOString()}`}
-                                  className="border-r border-[#F1F5F9] last:border-r-0"
-                                />
-                              ))
-                            ) : draftGantt.zoom === 'week' ? (
-                              timelineWeeks.map((weekDays) => (
-                                <div
-                                  key={`timeline-filler-${row}-week-${weekDays[0].toISOString()}`}
-                                  className="border-r border-[#F1F5F9] last:border-r-0"
-                                />
-                              ))
-                            ) : (
-                              timelineDays.map((day) => (
-                                <div
-                                  key={`timeline-filler-${row}-${day.toISOString()}`}
-                                  className={`border-r last:border-r-0 ${isRestDay(day) ? 'border-[#EEE5D6] bg-[#FCFAF5]' : 'border-[#F1F5F9]'}`}
-                                />
-                              ))
-                            )}
+                            {timelineBackgroundCells.map((cell) => (
+                              <div
+                                key={`timeline-filler-${row}-${cell.key}`}
+                                className={`border-r last:border-r-0 ${cell.isRest ? 'border-[#EEE5D6] bg-[#FCFAF5]' : 'border-[#F1F5F9]'}`}
+                              />
+                            ))}
                           </div>
                         </div>
                       ))}
@@ -2874,10 +3059,53 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                                 <p className="mt-1 text-sm font-semibold text-[#171717]">{formatNumber(getTaskProgress(selectedTask))}%</p>
                               </div>
                               <div className="rounded-xl bg-[#F8FAFC] p-3">
-                                <p className="text-[10px] uppercase tracking-[0.18em] text-[#A3A3A3]">{t('manager.status')}</p>
-                                <p className="mt-1 text-sm font-semibold capitalize text-[#171717]">
-                                  {formatStatusLabel(selectedTask.status)}
-                                </p>
+                                <p className="text-[10px] uppercase tracking-[0.18em] text-[#A3A3A3]">{t('ganttEditor.days')}</p>
+                                <p className="mt-1 text-sm font-semibold text-[#171717]">{formatNumber(selectedTask.durationDays)}</p>
+                              </div>
+                            </div>
+                            <div className="mt-3 space-y-2">
+                              <label className="block">
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#A3A3A3]">
+                                  {t('manager.status')}
+                                </span>
+                                <select
+                                  value={selectedTask.status}
+                                  onChange={(event) => updateTask(selectedTask.id, { status: event.target.value as GanttTask['status'] })}
+                                  onClick={(event) => event.stopPropagation()}
+                                  className="mt-1 h-9 w-full rounded-md border border-[#E5E7EB] bg-white px-2 py-1 text-sm"
+                                >
+                                  <option value="pending">{formatStatusLabel('pending')}</option>
+                                  <option value="in-progress">{formatStatusLabel('in-progress')}</option>
+                                  <option value="completed">{formatStatusLabel('completed')}</option>
+                                  <option value="delayed">{formatStatusLabel('delayed')}</option>
+                                </select>
+                              </label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <label className="block">
+                                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#A3A3A3]">
+                                    {t('manager.startDate')}
+                                  </span>
+                                  <input
+                                    type="date"
+                                    value={selectedTask.startDate}
+                                    onChange={(event) => updateTask(selectedTask.id, { startDate: event.target.value })}
+                                    onClick={(event) => event.stopPropagation()}
+                                    className="mt-1 h-9 w-full rounded-md border border-[#E5E7EB] bg-white px-2 py-1 text-xs"
+                                  />
+                                </label>
+                                <label className="block">
+                                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#A3A3A3]">
+                                    {t('manager.endDate')}
+                                  </span>
+                                  <input
+                                    type="date"
+                                    min={selectedTask.startDate}
+                                    value={selectedTask.endDate}
+                                    onChange={(event) => handleTaskDeadlineChange(selectedTask.id, event.target.value)}
+                                    onClick={(event) => event.stopPropagation()}
+                                    className="mt-1 h-9 w-full rounded-md border border-[#E5E7EB] bg-white px-2 py-1 text-xs"
+                                  />
+                                </label>
                               </div>
                             </div>
                             <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-[#EEF2F6] px-3 py-2 text-xs text-[#525252]">
@@ -2906,6 +3134,15 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
                         </div>
                       ) : null}
 
+                    </div>
+                    <div
+                      ref={timelineScrollbarRef}
+                      onScroll={handleTimelineScrollbarScroll}
+                      dir="ltr"
+                      aria-hidden="true"
+                      className="gantt-timeline-scrollbar sticky bottom-0 z-30 shrink-0 border-t border-[#EEF2F6] bg-white/95"
+                    >
+                      <div style={{ width: `max(100%, ${timelineWidth}px)`, height: 1 }} />
                     </div>
                   </div>
                   </div>

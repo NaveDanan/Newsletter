@@ -1,6 +1,6 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Calendar01Icon, Edit02Icon, ViewIcon, ViewOffIcon, Calendar03Icon, ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
-import { addMonths, addWeeks, differenceInCalendarDays, differenceInCalendarMonths, differenceInCalendarWeeks, endOfMonth, endOfWeek, format, isAfter, parseISO, startOfMonth, startOfWeek } from 'date-fns';
+import { addMonths, addWeeks, differenceInCalendarDays, differenceInCalendarMonths, differenceInCalendarWeeks, endOfMonth, endOfWeek, format, isAfter, parseISO, startOfMonth, startOfQuarter, startOfWeek } from 'date-fns';
 import { enUS, he as heLocale } from 'date-fns/locale';
 import { useMemo, useRef, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -68,6 +68,26 @@ function buildTimelineMonths(days: Date[]) {
   });
 
   return months;
+}
+
+function buildTimelineQuarters(days: Date[]) {
+  const quarters: Date[][] = [];
+
+  days.forEach((day) => {
+    const lastQuarter = quarters[quarters.length - 1];
+    if (!lastQuarter || startOfQuarter(lastQuarter[0]).getTime() !== startOfQuarter(day).getTime()) {
+      quarters.push([day]);
+      return;
+    }
+
+    lastQuarter.push(day);
+  });
+
+  return quarters;
+}
+
+function getQuarterNumber(date: Date) {
+  return Math.floor(date.getMonth() / 3) + 1;
 }
 
 function buildContentTimelineRow(
@@ -216,21 +236,76 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
   const timelineStart = previewTimelineDays[0] ?? new Date();
   const dayWidth = 30;
   const previewZoom: GanttZoom = selectedProject?.gantt.zoom ?? 'day';
-  const previewBaseDayWidth = previewZoom === 'month' ? 8 : previewZoom === 'week' ? 18 : dayWidth;
+  const previewBaseDayWidth = previewZoom === 'quarter'
+    ? 3
+    : previewZoom === 'month'
+      ? 8
+      : previewZoom === 'week'
+        ? 18
+        : dayWidth;
   const previewTimelineWeeks = useMemo(() => buildTimelineWeeks(previewTimelineDays), [previewTimelineDays]);
   const previewTimelineMonths = useMemo(() => buildTimelineMonths(previewTimelineDays), [previewTimelineDays]);
+  const previewTimelineQuarters = useMemo(() => buildTimelineQuarters(previewTimelineDays), [previewTimelineDays]);
   const previewTimelineWidth = Math.max(previewTimelineDays.length * previewBaseDayWidth, 640);
   const timelineCellWidth = previewTimelineDays.length > 0 ? previewTimelineWidth / previewTimelineDays.length : previewBaseDayWidth;
-  const previewTimelineGridColumns = previewZoom === 'month'
-    ? previewTimelineMonths.map((monthDays) => `minmax(${monthDays.length * previewBaseDayWidth}px, ${monthDays.length}fr)`).join(' ')
-    : previewZoom === 'week'
-      ? `repeat(${previewTimelineWeeks.length}, minmax(${7 * previewBaseDayWidth}px, 1fr))`
-      : `repeat(${previewTimelineDays.length}, minmax(${previewBaseDayWidth}px, 1fr))`;
+  const previewTimelineSegments = useMemo(() => {
+    if (previewZoom === 'quarter') {
+      return previewTimelineQuarters.map((days) => ({ key: `quarter-${days[0].toISOString()}`, days }));
+    }
+
+    if (previewZoom === 'month') {
+      return previewTimelineMonths.map((days) => ({ key: `month-${days[0].toISOString()}`, days }));
+    }
+
+    if (previewZoom === 'week') {
+      return previewTimelineWeeks.map((days) => ({ key: `week-${days[0].toISOString()}`, days }));
+    }
+
+    return previewTimelineDays.map((day) => ({ key: `day-${day.toISOString()}`, days: [day] }));
+  }, [previewTimelineDays, previewTimelineMonths, previewTimelineQuarters, previewTimelineWeeks, previewZoom]);
+  const previewTimelineGridColumns = previewZoom === 'day'
+    ? `repeat(${previewTimelineDays.length}, minmax(${previewBaseDayWidth}px, 1fr))`
+    : previewTimelineSegments
+      .map((segment) => `minmax(${segment.days.length * previewBaseDayWidth}px, ${segment.days.length}fr)`)
+      .join(' ');
   const formatTimelineDayLabel = (value: Date) => format(value, 'EEEEE', { locale: calendarLocale });
   const formatWeekLabel = (value: Date) => {
     const weekNumber = Number.parseInt(format(value, 'w'), 10);
     return `${t('editor.weekShort')} ${formatNumber(Number.isFinite(weekNumber) ? weekNumber : 0)}`;
   };
+  const previewTimelineHeaderCells = previewTimelineSegments.map((segment) => {
+    const segmentStart = segment.days[0];
+
+    if (previewZoom === 'quarter') {
+      return {
+        key: segment.key,
+        caption: String(segmentStart.getFullYear()),
+        label: `${t('ganttEditor.quarterShort')}${formatNumber(getQuarterNumber(segmentStart))}`,
+      };
+    }
+
+    if (previewZoom === 'month') {
+      return {
+        key: segment.key,
+        caption: String(segmentStart.getFullYear()),
+        label: formatDate(segmentStart, { month: 'short' }),
+      };
+    }
+
+    if (previewZoom === 'week') {
+      return {
+        key: segment.key,
+        caption: formatWeekLabel(segmentStart),
+        label: formatDate(segmentStart, { month: 'short', day: 'numeric' }),
+      };
+    }
+
+    return {
+      key: segment.key,
+      caption: formatTimelineDayLabel(segmentStart),
+      label: formatNumber(segmentStart.getDate()),
+    };
+  });
   const getPreviewTaskTimelineLayout = (task: GanttTask) => {
     const offsetDays = getTaskOffsetDays(task, timelineStart);
     const spanDays = getTaskCalendarSpanDays(task);
@@ -723,34 +798,12 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                               className="sticky top-0 z-10 grid h-14 border-b border-[#E5E5E5] bg-[#F8FAFC]"
                               style={{ gridTemplateColumns: previewTimelineGridColumns }}
                             >
-                              {previewZoom === 'month' ? (
-                                previewTimelineMonths.map((monthDays) => {
-                                  const monthStart = monthDays[0];
-                                  return (
-                                    <div key={monthStart.toISOString()} className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#E5E5E5] px-1 py-2 text-center text-xs last:border-r-0">
-                                      <p className="max-w-full truncate whitespace-nowrap uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">{monthStart.getFullYear()}</p>
-                                      <p className="max-w-full truncate whitespace-nowrap font-medium leading-tight text-[#171717]">{formatDate(monthStart, { month: 'short' })}</p>
-                                    </div>
-                                  );
-                                })
-                              ) : previewZoom === 'week' ? (
-                                previewTimelineWeeks.map((weekDays) => {
-                                  const weekStart = weekDays[0];
-                                  return (
-                                    <div key={weekStart.toISOString()} className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#E5E5E5] px-1 py-2 text-center text-xs last:border-r-0">
-                                      <p className="max-w-full truncate whitespace-nowrap uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">{formatWeekLabel(weekStart)}</p>
-                                      <p className="max-w-full truncate whitespace-nowrap font-medium leading-tight text-[#171717]">{formatDate(weekStart, { month: 'short', day: 'numeric' })}</p>
-                                    </div>
-                                  );
-                                })
-                              ) : (
-                                previewTimelineDays.map((day) => (
-                                  <div key={day.toISOString()} className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#E5E5E5] px-1 py-2 text-center text-xs last:border-r-0">
-                                    <p className="max-w-full truncate whitespace-nowrap uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">{formatTimelineDayLabel(day)}</p>
-                                    <p className="max-w-full truncate whitespace-nowrap font-medium leading-tight text-[#171717]">{formatNumber(day.getDate())}</p>
-                                  </div>
-                                ))
-                              )}
+                              {previewTimelineHeaderCells.map((cell) => (
+                                <div key={cell.key} className="flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden border-r border-[#E5E5E5] px-1 py-2 text-center text-xs last:border-r-0">
+                                  <p className="max-w-full truncate whitespace-nowrap uppercase leading-none tracking-[0.12em] text-[#A3A3A3]">{cell.caption}</p>
+                                  <p className="max-w-full truncate whitespace-nowrap font-medium leading-tight text-[#171717]">{cell.label}</p>
+                                </div>
+                              ))}
                             </div>
 
                             <div ref={taskTimelineBodyRef} onScroll={() => syncTaskScroll('timeline')} className="max-h-[566px] overflow-y-auto">
@@ -765,19 +818,9 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                                     className="absolute inset-0 grid"
                                     style={{ gridTemplateColumns: previewTimelineGridColumns }}
                                   >
-                                    {previewZoom === 'month' ? (
-                                      previewTimelineMonths.map((monthDays) => (
-                                        <div key={`${task.id}-month-${monthDays[0].toISOString()}`} className="border-r border-[#F1F5F9] last:border-r-0" />
-                                      ))
-                                    ) : previewZoom === 'week' ? (
-                                      previewTimelineWeeks.map((weekDays) => (
-                                        <div key={`${task.id}-week-${weekDays[0].toISOString()}`} className="border-r border-[#F1F5F9] last:border-r-0" />
-                                      ))
-                                    ) : (
-                                      previewTimelineDays.map((day) => (
-                                        <div key={`${task.id}-${day.toISOString()}`} className="border-r border-[#F1F5F9] last:border-r-0" />
-                                      ))
-                                    )}
+                                    {previewTimelineSegments.map((segment) => (
+                                      <div key={`${task.id}-${segment.key}`} className="border-r border-[#F1F5F9] last:border-r-0" />
+                                    ))}
                                   </div>
                                   <div
                                     className={`absolute top-1/2 -translate-y-1/2 ${

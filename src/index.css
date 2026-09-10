@@ -367,3 +367,32 @@ input::placeholder {
 .table-clean tr:hover td {
   background: #F9FAFB;
 }
+
+/* Gantt editor: always-visible horizontal scrollbar proxy for the timeline */
+.gantt-timeline-scrollbar {
+  overflow-x: scroll;
+  overflow-y: hidden;
+  height: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: #D4D4D4 #F1F5F9;
+}
+
+.gantt-timeline-scrollbar::-webkit-scrollbar {
+  height: 12px;
+  width: 12px;
+}
+
+.gantt-timeline-scrollbar::-webkit-scrollbar-track {
+  background: #F1F5F9;
+  border-radius: 999px;
+}
+
+.gantt-timeline-scrollbar::-webkit-scrollbar-thumb {
+  background: #C4C9D1;
+  border: 3px solid #F1F5F9;
+  border-radius: 999px;
+}
+
+.gantt-timeline-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}

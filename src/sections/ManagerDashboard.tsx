@@ -1,6 +1,7 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Logout01Icon, Menu01Icon, Shield01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
+import { BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Menu01Icon, Shield01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
 import { useRef, useState } from 'react';
+import { AccountMenu } from '@/components/AccountMenu';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSubscriberCount } from '@/hooks/useSubscriberCount';
@@ -41,6 +42,7 @@ interface ManagerDashboardProps {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
   onOpenGanttEditor: (projectId: string) => void;
+  onProfileClick: () => void;
   onLogout: () => void;
   onHomeClick: () => void;
   currentUser: PocketBaseUser | null;
@@ -61,6 +63,7 @@ export function ManagerDashboard({
   activeTab,
   onTabChange,
   onOpenGanttEditor,
+  onProfileClick,
   onLogout,
   onHomeClick,
   currentUser,
@@ -362,13 +365,13 @@ export function ManagerDashboard({
           </div>
           <div className="flex items-center gap-4">
             <LanguageToggleButton compact />
-            <button
-              onClick={() => requestLeaveEditor(onLogout)}
-              className="flex items-center gap-2 text-sm text-[#737373] hover:text-red-600 transition-colors"
-            >
-              <HugeiconsIcon icon={Logout01Icon} className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('manager.logout')}</span>
-            </button>
+            <AccountMenu
+              showManagerItem={false}
+              onProfileClick={onProfileClick}
+              onManagerClick={onHomeClick}
+              onSignOut={onLogout}
+              onNavigate={requestLeaveEditor}
+            />
           </div>
         </div>
       </header>

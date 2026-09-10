@@ -6,12 +6,13 @@ import {
   LayoutDashboard,
   LayoutGrid,
   LogIn,
-  LogOut,
+  UserRound,
   Newspaper,
   Sparkles,
   Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { AccountMenu } from '@/components/AccountMenu';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { DropdownNavigation, type DropdownNavigationItem } from '@/components/ui/dropdown-navigation';
 import { ExpandingSearchDock } from '@/components/ui/expanding-search-dock-shadcnui';
@@ -24,6 +25,7 @@ interface NavigationProps {
   onHomeClick: () => void;
   onCommunityClick: () => void;
   onSignInClick: () => void;
+  onProfileClick: () => void;
   onSignOut: () => void;
   onSearch?: (query: string) => void;
   onSearchChange?: (query: string) => void;
@@ -50,6 +52,7 @@ export function Navigation({
   onHomeClick,
   onCommunityClick,
   onSignInClick,
+  onProfileClick,
   onSignOut,
   onSearch,
   onSearchChange,
@@ -151,10 +154,10 @@ export function Navigation({
 
   const accountMenuItem = isAuthenticated
     ? {
-        label: authName ? `${t('nav.signOut')} (${authName})` : t('navDropdown.resources.accountLabelSignedIn'),
+        label: authName ?? t('navDropdown.resources.accountLabelSignedIn'),
         description: t('navDropdown.resources.accountDescriptionSignedIn'),
-        icon: LogOut,
-        onSelect: onSignOut,
+        icon: UserRound,
+        onSelect: onProfileClick,
       }
     : {
         label: t('navDropdown.resources.accountLabelSignedOut'),
@@ -282,21 +285,13 @@ export function Navigation({
             >
               {t('nav.manager')}
             </button>
-            {isAuthenticated ? (
-              <button
-                onClick={onSignOut}
-                className="hidden sm:block text-sm font-medium text-[#171717] hover:text-[#D93A3A] transition-colors"
-              >
-                {authName ? `${t('nav.signOut')} (${authName})` : t('nav.signOut')}
-              </button>
-            ) : (
-              <button
-                onClick={onSignInClick}
-                className="hidden sm:block text-sm font-medium text-[#171717] hover:text-[#D93A3A] transition-colors"
-              >
-                {t('nav.signIn')}
-              </button>
-            )}
+            <AccountMenu
+              onProfileClick={onProfileClick}
+              onManagerClick={onManagerClick}
+              onSignInClick={onSignInClick}
+              onSignOut={onSignOut}
+              className="hidden sm:block"
+            />
 
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -389,27 +384,27 @@ export function Navigation({
             >
               {t('nav.manager')}
             </button>
-            {isAuthenticated ? (
-              <button
-                onClick={() => {
-                  onSignOut();
+            <div className="pt-2">
+              <AccountMenu
+                variant="mobile"
+                onProfileClick={() => {
+                  onProfileClick();
                   setIsMobileMenuOpen(false);
                 }}
-                className="block py-2 text-[#171717] font-medium"
-              >
-                {t('nav.signOut')}
-              </button>
-            ) : (
-              <button
-                onClick={() => {
+                onManagerClick={() => {
+                  onManagerClick();
+                  setIsMobileMenuOpen(false);
+                }}
+                onSignInClick={() => {
                   onSignInClick();
                   setIsMobileMenuOpen(false);
                 }}
-                className="block py-2 text-[#171717] font-medium"
-              >
-                {t('nav.signIn')}
-              </button>
-            )}
+                onSignOut={() => {
+                  onSignOut();
+                  setIsMobileMenuOpen(false);
+                }}
+              />
+            </div>
           </div>
         </div>
       )}

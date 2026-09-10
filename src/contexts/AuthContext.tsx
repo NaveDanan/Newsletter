@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { avatarUrlFor } from '@/lib/avatar';
 import { bootLogger } from '@/lib/bootLogger';
 import {
   getPocketBase,
@@ -23,6 +24,8 @@ interface AuthContextType {
   confirmPasswordReset: (token: string, newPassword: string) => Promise<boolean>;
   requestEmailVerification: (email: string) => Promise<boolean>;
   confirmEmailVerification: (token: string) => Promise<boolean>;
+  updateProfile: (data: { name?: string }) => Promise<boolean>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,15 +45,6 @@ function mapAuthUser(model: Record<string, unknown>, avatarUrl?: string): Pocket
   };
 }
 
-function getRecordFileUrl(pb: ReturnType<typeof getPocketBase>, record: Record<string, unknown>, fileName: string): string {
-  const files = pb.files as { getURL?: (record: Record<string, unknown>, fileName: string) => string; getUrl?: (record: Record<string, unknown>, fileName: string) => string };
-  if (typeof files.getURL === 'function') {
-    return files.getURL(record, fileName);
-  }
-
-  return files.getUrl ? files.getUrl(record, fileName) : '';
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pb = getPocketBase();
   const [user, setUser] = useState<PocketBaseUser | null>(null);
@@ -65,8 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const authModel = pb.authStore.model as Record<string, unknown> | null;
     if (authModel && pb.authStore.isValid) {
-      const avatarFile = typeof authModel.avatar === 'string' ? authModel.avatar : '';
-      const avatar = avatarFile ? getRecordFileUrl(pb, authModel, avatarFile) : undefined;
+      const avatar = avatarUrlFor(pb, authModel);
       setUser(mapAuthUser(authModel, avatar));
       bootLogger.step('auth', 'Restored authenticated user from PocketBase auth store', {
         userId: String(authModel.id ?? ''),
@@ -85,8 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
           }
 
-          const refreshedAvatarFile = typeof refreshedModel.avatar === 'string' ? refreshedModel.avatar : '';
-          const refreshedAvatar = refreshedAvatarFile ? getRecordFileUrl(pb, refreshedModel, refreshedAvatarFile) : undefined;
+          const refreshedAvatar = avatarUrlFor(pb, refreshedModel);
           setUser(mapAuthUser(refreshedModel, refreshedAvatar));
           bootLogger.step('auth', 'Validated restored PocketBase auth state', {
             userId: String(refreshedModel.id ?? ''),
@@ -120,8 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = pb.authStore.onChange((token, model) => {
       if (token && model) {
         const authModelRecord = model as Record<string, unknown>;
-        const avatarFile = typeof authModelRecord.avatar === 'string' ? authModelRecord.avatar : '';
-        const avatar = avatarFile ? getRecordFileUrl(pb, authModelRecord, avatarFile) : undefined;
+        const avatar = avatarUrlFor(pb, authModelRecord);
         setUser(mapAuthUser(authModelRecord, avatar));
         bootLogger.step('auth', 'PocketBase auth store emitted authenticated user change', {
           userId: String(authModelRecord.id ?? ''),
@@ -332,6 +323,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [pb]);
 
+  const updateProfile = useCallback(async (data: { name?: string }) => {
+    const currentId = pb.authStore.record?.id;
+    if (!currentId) {
+      return false;
+    }
+
+    try {
+      // The SDK merges the response into authStore and fires onChange, so the
+      // subscriber above refreshes every useAuth() consumer on its own.
+      await pb.collection('users').update(currentId, data);
+      return true;
+    } catch (error) {
+      console.error('Profile update error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to update profile';
+      toast.error(message);
+      return false;
+    }
+  }, [pb]);
+
+  const refreshUser = useCallback(async () => {
+    if (!pb.authStore.isValid) {
+      return;
+    }
+
+    try {
+      await pb.collection('users').authRefresh<Record<string, unknown>>();
+    } catch (error) {
+      console.error('Auth refresh error:', error);
+    }
+  }, [pb]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -347,6 +369,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         confirmPasswordReset,
         requestEmailVerification,
         confirmEmailVerification,
+        updateProfile,
+        refreshUser,
       }}
     >
       {children}

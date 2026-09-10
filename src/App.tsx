@@ -7,6 +7,7 @@ import { Sidebar } from './sections/Sidebar';
 import { ManagerDashboard, type Tab as ManagerTab } from './sections/ManagerDashboard';
 import { GanttEditorPage } from './sections/manager/GanttEditorPage';
 import { NewsletterViewer } from './sections/NewsletterViewer';
+import { ProfilePage } from './sections/ProfilePage';
 import { UnsubscribePage } from './sections/UnsubscribePage';
 import { PasswordResetPage } from './components/auth/PasswordResetPage';
 import { VerifyEmailPage } from './components/auth/VerifyEmailPage';
@@ -25,7 +26,7 @@ import { toast } from 'sonner';
 import type { Newsletter } from './types/newsletter';
 import './App.css';
 
-export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'verify-email' | 'sso-callback' | 'gantt-editor' | 'migrate' | 'unsubscribe' | 'community';
+export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'verify-email' | 'sso-callback' | 'gantt-editor' | 'migrate' | 'unsubscribe' | 'community' | 'profile';
 
 const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet', 'links', 'scheduled', 'community'];
 
@@ -129,6 +130,10 @@ function resolveRoute(pathname: string): RouteState {
         projectId: decodeURIComponent(projectId),
       };
     }
+  }
+
+  if (normalizedPathname === '/profile') {
+    return { view: 'profile', pathname: '/profile' };
   }
 
   if (normalizedPathname === '/migrate') {
@@ -365,6 +370,19 @@ function App() {
     managerToastRouteRef.current = null;
   }, [currentRoute.managerSection, currentRoute.pathname, currentRoute.view, isAuthLoading, isUserAuthenticated, navigateTo, t, userRole]);
 
+  // The profile route is signed-in only; kept separate from the manager guard,
+  // whose early return keys off isManagerRoute.
+  useEffect(() => {
+    if (currentRoute.view !== 'profile' || isAuthLoading || isUserAuthenticated) {
+      return;
+    }
+
+    bootLogger.warn('router', 'Profile route requires authentication, redirecting to sign-in', {
+      pathname: currentRoute.pathname,
+    });
+    navigateTo('/sign-in', { replace: true });
+  }, [currentRoute.pathname, currentRoute.view, isAuthLoading, isUserAuthenticated, navigateTo]);
+
   useEffect(() => {
     if (appReadyRef.current) {
       return;
@@ -397,6 +415,18 @@ function App() {
         pathname: currentRoute.pathname,
         articleId: currentRoute.articleId,
         articleFound: Boolean(selectedArticle),
+      });
+      return;
+    }
+
+    if (currentRoute.view === 'profile') {
+      if (isAuthLoading) {
+        return;
+      }
+
+      appReadyRef.current = true;
+      bootLogger.markReady('app', 'Profile screen is ready', {
+        pathname: currentRoute.pathname,
       });
       return;
     }
@@ -467,6 +497,10 @@ function App() {
 
   const handlePasswordResetSuccess = () => {
     navigateTo('/sign-in', { replace: true });
+  };
+
+  const handleProfileClick = () => {
+    navigateTo('/profile');
   };
 
   const handleSignOut = () => {
@@ -586,6 +620,7 @@ function App() {
           onTabChange={handleManagerTabChange}
           onOpenGanttEditor={handleOpenGanttEditor}
           onLogout={handleSignOut}
+          onProfileClick={handleProfileClick}
           onHomeClick={handleHomeClick}
           currentUser={user}
           currentUserRole={userRole}
@@ -660,6 +695,23 @@ function App() {
     );
   }
 
+  if (currentRoute.view === 'profile') {
+    if (isAuthLoading) {
+      return <div className="min-h-screen bg-[#FAFAFA]" />;
+    }
+
+    if (!isUserAuthenticated) {
+      return null;
+    }
+
+    return (
+      <div className="min-h-screen bg-[#FAFAFA]">
+        <Toaster position={toasterPosition} richColors />
+        <ProfilePage onBack={handleHomeClick} />
+      </div>
+    );
+  }
+
   if (currentRoute.view === 'unsubscribe') {
     return (
       <div className="min-h-screen bg-white">
@@ -697,6 +749,7 @@ function App() {
         onCommunityClick={handleCommunityClick}
         onSignInClick={handleSignInClick}
         onSignOut={handleSignOut}
+        onProfileClick={handleProfileClick}
         onSearch={setSearchQuery}
         onSearchChange={setSearchQuery}
         isAuthenticated={isUserAuthenticated}

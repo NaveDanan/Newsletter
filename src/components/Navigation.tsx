@@ -22,6 +22,7 @@ import { DEFAULT_DROPDOWN_IDS, SEED_DROPDOWNS } from '@/types/navigation-link';
 interface NavigationProps {
   onManagerClick: () => void;
   onHomeClick: () => void;
+  onCommunityClick: () => void;
   onSignInClick: () => void;
   onSignOut: () => void;
   onSearch?: (query: string) => void;
@@ -47,6 +48,7 @@ function resolveBuiltinDropdownId(id: string, label: string): string | null {
 export function Navigation({
   onManagerClick,
   onHomeClick,
+  onCommunityClick,
   onSignInClick,
   onSignOut,
   onSearch,
@@ -176,7 +178,7 @@ export function Navigation({
         title: t('navDropdown.aiWorkflows.groupExplore'),
         items: [
           { label: t('navDropdown.aiWorkflows.topicsLabel'), description: t('navDropdown.aiWorkflows.topicsDescription'), icon: LayoutGrid, href: '#topics' },
-          { label: t('navDropdown.aiWorkflows.communityLabel'), description: t('navDropdown.aiWorkflows.communityDescription'), icon: Users, href: '#community' },
+          { label: t('navDropdown.aiWorkflows.communityLabel'), description: t('navDropdown.aiWorkflows.communityDescription'), icon: Users, href: '/community', onSelect: onCommunityClick },
         ],
       },
     ],
@@ -191,7 +193,7 @@ export function Navigation({
       {
         title: t('navDropdown.caseStudies.groupCommunity'),
         items: [
-          { label: t('navDropdown.caseStudies.communityLabel'), description: t('navDropdown.caseStudies.communityDescription'), icon: Users, href: '#community' },
+          { label: t('navDropdown.caseStudies.communityLabel'), description: t('navDropdown.caseStudies.communityDescription'), icon: Users, href: '/community', onSelect: onCommunityClick },
           { label: t('navDropdown.caseStudies.signInLabel'), description: t('navDropdown.caseStudies.signInDescription'), icon: LogIn, onSelect: onSignInClick },
         ],
       },
@@ -245,7 +247,7 @@ export function Navigation({
     { id: 'home', label: t('nav.home'), href: '#', active: true },
     { id: 'topics', label: t('nav.topics'), href: '#topics' },
     { id: 'bookmarks', label: t('nav.bookmarks'), href: '#workflows' },
-    { id: 'community', label: t('nav.community'), href: '#community' },
+    { id: 'community', label: t('nav.community'), href: '/community' },
   ];
 
   return (
@@ -321,6 +323,12 @@ export function Navigation({
                   if (link.id === 'home') {
                     event.preventDefault();
                     onHomeClick();
+                    return;
+                  }
+
+                  if (link.id === 'community') {
+                    event.preventDefault();
+                    onCommunityClick();
                   }
                 }}
               >
@@ -347,6 +355,12 @@ export function Navigation({
                     event.preventDefault();
                     onHomeClick();
                   }
+
+                  if (link.id === 'community') {
+                    event.preventDefault();
+                    onCommunityClick();
+                  }
+
                   setIsMobileMenuOpen(false);
                 }}
               >

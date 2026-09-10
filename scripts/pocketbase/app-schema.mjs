@@ -1,58 +1,5 @@
-const withFieldOptions = (base, options = {}) => ({
-  ...base,
-  ...options,
-});
-
-const text = (name, max = 0, options = {}) => withFieldOptions({
-  name,
-  type: 'text',
-  required: false,
-  max,
-}, options);
-
-const number = (name, min = 0, options = {}) => withFieldOptions({
-  name,
-  type: 'number',
-  required: false,
-  min,
-  onlyInt: false,
-}, options);
-
-const bool = (name, options = {}) => withFieldOptions({
-  name,
-  type: 'bool',
-  required: false,
-}, options);
-
-const file = (name, maxSelect = 1, maxSize = 10485760, mimeTypes = [], options = {}) => withFieldOptions({
-  name,
-  type: 'file',
-  required: false,
-  maxSelect,
-  maxSize,
-  mimeTypes,
-}, options);
-
-const email = (name, options = {}) => withFieldOptions({
-  name,
-  type: 'email',
-  required: true,
-}, options);
-
-const json = (name, options = {}) => withFieldOptions({
-  name,
-  type: 'json',
-  required: false,
-  maxSize: 5000000,
-}, options);
-
-const autodate = (name, onCreate = true, onUpdate = false, options = {}) => withFieldOptions({
-  name,
-  type: 'autodate',
-  required: false,
-  onCreate,
-  onUpdate,
-}, options);
+import { autodate, bool, email, file, json, number, text } from './schema-fields.mjs';
+import { COMMUNITY_COLLECTION_SCHEMAS } from './community-schema.mjs';
 
 export const PROJECTS_SCHEMA = {
   name: 'projects',
@@ -307,4 +254,5 @@ export const APP_COLLECTION_SCHEMAS = [
   SCHEDULED_JOBS_SCHEMA,
   NEWSLETTER_IMPORT_JOBS_SCHEMA,
   NEWSLETTER_IMPORTS_SCHEMA,
+  ...COMMUNITY_COLLECTION_SCHEMAS,
 ];

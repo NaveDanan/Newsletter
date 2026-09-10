@@ -5,6 +5,10 @@ export function hasManagerAccess(role: UserRole | null | undefined): boolean {
   return role === 'author' || role === 'manager' || role === 'general_manager' || role === 'admin';
 }
 
+export function canModerateCommunity(role: UserRole | null | undefined): boolean {
+  return role === 'manager' || role === 'general_manager' || role === 'admin';
+}
+
 export function canAccessManagerTab(role: UserRole | null | undefined, tab: string): boolean {
   if (tab === 'newsletters') {
     return hasManagerAccess(role);
@@ -16,6 +20,10 @@ export function canAccessManagerTab(role: UserRole | null | undefined, tab: stri
 
   if (tab === 'scheduled') {
     return role === 'admin';
+  }
+
+  if (tab === 'community') {
+    return canModerateCommunity(role);
   }
 
   return role === 'manager' || role === 'general_manager' || role === 'admin';

@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Logout01Icon, Menu01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
+import { BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Logout01Icon, Menu01Icon, Shield01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
 import { useRef, useState } from 'react';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -11,6 +11,7 @@ import { GanttView } from './manager/GanttView';
 import { LinksView } from './manager/LinksView';
 import { SpreadsheetView } from './manager/SpreadsheetView';
 import { ScheduledView } from './manager/ScheduledView';
+import { CommunityModerationView } from './manager/CommunityModerationView';
 import { NewsletterList } from './manager/NewsletterList';
 import { NewsletterEditor, type NewsletterEditorHandle } from './manager/NewsletterEditor';
 import { NewsletterViewer } from './NewsletterViewer';
@@ -33,7 +34,7 @@ import {
 import type { PocketBaseUser, UserRole } from '@/lib/pocketbase/client';
 import type { Newsletter, NewsletterComment, NewsletterFormData } from '../types/newsletter';
 
-export type Tab = 'newsletters' | 'projects' | 'goals' | 'gantt' | 'spreadsheet' | 'links' | 'scheduled';
+export type Tab = 'newsletters' | 'projects' | 'goals' | 'gantt' | 'spreadsheet' | 'links' | 'scheduled' | 'community';
 type ViewMode = 'list' | 'editor' | 'viewer';
 
 interface ManagerDashboardProps {
@@ -97,6 +98,7 @@ export function ManagerDashboard({
     { id: 'spreadsheet' as Tab, label: t('manager.spreadsheet'), icon: FileSpreadsheetIcon },
     { id: 'links' as Tab, label: t('manager.links'), icon: Link01Icon },
     { id: 'scheduled' as Tab, label: t('manager.scheduled'), icon: Calendar01Icon },
+    { id: 'community' as Tab, label: t('manager.community'), icon: Shield01Icon },
   ].filter((tab) => canAccessManagerTab(currentUserRole, tab.id));
 
   const handleCreateNewsletter = () => {
@@ -284,6 +286,8 @@ export function ManagerDashboard({
         return <LinksView currentUserRole={currentUserRole} />;
       case 'scheduled':
         return <ScheduledView currentUserRole={currentUserRole} />;
+      case 'community':
+        return <CommunityModerationView currentUserRole={currentUserRole} />;
       default:
         return null;
     }

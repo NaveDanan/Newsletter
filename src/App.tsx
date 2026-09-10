@@ -13,19 +13,21 @@ import { VerifyEmailPage } from './components/auth/VerifyEmailPage';
 import { SignIn } from './components/auth/SignIn';
 import { SSOCallback } from './components/auth/SSOCallback';
 import { MigratePage } from './sections/MigratePage';
+import { CommunityPage } from './sections/community/CommunityPage';
 import { useAuth } from './contexts/AuthContext';
 import { useLocale } from './contexts/LocaleContext';
 import { useNewsletters } from './hooks/useNewsletters';
 import { canAccessManagerTab, hasManagerAccess } from './lib/auth/permissions';
+import { parseCommunityRoute } from './lib/community-routes';
 import { bootLogger } from './lib/bootLogger';
 import { Toaster } from 'sonner';
 import { toast } from 'sonner';
 import type { Newsletter } from './types/newsletter';
 import './App.css';
 
-export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'verify-email' | 'sso-callback' | 'gantt-editor' | 'migrate' | 'unsubscribe';
+export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'verify-email' | 'sso-callback' | 'gantt-editor' | 'migrate' | 'unsubscribe' | 'community';
 
-const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet', 'links', 'scheduled'];
+const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet', 'links', 'scheduled', 'community'];
 
 interface RouteState {
   view: View;
@@ -169,6 +171,15 @@ function resolveRoute(pathname: string): RouteState {
     return { view: 'unsubscribe', pathname: '/unsubscribe' };
   }
 
+  // parseCommunityRoute owns every /community sub-path and returns the canonical
+  // spelling of it, so App records only that the branch was taken and lets
+  // CommunityPage read the rest of the state back out of the pathname.
+  const communityRoute = parseCommunityRoute(normalizedPathname);
+
+  if (communityRoute) {
+    return { view: 'community', pathname: communityRoute.pathname };
+  }
+
   if (normalizedPathname.startsWith('/article/')) {
     const [, , articleId] = normalizedPathname.split('/');
 
@@ -230,7 +241,7 @@ function App() {
   } = useNewsletters({
     currentUser: user,
     currentUserRole: userRole,
-    enabled: currentRoute.view !== 'migrate',
+    enabled: currentRoute.view !== 'migrate' && currentRoute.view !== 'community',
   });
   const [searchQuery, setSearchQuery] = useState('');
   const managerToastRouteRef = useRef<string | null>(null);
@@ -390,7 +401,7 @@ function App() {
       return;
     }
 
-    if (currentRoute.view === 'signin' || currentRoute.view === 'reset-password' || currentRoute.view === 'verify-email' || currentRoute.view === 'sso-callback' || currentRoute.view === 'migrate' || currentRoute.view === 'unsubscribe') {
+    if (currentRoute.view === 'signin' || currentRoute.view === 'reset-password' || currentRoute.view === 'verify-email' || currentRoute.view === 'sso-callback' || currentRoute.view === 'migrate' || currentRoute.view === 'unsubscribe' || currentRoute.view === 'community') {
       appReadyRef.current = true;
       bootLogger.markReady('app', 'Standalone route is ready', {
         pathname: currentRoute.pathname,
@@ -439,6 +450,10 @@ function App() {
 
   const handleSignInClick = () => {
     navigateTo('/sign-in');
+  };
+
+  const handleCommunityClick = () => {
+    navigateTo('/community');
   };
 
   const handleRequireAuth = () => {
@@ -654,6 +669,24 @@ function App() {
     );
   }
 
+  // The community is a full-page application with its own left rail rather than
+  // the marketing navigation, so it renders outside the home shell.
+  if (currentRoute.view === 'community') {
+    return (
+      <div className="min-h-screen bg-white">
+        <Toaster position={toasterPosition} richColors />
+        <CommunityPage
+          pathname={currentRoute.pathname}
+          isAuthenticated={isUserAuthenticated}
+          onNavigate={(pathname) => navigateTo(pathname)}
+          onRequireAuth={handleRequireAuth}
+          onLeave={handleHomeClick}
+          onOpenModeration={() => navigateTo('/manager/community')}
+        />
+      </div>
+    );
+  }
+
   // Render home page
   return (
     <div className="min-h-screen bg-white">
@@ -661,6 +694,7 @@ function App() {
       <Navigation
         onManagerClick={handleManagerClick}
         onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
         onSignInClick={handleSignInClick}
         onSignOut={handleSignOut}
         onSearch={setSearchQuery}

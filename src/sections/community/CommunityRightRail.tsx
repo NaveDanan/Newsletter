@@ -59,7 +59,7 @@ export function CommunityRightRail({ initialQuery = '' }: CommunityRightRailProp
   };
 
   return (
-    <aside className="sticky top-4 hidden max-h-[calc(100vh-2rem)] w-[350px] shrink-0 space-y-4 overflow-y-auto lg:block">
+    <aside className="sticky top-[104px] hidden h-[calc(100vh-104px)] h-[calc(100dvh-104px)] w-[350px] shrink-0 space-y-4 overflow-y-auto py-3 ps-6 lg:block">
       <form
         role="search"
         className="relative"

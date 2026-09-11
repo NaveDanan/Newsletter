@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { getPocketBaseErrorMessage, moderateCommunityPost } from '@/lib/pocketbase/community';
 import { cn } from '@/lib/utils';
@@ -50,6 +51,7 @@ export function CommunityPostCard({
 }: CommunityPostCardProps) {
   const { formatDate, formatRelativeTime, t } = useLocale();
   const { openPost, openProfile, openHashtag, openReport, canModerate } = useCommunity();
+  const { user } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isDetail = variant === 'detail';
 
@@ -86,7 +88,7 @@ export function CommunityPostCard({
           <CommunityAvatar
             handle={author.handle}
             displayName={author.displayName}
-            avatarUrl={author.avatarUrl}
+            avatarUrl={author.avatarUrl || (post.isAuthor ? user?.avatar : '') || ''}
             size={isDetail ? 'lg' : 'md'}
             onClick={() => openProfile(author.handle)}
           />

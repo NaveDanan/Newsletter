@@ -23,7 +23,14 @@ const SIZE_CLASS: Record<'sm' | 'md' | 'lg' | 'xl', string> = {
 // strings and gets a neutral placeholder.
 function initialsOf(displayName: string, handle: string): string {
   const source = displayName.trim() || handle.trim();
-  return source ? Array.from(source)[0].toUpperCase() : '?';
+  if (!source) {
+    return 'U';
+  }
+  const parts = source.split(/[\s@._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
+  }
+  return Array.from(source)[0].toUpperCase();
 }
 
 export function CommunityAvatar({
@@ -35,9 +42,13 @@ export function CommunityAvatar({
   onClick,
 }: CommunityAvatarProps) {
   const avatar = (
-    <Avatar className={cn(SIZE_CLASS[size], 'bg-[#F5F5F5]', className)}>
-      <AvatarImage src={resolveCommunityFileUrl(avatarUrl)} alt={displayName || handle} />
-      <AvatarFallback className="bg-[#F5F5F5] text-sm font-semibold text-[#737373]">
+    <Avatar className={cn(SIZE_CLASS[size], 'shrink-0 border border-[#E5E5E5] bg-[#F5F5F5]', className)}>
+      <AvatarImage
+        src={resolveCommunityFileUrl(avatarUrl)}
+        alt={displayName || handle || 'Avatar'}
+        className="object-cover"
+      />
+      <AvatarFallback className="bg-gradient-to-br from-[#D93A3A] to-[#B91C1C] text-sm font-semibold text-white">
         {initialsOf(displayName, handle)}
       </AvatarFallback>
     </Avatar>

@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AccountMenu } from '@/components/AccountMenu';
-import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { DropdownNavigation, type DropdownNavigationItem } from '@/components/ui/dropdown-navigation';
 import { ExpandingSearchDock } from '@/components/ui/expanding-search-dock-shadcnui';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -31,6 +30,7 @@ interface NavigationProps {
   onSearchChange?: (query: string) => void;
   isAuthenticated: boolean;
   authName?: string;
+  activeTab?: 'home' | 'topics' | 'bookmarks' | 'community' | string;
 }
 
 function normalizeDropdownLabel(value: string): string {
@@ -58,6 +58,7 @@ export function Navigation({
   onSearchChange,
   isAuthenticated,
   authName,
+  activeTab = 'home',
 }: NavigationProps) {
   const { t } = useLocale();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -247,10 +248,10 @@ export function Navigation({
   });
 
   const navLinks = [
-    { id: 'home', label: t('nav.home'), href: '#', active: true },
-    { id: 'topics', label: t('nav.topics'), href: '#topics' },
-    { id: 'bookmarks', label: t('nav.bookmarks'), href: '#workflows' },
-    { id: 'community', label: t('nav.community'), href: '/community' },
+    { id: 'home', label: t('nav.home'), href: '/', active: activeTab === 'home' },
+    { id: 'topics', label: t('nav.topics'), href: '/#topics', active: activeTab === 'topics' },
+    { id: 'bookmarks', label: t('nav.bookmarks'), href: '/#workflows', active: activeTab === 'bookmarks' },
+    { id: 'community', label: t('nav.community'), href: '/community', active: activeTab === 'community' },
   ];
 
   return (
@@ -278,13 +279,6 @@ export function Navigation({
               onQueryChange={onSearchChange}
               placeholder={t('nav.searchPlaceholder')}
             />
-            <LanguageToggleButton className="hidden sm:inline-flex" compact />
-            <button 
-              onClick={onManagerClick}
-              className="hidden sm:block text-sm font-medium text-[#737373] hover:text-[#171717] transition-colors"
-            >
-              {t('nav.manager')}
-            </button>
             <AccountMenu
               onProfileClick={onProfileClick}
               onManagerClick={onManagerClick}
@@ -312,7 +306,7 @@ export function Navigation({
             {navLinks.map((link) => (
               <a
                 key={link.label}
-                href={link.id === 'home' ? '/' : link.href}
+                href={link.href}
                 className={`nav-link whitespace-nowrap ${link.active ? 'active' : ''}`}
                 onClick={(event) => {
                   if (link.id === 'home') {
@@ -324,6 +318,15 @@ export function Navigation({
                   if (link.id === 'community') {
                     event.preventDefault();
                     onCommunityClick();
+                    return;
+                  }
+
+                  if (link.id === 'topics' || link.id === 'bookmarks') {
+                    if (activeTab !== 'home') {
+                      event.preventDefault();
+                      onHomeClick();
+                      window.location.hash = link.href.replace('/#', '#');
+                    }
                   }
                 }}
               >
@@ -343,17 +346,21 @@ export function Navigation({
             {navLinks.map((link) => (
               <a
                 key={link.label}
-                href={link.id === 'home' ? '/' : link.href}
+                href={link.href}
                 className="block py-2 text-[#171717] font-medium"
                 onClick={(event) => {
                   if (link.id === 'home') {
                     event.preventDefault();
                     onHomeClick();
-                  }
-
-                  if (link.id === 'community') {
+                  } else if (link.id === 'community') {
                     event.preventDefault();
                     onCommunityClick();
+                  } else if (link.id === 'topics' || link.id === 'bookmarks') {
+                    if (activeTab !== 'home') {
+                      event.preventDefault();
+                      onHomeClick();
+                      window.location.hash = link.href.replace('/#', '#');
+                    }
                   }
 
                   setIsMobileMenuOpen(false);
@@ -372,18 +379,6 @@ export function Navigation({
                 {link.label}
               </a>
             ))}
-            <div className="pt-2">
-              <LanguageToggleButton />
-            </div>
-            <button 
-              onClick={() => {
-                onManagerClick();
-                setIsMobileMenuOpen(false);
-              }}
-              className="block py-2 text-[#737373] font-medium"
-            >
-              {t('nav.manager')}
-            </button>
             <div className="pt-2">
               <AccountMenu
                 variant="mobile"

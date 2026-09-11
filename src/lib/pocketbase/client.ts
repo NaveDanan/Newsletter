@@ -2,7 +2,7 @@ import PocketBase, { type RecordModel } from 'pocketbase';
 import { bootLogger } from '@/lib/bootLogger';
 import { getPocketBaseUrl } from '@/lib/runtime-config';
 
-export const POCKETBASE_URL = getPocketBaseUrl();
+export const POCKETBASE_URL = getPocketBaseUrl(); // runtime origin proxy
 const AUTH_STORAGE_KEY = 'pb_auth';
 
 let pb: PocketBase | null = null;
@@ -32,11 +32,12 @@ export interface PocketBaseUser {
 export type SSOProvider = 'oidc' | 'microsoft' | 'custom';
 
 export function getPocketBase(): PocketBase {
+  const currentUrl = getPocketBaseUrl();
   if (!pb) {
     bootLogger.step('pocketbase', 'Creating PocketBase client', {
-      url: POCKETBASE_URL,
+      url: currentUrl,
     });
-    pb = new PocketBase(POCKETBASE_URL);
+    pb = new PocketBase(currentUrl);
 
     const authData = localStorage.getItem(AUTH_STORAGE_KEY);
     if (authData) {
@@ -69,6 +70,7 @@ export function getPocketBase(): PocketBase {
       bootLogger.debug('pocketbase', 'Cleared PocketBase auth state');
     });
   } else {
+    pb.baseUrl = currentUrl;
     bootLogger.debug('pocketbase', 'Reusing existing PocketBase client');
   }
 

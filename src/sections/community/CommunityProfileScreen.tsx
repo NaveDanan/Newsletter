@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useCommunityEngagement } from '@/hooks/useCommunityEngagement';
 import { useCommunityPosts } from '@/hooks/useCommunityPosts';
@@ -57,6 +58,7 @@ const EMPTY_KEY: Record<CommunityProfileTab, string> = {
 export function CommunityProfileScreen({ handle, tab, onEditProfile }: CommunityProfileScreenProps) {
   const { t, formatDate, formatNumber } = useLocale();
   const { isAuthenticated, navigate, openReport, requireAuth, canModerate } = useCommunity();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<CommunityProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +158,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
 
   return (
     <div>
-      <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-[#E5E5E5] bg-white/85 px-4 py-2 backdrop-blur">
+      <div className="sticky top-[104px] z-10 flex items-center gap-4 border-b border-[#E5E5E5] bg-white/85 px-4 py-2 backdrop-blur">
         <button
           type="button"
           aria-label={t('community.thread.back')}
@@ -190,8 +192,8 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
           <div className="-mt-12">
             <CommunityAvatar
               handle={profile.handle}
-              displayName={profile.displayName}
-              avatarUrl={profile.avatarUrl}
+              displayName={profile.displayName || (profile.isSelf ? user?.name : '') || ''}
+              avatarUrl={profile.avatarUrl || (profile.isSelf ? user?.avatar : '') || ''}
               size="xl"
             />
           </div>

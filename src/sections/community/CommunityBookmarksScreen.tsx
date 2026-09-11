@@ -32,7 +32,7 @@ export function CommunityBookmarksScreen() {
 
   return (
     <div>
-      <div className="sticky top-0 z-10 border-b border-[#E5E5E5] bg-white/85 px-4 py-3 backdrop-blur">
+      <div className="sticky top-[104px] z-10 border-b border-[#E5E5E5] bg-white/85 px-4 py-3 backdrop-blur">
         <h1 className="text-xl font-bold text-[#171717]">{t('community.bookmarks.title')}</h1>
       </div>
 

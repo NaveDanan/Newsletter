@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { bootLogger } from '@/lib/bootLogger';
 import {
   fetchCommunitySession,
@@ -22,6 +23,7 @@ export interface UseCommunitySessionResult {
 }
 
 export function useCommunitySession(isAuthenticated: boolean): UseCommunitySessionResult {
+  const { user } = useAuth();
   const [session, setSession] = useState<CommunitySession | null>(null);
   const [isLoading, setIsLoading] = useState(isAuthenticated);
   const [error, setError] = useState<string | null>(null);
@@ -66,9 +68,45 @@ export function useCommunitySession(isAuthenticated: boolean): UseCommunitySessi
     setSession((current) => (current ? { ...current, unreadNotifications: Math.max(0, count) } : current));
   }, []);
 
+  const effectiveProfile = useMemo<CommunityProfile | null>(() => {
+    if (session?.profile) {
+      return {
+        ...session.profile,
+        displayName: session.profile.displayName || user?.name || session.profile.handle || 'User',
+        avatarUrl: session.profile.avatarUrl || user?.avatar || '',
+      };
+    }
+
+    if (isAuthenticated && user) {
+      return {
+        id: user.id,
+        userId: user.id,
+        handle: user.email ? user.email.split('@')[0] : 'user',
+        displayName: user.name || 'Member',
+        bio: '',
+        location: '',
+        website: '',
+        avatarUrl: user.avatar || '',
+        bannerUrl: '',
+        pinnedPostId: '',
+        followerCount: 0,
+        followingCount: 0,
+        postCount: 0,
+        isSuspended: false,
+        suspendedReason: '',
+        createdAt: user.created || '',
+        isFollowing: false,
+        isFollowedBy: false,
+        isSelf: true,
+      };
+    }
+
+    return null;
+  }, [session?.profile, isAuthenticated, user]);
+
   return {
     session,
-    profile: session?.profile ?? null,
+    profile: effectiveProfile,
     isLoading,
     error,
     refresh: load,

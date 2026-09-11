@@ -25,17 +25,13 @@ export function getDefaultPocketBaseUrl(): string {
     return 'http://127.0.0.1:8090';
   }
 
-  const { hostname, origin } = window.location;
-  const isLocalDevelopmentHost = hostname === 'localhost' || hostname === '127.0.0.1';
-
-  if (isLocalDevelopmentHost) {
-    return `${window.location.protocol}//${hostname}:8090`;
-  }
-
-  return origin;
+  return window.location.origin;
 }
 
 export function getPocketBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
   return getAppConfigValue('VITE_POCKETBASE_URL') || getDefaultPocketBaseUrl();
 }
 

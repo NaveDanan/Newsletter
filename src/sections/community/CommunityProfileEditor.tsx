@@ -11,6 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { communityMediaKindOf, compressCommunityImage, isCommunityMediaTooLarge } from '@/lib/community-media';
 import { getPocketBaseErrorMessage, resolveCommunityFileUrl } from '@/lib/pocketbase/community';
@@ -37,6 +38,7 @@ interface CommunityProfileEditorProps {
 
 export function CommunityProfileEditor({ open, profile, onSave, onClose }: CommunityProfileEditorProps) {
   const { t } = useLocale();
+  const { user } = useAuth();
   const [handle, setHandle] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -172,9 +174,9 @@ export function CommunityProfileEditor({ open, profile, onSave, onClose }: Commu
                 <img src={avatarPreview} alt="" className="size-16 rounded-full object-cover" />
               ) : (
                 <CommunityAvatar
-                  handle={profile ? profile.handle : ''}
-                  displayName={profile ? profile.displayName : ''}
-                  avatarUrl={profile ? profile.avatarUrl : ''}
+                  handle={profile ? profile.handle : (user?.email ? user.email.split('@')[0] : '')}
+                  displayName={profile ? profile.displayName : (user?.name || '')}
+                  avatarUrl={profile ? profile.avatarUrl || user?.avatar || '' : (user?.avatar || '')}
                   size="lg"
                 />
               )}

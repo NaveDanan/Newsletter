@@ -1,13 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  ArrowLeft01Icon,
   Bookmark01Icon,
   Home01Icon,
   Notification01Icon,
   PencilEdit01Icon,
   Search01Icon,
-  UserGroupIcon,
+  UserIcon,
 } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -230,7 +229,7 @@ export function CommunityPage({
     {
       key: 'profile',
       label: t('community.nav.profile'),
-      icon: UserGroupIcon,
+      icon: UserIcon,
       path: profile ? communityProfilePath(profile.handle) : communityFeedPath(),
       guarded: true,
     },
@@ -247,20 +246,8 @@ export function CommunityPage({
   return (
     <CommunityProvider value={contextValue}>
       <div className="min-h-screen bg-white">
-        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-[#E5E5E5] bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
-          <button
-            type="button"
-            aria-label={t('community.nav.backToSite')}
-            className="rounded-full p-2 text-[#171717] transition-colors hover:bg-[#F5F5F5]"
-            onClick={onLeave}
-          >
-            <HugeiconsIcon icon={ArrowLeft01Icon} className="size-5 rtl:rotate-180" />
-          </button>
-          <span className="text-lg font-bold text-[#171717]">{t('community.title')}</span>
-        </header>
-
         <div className="mx-auto flex w-full max-w-[1265px] gap-0 px-0 lg:px-4">
-          <div className="hidden w-[88px] shrink-0 lg:block xl:w-[275px]">
+          <aside className="sticky top-[104px] hidden h-[calc(100vh-104px)] h-[calc(100dvh-104px)] shrink-0 lg:flex lg:flex-col lg:w-[88px] xl:w-[275px] z-10 select-none">
             <CommunityLeftRail
               section={route.section}
               unreadCount={unreadCount}
@@ -268,7 +255,7 @@ export function CommunityPage({
               onLeave={onLeave}
               onOpenModeration={onOpenModeration}
             />
-          </div>
+          </aside>
 
           <main className="min-h-screen w-full min-w-0 flex-1 border-[#E5E5E5] pb-24 lg:max-w-[600px] lg:border-x lg:pb-0">
             {profile && profile.isSuspended ? (

@@ -703,7 +703,20 @@ function profileAvatarUrl(app, profile) {
   if (uploaded) {
     return fileUrl(app, profile, uploaded);
   }
-  return profile.getString('avatarUrl');
+  var stored = profile.getString('avatarUrl');
+  if (stored) {
+    return stored;
+  }
+  try {
+    var userId = profile.getString('userId');
+    if (userId) {
+      var userRecord = app.findRecordById('users', userId);
+      if (userRecord && userRecord.getString('avatar')) {
+        return fileUrl(app, userRecord, userRecord.getString('avatar'));
+      }
+    }
+  } catch (_) {}
+  return '';
 }
 
 function serializeProfile(app, profile, viewerState) {

@@ -721,12 +721,26 @@ function App() {
     );
   }
 
-  // The community is a full-page application with its own left rail rather than
-  // the marketing navigation, so it renders outside the home shell.
   if (currentRoute.view === 'community') {
     return (
       <div className="min-h-screen bg-white">
         <Toaster position={toasterPosition} richColors />
+        <Navigation
+          onManagerClick={handleManagerClick}
+          onHomeClick={handleHomeClick}
+          onCommunityClick={handleCommunityClick}
+          onSignInClick={handleSignInClick}
+          onSignOut={handleSignOut}
+          onProfileClick={handleProfileClick}
+          onSearch={(query) => {
+            setSearchQuery(query);
+            navigateTo(`/?search=${encodeURIComponent(query)}`);
+          }}
+          onSearchChange={setSearchQuery}
+          isAuthenticated={isUserAuthenticated}
+          authName={user?.name}
+          activeTab="community"
+        />
         <CommunityPage
           pathname={currentRoute.pathname}
           isAuthenticated={isUserAuthenticated}

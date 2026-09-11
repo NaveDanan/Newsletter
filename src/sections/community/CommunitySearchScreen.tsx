@@ -118,7 +118,7 @@ export function CommunitySearchScreen({ query, type }: CommunitySearchScreenProp
 
   return (
     <div>
-      <div className="sticky top-0 z-10 border-b border-[#E5E5E5] bg-white/85 backdrop-blur">
+      <div className="sticky top-[104px] z-10 border-b border-[#E5E5E5] bg-white/85 backdrop-blur">
         <form
           role="search"
           className="relative px-4 py-3"

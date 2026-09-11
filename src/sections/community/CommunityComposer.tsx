@@ -10,6 +10,7 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import {
   communityMediaKindOf,
@@ -91,6 +92,7 @@ export function CommunityComposer({
 }: CommunityComposerProps) {
   const { t } = useLocale();
   const { isAuthenticated, profile, requireAuth } = useCommunity();
+  const { user } = useAuth();
   const [body, setBody] = useState('');
   const [items, setItems] = useState<PendingMedia[]>([]);
   const [sensitive, setSensitive] = useState(false);
@@ -275,12 +277,16 @@ export function CommunityComposer({
       ? 'community.composer.quotePlaceholder'
       : 'community.composer.placeholder';
 
+  const authorAvatarUrl = profile?.avatarUrl || user?.avatar || '';
+  const authorDisplayName = profile?.displayName || user?.name || '';
+  const authorHandle = profile?.handle || (user?.email ? user.email.split('@')[0] : '');
+
   return (
     <div className={cn('flex gap-3 px-4 py-3', className)}>
       <CommunityAvatar
-        handle={profile ? profile.handle : ''}
-        displayName={profile ? profile.displayName : ''}
-        avatarUrl={profile ? profile.avatarUrl : ''}
+        handle={authorHandle}
+        displayName={authorDisplayName}
+        avatarUrl={authorAvatarUrl}
         size={compact ? 'md' : 'lg'}
       />
 

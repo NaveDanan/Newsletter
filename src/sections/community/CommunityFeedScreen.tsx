@@ -43,7 +43,7 @@ export function CommunityFeedScreen({ tab, onPostCreated }: CommunityFeedScreenP
 
   return (
     <div>
-      <div className="sticky top-0 z-10 border-b border-[#E5E5E5] bg-white/85 backdrop-blur">
+      <div className="sticky top-[104px] z-10 border-b border-[#E5E5E5] bg-white/85 backdrop-blur">
         <h1 className="sr-only">{t('community.title')}</h1>
         <div role="tablist" aria-label={t('community.title')} className="flex">
           {COMMUNITY_FEED_TABS.map((value) => {

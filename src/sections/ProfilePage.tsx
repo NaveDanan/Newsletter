@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { UserAvatarCircle } from '@/components/UserAvatarCircle';
 import { ImageCropperDialog } from '@/components/profile/ImageCropperDialog';
+import { NotificationPreferences } from '@/components/profile/NotificationPreferences';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -292,6 +293,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
             </Button>
           </CardContent>
         </Card>
+        <NotificationPreferences key={user.id} />
       </main>
 
       {pendingFile ? (

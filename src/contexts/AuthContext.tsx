@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { toast } from 'sonner';
 import { avatarUrlFor } from '@/lib/avatar';
 import { bootLogger } from '@/lib/bootLogger';
+import { disableBrowserNotifications } from '@/lib/browser-notifications';
 import {
   getPocketBase,
   getSSOCallbackUrl,
@@ -193,6 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [login, pb]);
 
   const logout = useCallback(() => {
+    void disableBrowserNotifications().catch(() => { /* Local unsubscribe still runs when offline. */ });
     resetPocketBase();
     setUser(null);
     toast.success('Signed out');

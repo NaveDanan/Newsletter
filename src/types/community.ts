@@ -3,6 +3,8 @@
 // denormalized objects because the users collection is not readable by
 // non-admins and PocketBase relations are not used anywhere in this project.
 
+import type { NewsletterEvent, NewsletterPoll } from './newsletter';
+
 export const COMMUNITY_FEED_TABS = ['for-you', 'following', 'latest'] as const;
 export type CommunityFeedTab = (typeof COMMUNITY_FEED_TABS)[number];
 
@@ -15,7 +17,7 @@ export type CommunityPostKind = (typeof COMMUNITY_POST_KINDS)[number];
 export const COMMUNITY_POST_STATUSES = ['published', 'removed', 'deleted'] as const;
 export type CommunityPostStatus = (typeof COMMUNITY_POST_STATUSES)[number];
 
-export const COMMUNITY_NOTIFICATION_KINDS = ['like', 'reply', 'repost', 'quote', 'follow', 'mention'] as const;
+export const COMMUNITY_NOTIFICATION_KINDS = ['like', 'reply', 'repost', 'quote', 'follow', 'mention', 'comment', 'following_post', 'event', 'newsletter'] as const;
 export type CommunityNotificationKind = (typeof COMMUNITY_NOTIFICATION_KINDS)[number];
 
 export const COMMUNITY_REPORT_REASONS = ['spam', 'abuse', 'harassment', 'misinformation', 'sensitive', 'other'] as const;
@@ -117,6 +119,8 @@ export interface CommunityPost {
   reposted: boolean;
   bookmarked: boolean;
   removedReason: string;
+  poll?: NewsletterPoll | null;
+  event?: NewsletterEvent | null;
   /** null on a removed post, whose author identity is withheld. */
   author: CommunityPostAuthor | null;
   isAuthor: boolean;
@@ -160,6 +164,7 @@ export interface CommunityHashtag {
 }
 
 export interface CommunityNotification {
+  targetPath: string;
   id: string;
   kind: CommunityNotificationKind;
   actorId: string;

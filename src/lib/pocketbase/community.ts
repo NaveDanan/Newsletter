@@ -1,4 +1,6 @@
 import { getPocketBase, POCKETBASE_URL } from './client';
+import { normalizeEvent, normalizePoll } from './newsletters';
+import type { NewsletterEvent, NewsletterPoll } from '@/types/newsletter';
 import {
   COMMUNITY_ENTITY_TYPES,
   COMMUNITY_NOTIFICATION_KINDS,
@@ -215,6 +217,8 @@ export function mapCommunityPost(raw: unknown, depth = 0): CommunityPost {
     reposted: bool(value.reposted),
     bookmarked: bool(value.bookmarked),
     removedReason: str(value.removedReason),
+    poll: normalizePoll(value.poll),
+    event: normalizeEvent(value.event),
     author: mapAuthor(value.author),
     isAuthor: bool(value.isAuthor),
     canModerate: bool(value.canModerate),
@@ -270,6 +274,7 @@ function mapNotification(raw: unknown): CommunityNotification {
     postId: str(value.postId),
     rootId: str(value.rootId),
     preview: str(value.preview),
+    targetPath: str(value.targetPath),
     isRead: bool(value.isRead),
     createdAt: str(value.createdAt),
   };
@@ -452,6 +457,8 @@ export async function createCommunityPost(draft: {
   quotedPostId?: string;
   clientId?: string;
   sensitive?: boolean;
+  poll?: NewsletterPoll | null;
+  event?: NewsletterEvent | null;
 }): Promise<CommunityPost> {
   const payload = {
     body: draft.body,
@@ -460,6 +467,8 @@ export async function createCommunityPost(draft: {
     quotedPostId: draft.quotedPostId ?? '',
     clientId: draft.clientId ?? '',
     sensitive: draft.sensitive === true,
+    poll: draft.poll ?? null,
+    event: draft.event ?? null,
   };
   return mapCommunityPost(await sendJson('/api/community/posts', 'POST', payload));
 }
@@ -505,6 +514,33 @@ export async function toggleCommunityRepost(postId: string): Promise<CommunityEn
 
 export async function toggleCommunityBookmark(postId: string): Promise<CommunityEngagementResult> {
   return toggleEngagement(postId, 'bookmark');
+}
+
+export async function voteCommunityPoll(
+  postId: string,
+  optionId: string,
+): Promise<{ ok: boolean; poll: NewsletterPoll }> {
+  const result = record(
+    await sendJson(`/api/community/posts/${encodeURIComponent(postId)}/vote`, 'POST', { optionId })
+  );
+  const normalized = normalizePoll(result.poll);
+  if (!normalized) {
+    throw new Error('Failed to normalize poll response');
+  }
+  return { ok: bool(result.ok), poll: normalized };
+}
+
+export async function rsvpCommunityEvent(
+  postId: string,
+): Promise<{ ok: boolean; attending: boolean; event: NewsletterEvent }> {
+  const result = record(
+    await sendJson(`/api/community/posts/${encodeURIComponent(postId)}/rsvp`, 'POST', {})
+  );
+  const normalized = normalizeEvent(result.event);
+  if (!normalized) {
+    throw new Error('Failed to normalize event response');
+  }
+  return { ok: bool(result.ok), attending: bool(result.attending), event: normalized };
 }
 
 export async function fetchCommunityBookmarks(

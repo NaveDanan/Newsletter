@@ -1,5 +1,6 @@
 import { autodate, bool, email, file, json, number, text } from './schema-fields.mjs';
 import { COMMUNITY_COLLECTION_SCHEMAS } from './community-schema.mjs';
+import { NOTIFICATION_COLLECTION_SCHEMAS } from './notification-schema.mjs';
 
 export const PROJECTS_SCHEMA = {
   name: 'projects',
@@ -61,6 +62,8 @@ export const NEWSLETTERS_SCHEMA = {
     json('likedByUserIds'),
     json('bookmarkedByUserIds'),
     json('commentItems'),
+    json('poll'),
+    json('event'),
     text('notificationSentAt', 255, { hidden: true }),
     number('notificationRecipientCount', 0, { hidden: true, onlyInt: true }),
   ],
@@ -243,6 +246,7 @@ export const NEWSLETTER_IMPORTS_SCHEMA = {
 };
 
 export const APP_COLLECTION_SCHEMAS = [
+  ...NOTIFICATION_COLLECTION_SCHEMAS,
   PROJECTS_SCHEMA,
   NEWSLETTERS_SCHEMA,
   NAVIGATION_LINKS_SCHEMA,

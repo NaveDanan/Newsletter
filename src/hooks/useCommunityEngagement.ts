@@ -1,12 +1,15 @@
 import { useCallback, useRef } from 'react';
 import { toast } from 'sonner';
+import { getPocketBase } from '@/lib/pocketbase/client';
 import {
   deleteCommunityPost,
   getPocketBaseErrorMessage,
+  rsvpCommunityEvent,
   toggleCommunityBookmark,
   toggleCommunityLike,
   toggleCommunityRepost,
   updateCommunityPost,
+  voteCommunityPoll,
 } from '@/lib/pocketbase/community';
 import type { CommunityEngagementResult, CommunityPost } from '@/types/community';
 
@@ -28,6 +31,8 @@ export interface UseCommunityEngagementResult {
   toggleLike: (post: CommunityPost) => Promise<void>;
   toggleRepost: (post: CommunityPost) => Promise<void>;
   toggleBookmark: (post: CommunityPost) => Promise<void>;
+  votePoll: (post: CommunityPost, optionId: string) => Promise<void>;
+  rsvpEvent: (post: CommunityPost) => Promise<void>;
   deletePost: (post: CommunityPost) => Promise<void>;
   editPost: (
     post: CommunityPost,
@@ -98,6 +103,88 @@ export function useCommunityEngagement({
     run(post, 'bookmark', 'bookmarked', 'bookmarkCount', toggleCommunityBookmark, 'community.errors.bookmark')
   ), [run]);
 
+  const votePoll = useCallback(async (post: CommunityPost, optionId: string) => {
+    if (!isAuthenticated) {
+      onRequireAuth();
+      return;
+    }
+    if (!post.poll || post.poll.closed) return;
+
+    const currentUserId = getPocketBase().authStore.model?.id || '';
+    if (!currentUserId) {
+      onRequireAuth();
+      return;
+    }
+
+    const previousPoll = post.poll;
+    const existingVoted = previousPoll.options.find((opt) => opt.voterUserIds.includes(currentUserId));
+    const isUnvoting = existingVoted?.id === optionId;
+
+    const nextOptions = previousPoll.options.map((opt) => {
+      const filteredVoters = opt.voterUserIds.filter((uid) => uid !== currentUserId);
+      if (!isUnvoting && opt.id === optionId) {
+        filteredVoters.push(currentUserId);
+      }
+      return {
+        ...opt,
+        voterUserIds: filteredVoters,
+        votes: filteredVoters.length,
+      };
+    });
+
+    const optimisticPoll = { ...previousPoll, options: nextOptions };
+    patchPost(post.id, { poll: optimisticPoll });
+
+    try {
+      const response = await voteCommunityPoll(post.id, optionId);
+      patchPost(post.id, { poll: response.poll });
+    } catch (caught) {
+      patchPost(post.id, { poll: previousPoll });
+      toast.error(getPocketBaseErrorMessage(caught, translate('viewer.pollClosed')));
+    }
+  }, [isAuthenticated, onRequireAuth, patchPost, translate]);
+
+  const rsvpEvent = useCallback(async (post: CommunityPost) => {
+    if (!isAuthenticated) {
+      onRequireAuth();
+      return;
+    }
+    if (!post.event) return;
+
+    const authModel = getPocketBase().authStore.model as { id?: string; name?: string; avatar?: string } | null;
+    const currentUserId = authModel?.id || '';
+    if (!currentUserId) {
+      onRequireAuth();
+      return;
+    }
+
+    const previousEvent = post.event;
+    const isAttending = previousEvent.attendees.some((a) => a.userId === currentUserId);
+    const nextAttendees = isAttending
+      ? previousEvent.attendees.filter((a) => a.userId !== currentUserId)
+      : [
+          ...previousEvent.attendees,
+          {
+            userId: currentUserId,
+            name: authModel?.name || 'User',
+            avatar: authModel?.avatar,
+            rsvpAt: new Date().toISOString(),
+          },
+        ];
+
+    const optimisticEvent = { ...previousEvent, attendees: nextAttendees };
+    patchPost(post.id, { event: optimisticEvent });
+
+    try {
+      const response = await rsvpCommunityEvent(post.id);
+      patchPost(post.id, { event: response.event });
+      toast.success(response.attending ? translate('viewer.rsvpSuccess') : translate('viewer.rsvpCancelled'));
+    } catch (caught) {
+      patchPost(post.id, { event: previousEvent });
+      toast.error(getPocketBaseErrorMessage(caught, 'Failed to update RSVP'));
+    }
+  }, [isAuthenticated, onRequireAuth, patchPost, translate]);
+
   const deletePost = useCallback(async (post: CommunityPost) => {
     if (!isAuthenticated) {
       onRequireAuth();
@@ -137,5 +224,5 @@ export function useCommunityEngagement({
     }
   }, [isAuthenticated, onRequireAuth, patchPost, translate]);
 
-  return { toggleLike, toggleRepost, toggleBookmark, deletePost, editPost };
+  return { toggleLike, toggleRepost, toggleBookmark, votePoll, rsvpEvent, deletePost, editPost };
 }

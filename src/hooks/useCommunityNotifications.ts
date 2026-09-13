@@ -1,3 +1,6 @@
+import { useAuth } from '@/contexts/AuthContext';
+import { notificationsChanged } from '@/lib/pocketbase/notifications';
+import { useLocale } from '@/contexts/LocaleContext';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchCommunityNotifications,
@@ -25,6 +28,9 @@ export function useCommunityNotifications(options: {
   onUnreadChange?: (count: number) => void;
 }): UseCommunityNotificationsResult {
   const { enabled, kind, onUnreadChange } = options;
+  const { user } = useAuth();
+  const { t } = useLocale();
+  const userId = user?.id;
   const [notifications, setNotifications] = useState<CommunityNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(enabled);
@@ -36,13 +42,14 @@ export function useCommunityNotifications(options: {
   const unreadChangeRef = useRef(onUnreadChange);
   unreadChangeRef.current = onUnreadChange;
 
-  const load = useCallback(async (nextCursor: string) => {
+  const load = useCallback(async (nextCursor: string, background = false) => {
+    if (!userId) return;
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
 
     if (nextCursor) {
       setIsLoadingMore(true);
-    } else {
+    } else if (!background) {
       setIsLoading(true);
     }
 
@@ -53,13 +60,19 @@ export function useCommunityNotifications(options: {
       }
       setNotifications((current) => {
         if (!nextCursor) {
+          if (background) {
+            const seen = new Set(page.items.map((item) => item.id));
+            return page.items.concat(current.filter((item) => !seen.has(item.id)));
+          }
           return page.items;
         }
         const seen = new Set(current.map((item) => item.id));
         return current.concat(page.items.filter((item) => !seen.has(item.id)));
       });
-      setCursor(page.cursor);
-      setHasMore(page.hasMore);
+      if (!background) {
+        setCursor(page.cursor);
+        setHasMore(page.hasMore);
+      }
       setUnreadCount(page.unreadCount);
       unreadChangeRef.current?.(page.unreadCount);
       setError(null);
@@ -73,7 +86,7 @@ export function useCommunityNotifications(options: {
         setIsLoadingMore(false);
       }
     }
-  }, [kind]);
+  }, [kind, userId]);
 
   useEffect(() => {
     if (!enabled) {
@@ -86,7 +99,16 @@ export function useCommunityNotifications(options: {
       return;
     }
     void load('');
+    return () => { requestRef.current += 1; };
   }, [enabled, load]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const refresh = () => { if (!document.hidden && !isLoading && !isLoadingMore) void load('', true); };
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [enabled, load, isLoading, isLoadingMore]);
 
   const loadMore = useCallback(() => {
     if (!hasMore || isLoading || isLoadingMore || !cursor) {
@@ -96,7 +118,7 @@ export function useCommunityNotifications(options: {
   }, [cursor, hasMore, isLoading, isLoadingMore, load]);
 
   const markAllRead = useCallback(async () => {
-    const hadUnread = notifications.some((item) => !item.isRead);
+    const hadUnread = unreadCount > 0;
     if (!hadUnread) {
       return;
     }
@@ -105,10 +127,12 @@ export function useCommunityNotifications(options: {
     unreadChangeRef.current?.(0);
     try {
       await markCommunityNotificationsRead([]);
+      notificationsChanged();
     } catch {
       await load('');
+      setError(t('notifications.updateFailed'));
     }
-  }, [load, notifications]);
+  }, [load, unreadCount, t]);
 
   const markRead = useCallback(async (id: string) => {
     const target = notifications.find((item) => item.id === id);
@@ -123,10 +147,12 @@ export function useCommunityNotifications(options: {
     });
     try {
       await markCommunityNotificationsRead([id]);
+      notificationsChanged();
     } catch {
       await load('');
+      setError(t('notifications.updateFailed'));
     }
-  }, [load, notifications]);
+  }, [load, notifications, t]);
 
   return {
     notifications,

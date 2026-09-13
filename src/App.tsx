@@ -243,6 +243,8 @@ function App() {
     addNewsletterComment,
     toggleCommentLike,
     toggleBookmark,
+    voteNewsletterPoll,
+    rsvpNewsletterEvent,
   } = useNewsletters({
     currentUser: user,
     currentUserRole: userRole,
@@ -548,6 +550,24 @@ function App() {
     toggleBookmark(newsletterId);
   };
 
+  const handleVotePoll = (newsletterId: string, optionId: string) => {
+    if (!isUserAuthenticated) {
+      handleRequireAuth();
+      return;
+    }
+
+    voteNewsletterPoll(newsletterId, optionId);
+  };
+
+  const handleRsvpEvent = (newsletterId: string) => {
+    if (!isUserAuthenticated) {
+      handleRequireAuth();
+      return;
+    }
+
+    rsvpNewsletterEvent(newsletterId);
+  };
+
   // Render article view
   if (currentRoute.view === 'article' && selectedArticle) {
     return (
@@ -563,6 +583,8 @@ function App() {
           onToggleCommentLike={handleCommentLike}
           isBookmarked={Boolean(user?.id && selectedArticle.bookmarkedByUserIds.includes(user.id))}
           onToggleBookmark={handleToggleBookmark}
+          onVotePoll={handleVotePoll}
+          onRsvpEvent={handleRsvpEvent}
         />
       </div>
     );
@@ -638,6 +660,8 @@ function App() {
           onToggleNewsletterLike={handleArticleLike}
           onAddNewsletterComment={handleArticleComment}
           onToggleCommentLike={handleCommentLike}
+          onVoteNewsletterPoll={handleVotePoll}
+          onRsvpNewsletterEvent={handleRsvpEvent}
         />
       </div>
     );

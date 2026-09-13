@@ -8,6 +8,8 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { NewsletterContent } from '@/components/newsletter/NewsletterContent';
 import { stripCommentFormatting } from '@/lib/comment-formatting';
 import { cn } from '@/lib/utils';
+import { NewsletterPollCard } from '@/components/newsletter/NewsletterPollCard';
+import { NewsletterEventCard } from '@/components/newsletter/NewsletterEventCard';
 import type { PocketBaseUser } from '@/lib/pocketbase/client';
 import type { Newsletter, NewsletterComment } from '../types/newsletter';
 import '../components/editor/EditorStyles.css';
@@ -22,6 +24,8 @@ interface NewsletterViewerProps {
   onToggleCommentLike?: (newsletterId: string, commentId: string) => void;
   isBookmarked?: boolean;
   onToggleBookmark?: (newsletterId: string) => void;
+  onVotePoll?: (newsletterId: string, optionId: string) => void | Promise<unknown>;
+  onRsvpEvent?: (newsletterId: string) => void | Promise<unknown>;
 }
 
 function getInitials(name: string): string {
@@ -43,6 +47,8 @@ export function NewsletterViewer({
   onToggleCommentLike,
   isBookmarked = false,
   onToggleBookmark,
+  onVotePoll,
+  onRsvpEvent,
 }: NewsletterViewerProps) {
   const { formatDate, formatNumber, formatRelativeTime, isRTL, t } = useLocale();
   const articleRef = useRef<HTMLDivElement>(null);
@@ -241,6 +247,34 @@ export function NewsletterViewer({
           className="newsletter-article"
           dir="auto"
         />
+
+        {/* Scheduled Event */}
+        {newsletter.event && newsletter.event.title && (
+          <div className="mt-8">
+            <NewsletterEventCard
+              event={newsletter.event}
+              newsletterId={newsletter.id}
+              currentUser={currentUser}
+              onRsvp={onRsvpEvent}
+              onRequireAuth={onRequireAuth}
+              isInteractive={true}
+            />
+          </div>
+        )}
+
+        {/* Interactive Poll */}
+        {newsletter.poll && newsletter.poll.question && (
+          <div className="mt-8">
+            <NewsletterPollCard
+              poll={newsletter.poll}
+              newsletterId={newsletter.id}
+              currentUser={currentUser}
+              onVote={onVotePoll}
+              onRequireAuth={onRequireAuth}
+              isInteractive={true}
+            />
+          </div>
+        )}
 
         {/* <div className="mt-10 grid gap-4 rounded-[2rem] border border-[#E5E5E5] bg-[#FAFAFA] p-4 sm:grid-cols-3 sm:p-5">
           <button

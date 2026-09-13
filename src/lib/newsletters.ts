@@ -39,6 +39,8 @@ function normalizeNewsletter(newsletter: Newsletter): Newsletter {
     shares: Math.max(0, newsletter.shares ?? 0),
     likedByUserIds: Array.isArray(newsletter.likedByUserIds) ? newsletter.likedByUserIds : [],
     commentItems,
+    poll: newsletter.poll ?? null,
+    event: newsletter.event ?? null,
   };
 }
 
@@ -97,6 +99,26 @@ export const initialNewsletters: Newsletter[] = [
     likedByUserIds: [],
     bookmarkedByUserIds: [],
     commentItems: [],
+    poll: {
+      id: 'poll-1',
+      question: 'Which AI tool has saved you the most time this month?',
+      options: [
+        { id: 'opt-1', text: 'Claude (Anthropic)', votes: 42, voterUserIds: [] },
+        { id: 'opt-2', text: 'ChatGPT (OpenAI)', votes: 58, voterUserIds: [] },
+        { id: 'opt-3', text: 'Cursor / Copilot', votes: 35, voterUserIds: [] },
+        { id: 'opt-4', text: 'Midjourney', votes: 12, voterUserIds: [] },
+      ],
+      createdAt: '2025-05-16',
+    },
+    event: {
+      id: 'event-1',
+      title: 'AI Workflow Deep Dive: Live Masterclass & Q&A',
+      description: 'Join Alex Chen for a hands-on session demonstrating prompt engineering frameworks and real-time automation setup.',
+      startDate: '2026-09-25T17:00:00Z',
+      endDate: '2026-09-25T18:30:00Z',
+      location: 'https://meet.google.com/ai-workflow-live',
+      attendees: [],
+    },
   },
   {
     id: '2',

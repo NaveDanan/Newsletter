@@ -580,6 +580,8 @@ function buildNewsletterPayload(body, auth, existing) {
     'commentItems',
     'presentationFiles',
     'presentationPreviewManifest',
+    'poll',
+    'event',
   ].forEach(function (field) {
     if (Object.prototype.hasOwnProperty.call(source, field)) {
       payload[field] = source[field];

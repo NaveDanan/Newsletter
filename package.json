@@ -13,6 +13,8 @@
     "test:community-core": "node scripts/test-community-core.cjs",
     "test:community-mirror": "node scripts/test-community-mirror.cjs",
     "test:community-api": "node tests/scripts/community-api.mjs",
+    "test:notifications": "node tests/scripts/notifications-api.mjs",
+    "test:browser-notifications": "node --test tests/scripts/browser-notifications.test.mjs",
     "docker:build": "node scripts/build-docker-image.mjs",
     "test:docker-api": "node scripts/test-docker-api.mjs",
     "pb:setup-collections": "node scripts/setup-pocketbase-collections.mjs",
@@ -104,6 +106,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "vaul": "^1.1.2",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },

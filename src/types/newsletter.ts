@@ -11,6 +11,38 @@ export interface NewsletterComment {
 
 export type NewsletterTextAlignment = 'left' | 'center' | 'right';
 
+export interface NewsletterPollOption {
+  id: string;
+  text: string;
+  votes: number;
+  voterUserIds: string[];
+}
+
+export interface NewsletterPoll {
+  id: string;
+  question: string;
+  options: NewsletterPollOption[];
+  closed?: boolean;
+  createdAt?: string;
+}
+
+export interface NewsletterEventAttendee {
+  userId: string;
+  name: string;
+  avatar?: string;
+  rsvpAt: string;
+}
+
+export interface NewsletterEvent {
+  id: string;
+  title: string;
+  description?: string;
+  startDate: string; // ISO string e.g. "2026-09-20T14:00"
+  endDate?: string;   // ISO string e.g. "2026-09-20T15:00"
+  location?: string;
+  attendees: NewsletterEventAttendee[];
+}
+
 export interface PresentationPreview {
   sourceFileName: string;
   sourceUrl?: string;
@@ -48,6 +80,8 @@ export interface Newsletter {
   likedByUserIds: string[];
   bookmarkedByUserIds: string[];
   commentItems: NewsletterComment[];
+  poll?: NewsletterPoll | null;
+  event?: NewsletterEvent | null;
 }
 
 export interface NewsletterFormData {
@@ -59,4 +93,6 @@ export interface NewsletterFormData {
   tags: string[];
   status: 'draft' | 'published';
   publishedAt?: string;
+  poll?: NewsletterPoll | null;
+  event?: NewsletterEvent | null;
 }

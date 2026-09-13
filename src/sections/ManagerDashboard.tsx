@@ -57,6 +57,8 @@ interface ManagerDashboardProps {
   onToggleNewsletterLike: (newsletterId: string) => void;
   onAddNewsletterComment: (newsletterId: string, body: string) => Promise<NewsletterComment | null> | NewsletterComment | null;
   onToggleCommentLike: (newsletterId: string, commentId: string) => void;
+  onVoteNewsletterPoll?: (newsletterId: string, optionId: string) => void;
+  onRsvpNewsletterEvent?: (newsletterId: string) => void;
 }
 
 export function ManagerDashboard({
@@ -78,6 +80,8 @@ export function ManagerDashboard({
   onToggleNewsletterLike,
   onAddNewsletterComment,
   onToggleCommentLike,
+  onVoteNewsletterPoll,
+  onRsvpNewsletterEvent,
 }: ManagerDashboardProps) {
   const { formatNumber, isRTL, t } = useLocale();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -250,6 +254,8 @@ export function ManagerDashboard({
             onToggleLike={onToggleNewsletterLike}
             onAddComment={onAddNewsletterComment}
             onToggleCommentLike={onToggleCommentLike}
+            onVotePoll={onVoteNewsletterPoll}
+            onRsvpEvent={onRsvpNewsletterEvent}
           />
         );
       }

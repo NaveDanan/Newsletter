@@ -37,6 +37,8 @@ import { CommunityLinkPreviewCard } from './CommunityLinkPreviewCard';
 import { CommunityMediaGrid } from './CommunityMediaGrid';
 import { CommunityPostActions } from './CommunityPostActions';
 import { CommunityQuotedPost } from './CommunityQuotedPost';
+import { NewsletterPollCard } from '@/components/newsletter/NewsletterPollCard';
+import { NewsletterEventCard } from '@/components/newsletter/NewsletterEventCard';
 import type { UseCommunityEngagementResult } from '@/hooks/useCommunityEngagement';
 import type { CommunityPost } from '@/types/community';
 
@@ -60,7 +62,7 @@ export function CommunityPostCard({
   repostedBy,
 }: CommunityPostCardProps) {
   const { formatDate, formatRelativeTime, t } = useLocale();
-  const { openPost, openProfile, openHashtag, openReport, canModerate } = useCommunity();
+  const { openPost, openProfile, openHashtag, openReport, canModerate, requireAuth } = useCommunity();
   const { user } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -218,6 +220,34 @@ export function CommunityPostCard({
             <CommunityLinkPreviewCard preview={post.linkPreview} />
           ) : null}
           {post.quotedPost ? <CommunityQuotedPost post={post.quotedPost} /> : null}
+
+          {/* Poll Card */}
+          {post.poll && post.poll.question ? (
+            <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+              <NewsletterPollCard
+                poll={post.poll}
+                newsletterId={post.id}
+                currentUser={user}
+                onVote={actions.votePoll ? (_, optionId) => actions.votePoll(post, optionId) : undefined}
+                onRequireAuth={requireAuth}
+                isInteractive={true}
+              />
+            </div>
+          ) : null}
+
+          {/* Scheduled Event Card */}
+          {post.event && post.event.title ? (
+            <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+              <NewsletterEventCard
+                event={post.event}
+                newsletterId={post.id}
+                currentUser={user}
+                onRsvp={actions.rsvpEvent ? () => actions.rsvpEvent(post) : undefined}
+                onRequireAuth={requireAuth}
+                isInteractive={true}
+              />
+            </div>
+          ) : null}
 
           {isDetail ? (
             <div className="mt-3 flex items-center gap-2 text-sm text-[#737373]">

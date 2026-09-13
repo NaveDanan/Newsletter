@@ -241,7 +241,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
     setSuggestions((current) => {
       const list = current.length > 0 ? current : DEFAULT_SUGGESTIONS;
       return list.map((item) => (
-        item.handle === targetHandle
+        item.handle === sugHandle
           ? { ...item, isFollowing, followerCount: followerCount >= 0 ? followerCount : item.followerCount }
           : item
       ));

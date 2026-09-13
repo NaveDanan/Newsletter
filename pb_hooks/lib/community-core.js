@@ -24,7 +24,7 @@ var MODERATOR_ROLES = ['manager', 'general_manager', 'admin'];
 var POST_KINDS = ['post', 'reply', 'quote'];
 var REPORT_REASONS = ['spam', 'abuse', 'harassment', 'misinformation', 'sensitive', 'other'];
 var REPORT_STATUSES = ['open', 'resolved', 'dismissed'];
-var NOTIFICATION_KINDS = ['like', 'reply', 'repost', 'quote', 'follow', 'mention'];
+var NOTIFICATION_KINDS = ['like', 'reply', 'repost', 'quote', 'follow', 'mention', 'comment', 'following_post', 'event', 'newsletter'];
 var FEED_TABS = ['for-you', 'following', 'latest'];
 var PROFILE_TABS = ['posts', 'replies', 'reposts', 'media', 'likes'];
 
@@ -419,12 +419,12 @@ function uniqueStrings(values) {
   return result;
 }
 
-function validatePostInput(body, mediaCount, hasQuote) {
+function validatePostInput(body, mediaCount, hasQuote, hasAddon) {
   var text = trimBody(body);
   if (text.length > MAX_BODY_LENGTH) {
     return { ok: false, message: 'A post can contain at most ' + MAX_BODY_LENGTH + ' characters.' };
   }
-  if (!text && !mediaCount && !hasQuote) {
+  if (!text && !mediaCount && !hasQuote && !hasAddon) {
     return { ok: false, message: 'Write something or attach media before posting.' };
   }
   if (mediaCount > MAX_MEDIA_PER_POST) {

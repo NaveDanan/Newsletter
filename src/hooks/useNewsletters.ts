@@ -27,6 +27,7 @@ function createClientId(): string {
 export function useNewsletters({ currentUser, currentUserRole, enabled = true }: UseNewslettersOptions) {
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
@@ -34,6 +35,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!enabled) {
+      setHasLoaded(false);
       setIsLoading(false);
       setError(null);
       setNewsletters([]);
@@ -67,6 +69,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       })
       .finally(() => {
         if (!cancelled) {
+          setHasLoaded(true);
           setIsLoading(false);
           bootLogger.step('newsletters', 'Initial newsletter fetch finished');
         }
@@ -410,11 +413,106 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
     }
   }, [currentUser?.id, newsletters]);
 
+  // ---------------------------------------------------------------------------
+  // Poll vote (optimistic)
+  // ---------------------------------------------------------------------------
+  const voteNewsletterPoll = useCallback(async (newsletterId: string, optionId: string): Promise<Newsletter | null> => {
+    if (!currentUser?.id) {
+      return null;
+    }
+
+    const newsletter = newsletters.find((n) => n.id === newsletterId);
+    if (!newsletter || !newsletter.poll) return null;
+
+    if (newsletter.poll.closed) {
+      return null;
+    }
+
+    const currentPoll = newsletter.poll;
+    const existingVotedOption = currentPoll.options.find((opt) => opt.voterUserIds.includes(currentUser.id));
+    const isUnvoting = existingVotedOption?.id === optionId;
+
+    const nextOptions = currentPoll.options.map((opt) => {
+      const filteredVoters = opt.voterUserIds.filter((uid) => uid !== currentUser.id);
+      if (!isUnvoting && opt.id === optionId) {
+        filteredVoters.push(currentUser.id);
+      }
+      return {
+        ...opt,
+        voterUserIds: filteredVoters,
+        votes: filteredVoters.length,
+      };
+    });
+
+    const updatedPoll = {
+      ...currentPoll,
+      options: nextOptions,
+    };
+
+    const optimistic: Newsletter = { ...newsletter, poll: updatedPoll };
+    setNewsletters((prev) => prev.map((n) => (n.id === newsletterId ? optimistic : n)));
+
+    try {
+      const updated = await patchNewsletter(newsletterId, { poll: updatedPoll });
+      setNewsletters((prev) => prev.map((n) => (n.id === newsletterId ? updated : n)));
+      return updated;
+    } catch (err) {
+      setNewsletters((prev) => prev.map((n) => (n.id === newsletterId ? newsletter : n)));
+      console.error('voteNewsletterPoll error:', err);
+      return null;
+    }
+  }, [currentUser?.id, newsletters]);
+
+  // ---------------------------------------------------------------------------
+  // Event RSVP (optimistic)
+  // ---------------------------------------------------------------------------
+  const rsvpNewsletterEvent = useCallback(async (newsletterId: string): Promise<Newsletter | null> => {
+    if (!currentUser?.id) {
+      return null;
+    }
+
+    const newsletter = newsletters.find((n) => n.id === newsletterId);
+    if (!newsletter || !newsletter.event) return null;
+
+    const currentEvent = newsletter.event;
+    const isAttending = currentEvent.attendees.some((a) => a.userId === currentUser.id);
+
+    const nextAttendees = isAttending
+      ? currentEvent.attendees.filter((a) => a.userId !== currentUser.id)
+      : [
+          ...currentEvent.attendees,
+          {
+            userId: currentUser.id,
+            name: currentUser.name || 'User',
+            avatar: currentUser.avatar,
+            rsvpAt: new Date().toISOString(),
+          },
+        ];
+
+    const updatedEvent = {
+      ...currentEvent,
+      attendees: nextAttendees,
+    };
+
+    const optimistic: Newsletter = { ...newsletter, event: updatedEvent };
+    setNewsletters((prev) => prev.map((n) => (n.id === newsletterId ? optimistic : n)));
+
+    try {
+      const updated = await patchNewsletter(newsletterId, { event: updatedEvent });
+      setNewsletters((prev) => prev.map((n) => (n.id === newsletterId ? updated : n)));
+      return updated;
+    } catch (err) {
+      setNewsletters((prev) => prev.map((n) => (n.id === newsletterId ? newsletter : n)));
+      console.error('rsvpNewsletterEvent error:', err);
+      return null;
+    }
+  }, [currentUser, newsletters]);
+
   return {
     newsletters,
     isLoading,
     refreshNewsletters,
-    isLoaded: !isLoading,   // backwards-compat alias used in App.tsx
+    isLoaded: enabled && hasLoaded && !isLoading,
     error,
     addNewsletter,
     upsertDraftNewsletter,
@@ -428,6 +526,8 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
     addNewsletterComment,
     toggleCommentLike,
     toggleBookmark,
+    voteNewsletterPoll,
+    rsvpNewsletterEvent,
     uploadPresentation,
   };
 }

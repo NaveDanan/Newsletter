@@ -4,6 +4,7 @@ import {
   DashboardSquare01Icon,
   GlobeIcon,
   Logout01Icon,
+  Notification01Icon,
 } from '@hugeicons/core-free-icons';
 import { UserAvatarCircle } from '@/components/UserAvatarCircle';
 import {
@@ -17,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { hasManagerAccess } from '@/lib/auth/permissions';
 import { cn } from '@/lib/utils';
+import { useNotificationCount } from '@/contexts/NotificationsContext';
 
 /** Overrides the stock `focus:bg-accent`, which in this theme is the brand red. */
 const ITEM_CLASS =
@@ -47,6 +49,7 @@ export function AccountMenu({
 }: AccountMenuProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { t, dir, isRTL, toggleLocale } = useLocale();
+  const unreadCount = useNotificationCount();
 
   if (isLoading && !user) {
     return <div className={cn('size-9 animate-pulse rounded-full bg-[#F3F4F6]', className)} />;
@@ -73,6 +76,11 @@ export function AccountMenu({
   const showManage = showManagerItem && hasManagerAccess(user.role);
 
   return (
+    <div className="flex items-center gap-3">
+      <button type="button" aria-label={t('notifications.badge', { count: unreadCount })} className="relative flex size-9 shrink-0 items-center justify-center rounded-full text-[#737373] hover:bg-[#F3F4F6] hover:text-[#D93A3A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93A3A]" onClick={() => run(() => { window.history.pushState({}, '', '/community/notifications'); window.dispatchEvent(new Event('app:navigate')); })}>
+        <HugeiconsIcon icon={Notification01Icon} className="size-5" />
+        {unreadCount > 0 ? <span aria-hidden="true" className="absolute -end-1 -top-1 min-w-4 rounded-full bg-[#D93A3A] px-1 text-center text-[10px] font-semibold leading-4 text-white">{unreadCount > 99 ? '99+' : unreadCount}</span> : null}
+      </button>
     <DropdownMenu dir={dir}>
       <DropdownMenuTrigger asChild>
         <button
@@ -141,5 +149,6 @@ export function AccountMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    </div>
   );
 }

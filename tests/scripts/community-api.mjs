@@ -32,7 +32,7 @@ for (const [name, role] of ACCOUNTS) {
 }
 
 // Each run starts from an empty community so counters and pagination are exact.
-for (const collection of ['community_reports', 'community_notifications', 'community_likes', 'community_reposts', 'community_bookmarks', 'community_follows', 'community_blocks', 'community_media', 'community_posts', 'community_hashtags', 'community_rate_limits', 'community_profiles']) {
+for (const collection of ['notification_jobs', 'notification_preferences', 'community_reports', 'community_notifications', 'community_likes', 'community_reposts', 'community_bookmarks', 'community_follows', 'community_blocks', 'community_media', 'community_posts', 'community_hashtags', 'community_rate_limits', 'community_profiles']) {
   for (const record of await root.collection(collection).getFullList({ batch: 500 })) await root.collection(collection).delete(record.id);
 }
 

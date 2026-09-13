@@ -70,6 +70,14 @@ routerAdd('POST', '/api/community/posts/{id}/bookmark', function (e) {
   return e.json(200, require(__hooks + '/lib/community.js').toggleBookmark(e, e.request.pathValue('id')));
 }, $apis.bodyLimit(16384), $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
 
+routerAdd('POST', '/api/community/posts/{id}/vote', function (e) {
+  return e.json(200, require(__hooks + '/lib/community.js').votePoll(e, e.request.pathValue('id')));
+}, $apis.bodyLimit(16384), $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
+
+routerAdd('POST', '/api/community/posts/{id}/rsvp', function (e) {
+  return e.json(200, require(__hooks + '/lib/community.js').rsvpEvent(e, e.request.pathValue('id')));
+}, $apis.bodyLimit(16384), $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
+
 routerAdd('GET', '/api/community/bookmarks', function (e) {
   return e.json(200, require(__hooks + '/lib/community.js').listBookmarks(e));
 }, $apis.requireAuth('users'), $apis.skipSuccessActivityLog());

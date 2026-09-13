@@ -1,8 +1,18 @@
+import { eventWithUtcDates } from '@/lib/event-time';
 import type { RecordModel } from 'pocketbase';
 import { getPocketBase } from './client';
 import { extractExcerpt, calculateReadTime } from '../newsletters';
 import { inferNewsletterTextAlignment, normalizeNewsletterTextAlignment } from '../newsletter-alignment';
-import type { Newsletter, NewsletterComment, NewsletterFormData, PresentationPreview } from '../../types/newsletter';
+import type {
+  Newsletter,
+  NewsletterComment,
+  NewsletterEvent,
+  NewsletterEventAttendee,
+  NewsletterFormData,
+  NewsletterPoll,
+  NewsletterPollOption,
+  PresentationPreview,
+} from '../../types/newsletter';
 
 export const NEWSLETTERS_COLLECTION = 'newsletters';
 
@@ -34,6 +44,72 @@ function normalizeComments(raw: unknown): NewsletterComment[] {
       likedByUserIds: Array.isArray(c.likedByUserIds) ? (c.likedByUserIds as string[]) : [],
     } as NewsletterComment;
   }).filter((c): c is NewsletterComment => c !== null);
+}
+
+export function normalizePoll(raw: unknown): NewsletterPoll | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const p = raw as Record<string, unknown>;
+  const question = typeof p.question === 'string' ? p.question.trim() : '';
+  if (!question) return null;
+
+  const rawOptions = Array.isArray(p.options) ? p.options : [];
+  const options: NewsletterPollOption[] = rawOptions.map((opt, index): NewsletterPollOption | null => {
+    if (!opt || typeof opt !== 'object') return null;
+    const o = opt as Record<string, unknown>;
+    const text = typeof o.text === 'string' ? o.text.trim() : '';
+    if (!text) return null;
+    const voterUserIds = Array.isArray(o.voterUserIds)
+      ? (o.voterUserIds as unknown[]).filter((id): id is string => typeof id === 'string' && Boolean(id))
+      : [];
+    return {
+      id: typeof o.id === 'string' && o.id ? o.id : `opt-${index + 1}`,
+      text,
+      votes: typeof o.votes === 'number' ? Math.max(o.votes, voterUserIds.length) : voterUserIds.length,
+      voterUserIds,
+    };
+  }).filter((o): o is NewsletterPollOption => o !== null);
+
+  if (options.length === 0) return null;
+
+  return {
+    id: typeof p.id === 'string' && p.id ? p.id : `poll-${Date.now()}`,
+    question,
+    options,
+    closed: Boolean(p.closed),
+    createdAt: typeof p.createdAt === 'string' ? p.createdAt : undefined,
+  };
+}
+
+export function normalizeEvent(raw: unknown): NewsletterEvent | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const e = raw as Record<string, unknown>;
+  const title = typeof e.title === 'string' ? e.title.trim() : '';
+  const startDate = typeof e.startDate === 'string' ? e.startDate.trim() : '';
+  if (!title || !startDate) return null;
+
+  const rawAttendees = Array.isArray(e.attendees) ? e.attendees : [];
+  const attendees: NewsletterEventAttendee[] = rawAttendees.map((att): NewsletterEventAttendee | null => {
+    if (!att || typeof att !== 'object') return null;
+    const a = att as Record<string, unknown>;
+    const userId = typeof a.userId === 'string' ? a.userId : '';
+    if (!userId) return null;
+    return {
+      userId,
+      name: typeof a.name === 'string' ? a.name : 'Attendee',
+      avatar: typeof a.avatar === 'string' ? a.avatar : undefined,
+      rsvpAt: typeof a.rsvpAt === 'string' ? a.rsvpAt : new Date().toISOString(),
+    };
+  }).filter((a): a is NewsletterEventAttendee => a !== null);
+
+  return {
+    id: typeof e.id === 'string' && e.id ? e.id : `event-${Date.now()}`,
+    title,
+    description: typeof e.description === 'string' ? e.description : '',
+    startDate,
+    endDate: typeof e.endDate === 'string' && e.endDate.trim() ? e.endDate.trim() : undefined,
+    location: typeof e.location === 'string' ? e.location : '',
+    attendees,
+  };
 }
 
 function getRecordFileUrl(pb: ReturnType<typeof getPocketBase>, record: RecordModel, fileName: string): string {
@@ -101,6 +177,8 @@ function buildNewsletterCorePayload(data: NewsletterFormData) {
     textAlignment: inferNewsletterTextAlignment(data.content),
     tags: data.tags,
     status: data.status,
+    poll: data.poll ?? null,
+    event: data.event ? eventWithUtcDates(data.event) : null,
     ...(data.publishedAt ? { publishedAt: data.publishedAt } : {}),
   };
 }
@@ -137,6 +215,8 @@ function stripUnsupportedNewsletterFields(payload: Record<string, unknown>) {
   delete nextPayload.comments;
   delete nextPayload.shares;
   delete nextPayload.textAlignment;
+  delete nextPayload.poll;
+  delete nextPayload.event;
   return nextPayload;
 }
 
@@ -193,6 +273,8 @@ export function mapPBRecordToNewsletter(record: RecordModel): Newsletter {
     likedByUserIds: Array.isArray(record['likedByUserIds']) ? (record['likedByUserIds'] as string[]) : [],
     bookmarkedByUserIds: Array.isArray(record['bookmarkedByUserIds']) ? (record['bookmarkedByUserIds'] as string[]) : [],
     commentItems,
+    poll: normalizePoll(record['poll']),
+    event: normalizeEvent(record['event']),
   };
 }
 
@@ -257,6 +339,7 @@ export async function patchNewsletter(
   const pb = getPocketBase();
   // Recompute derived fields if content changed
   const patch: Record<string, unknown> = { ...data };
+  if (data.event) patch.event = eventWithUtcDates(data.event);
   if (typeof data.content === 'string') {
     patch.excerpt = extractExcerpt(data.content);
     patch.readTime = calculateReadTime(data.content);

@@ -1,13 +1,27 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Cancel01Icon, FloppyDiskIcon, Tag01Icon, UserIcon, ViewIcon } from "@hugeicons/core-free-icons";
+import {
+  Add01Icon,
+  BarChartIcon,
+  Calendar01Icon,
+  Calendar03Icon,
+  Cancel01Icon,
+  Delete02Icon,
+  FloppyDiskIcon,
+  Tag01Icon,
+  UserIcon,
+  ViewIcon,
+} from "@hugeicons/core-free-icons";
 import { forwardRef, startTransition, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { NewsletterContent } from '@/components/newsletter/NewsletterContent';
+import { NewsletterPollCard } from '@/components/newsletter/NewsletterPollCard';
+import { NewsletterEventCard } from '@/components/newsletter/NewsletterEventCard';
 import { cn } from '@/lib/utils';
+import { eventDateTimeInput } from '@/lib/event-time';
 import { AdvancedEditor, type AdvancedEditorHandle } from '../../components/editor/AdvancedEditor';
 import { FileUploadZone } from '../../components/upload/FileUploadZone';
 import { toast } from 'sonner';
-import type { Newsletter, NewsletterFormData } from '../../types/newsletter';
+import type { Newsletter, NewsletterEvent, NewsletterFormData, NewsletterPoll } from '../../types/newsletter';
 import '../../components/editor/EditorStyles.css';
 
 function normalizeFormData(data: NewsletterFormData) {
@@ -19,6 +33,17 @@ function normalizeFormData(data: NewsletterFormData) {
     coverImage: data.coverImage.trim(),
     tags: data.tags,
     status: data.status,
+    poll: data.poll ? {
+      question: data.poll.question.trim(),
+      options: data.poll.options.map((o) => ({ id: o.id, text: o.text.trim() })),
+    } : null,
+    event: data.event ? {
+      title: data.event.title.trim(),
+      startDate: data.event.startDate.trim(),
+      endDate: data.event.endDate?.trim() || '',
+      location: data.event.location?.trim() || '',
+      description: data.event.description?.trim() || '',
+    } : null,
   };
 }
 
@@ -29,7 +54,9 @@ function hasMeaningfulContent(data: NewsletterFormData): boolean {
     data.content.replace(/<[^>]*>/g, '').trim() ||
     data.author.trim() ||
     data.coverImage.trim() ||
-    data.tags.length
+    data.tags.length ||
+    data.poll?.question.trim() ||
+    data.event?.title.trim()
   );
 }
 
@@ -67,6 +94,8 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
     coverImage: '',
     tags: [],
     status: 'draft',
+    poll: null,
+    event: null,
   });
   const [tagInput, setTagInput] = useState('');
   const [autoSaveDraftId, setAutoSaveDraftId] = useState<string | null>(newsletter?.id ?? null);
@@ -88,6 +117,8 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
         coverImage: newsletter.coverImage,
         tags: newsletter.tags,
         status: newsletter.status,
+        poll: newsletter.poll ?? null,
+        event: newsletter.event ?? null,
       }))
     : null;
   const currentSnapshot = JSON.stringify(normalizeFormData(formData));
@@ -109,6 +140,8 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
           coverImage: newsletter.coverImage,
           tags: newsletter.tags,
           status: newsletter.status,
+          poll: newsletter.poll ? JSON.parse(JSON.stringify(newsletter.poll)) : null,
+          event: newsletter.event ? JSON.parse(JSON.stringify(newsletter.event)) : null,
         });
         setAutoSaveDraftId(newsletter.id);
       });
@@ -248,7 +281,59 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
       return false;
     }
 
-    const data = { ...nextFormData, status };
+    if (nextFormData.poll) {
+      const q = nextFormData.poll.question.trim();
+      const validOptions = nextFormData.poll.options.filter((o) => o.text.trim());
+      if (q && validOptions.length < 2) {
+        toast.error(t('manager.minTwoOptions'));
+        return false;
+      }
+    }
+
+    if (nextFormData.event) {
+      if (!nextFormData.event.title.trim()) {
+        toast.error(t('manager.eventTitle'));
+        return false;
+      }
+      if (!nextFormData.event.startDate) {
+        toast.error(t('manager.eventStartDate'));
+        return false;
+      }
+    }
+
+    const sanitizedPoll: NewsletterPoll | null = nextFormData.poll && nextFormData.poll.question.trim()
+      ? {
+          ...nextFormData.poll,
+          question: nextFormData.poll.question.trim(),
+          options: nextFormData.poll.options
+            .map((opt, i) => ({
+              id: opt.id || `opt-${i + 1}`,
+              text: opt.text.trim(),
+              votes: opt.votes || 0,
+              voterUserIds: opt.voterUserIds || [],
+            }))
+            .filter((opt) => opt.text.length > 0),
+        }
+      : null;
+
+    const sanitizedEvent: NewsletterEvent | null = nextFormData.event && nextFormData.event.title.trim() && nextFormData.event.startDate
+      ? {
+          ...nextFormData.event,
+          title: nextFormData.event.title.trim(),
+          startDate: nextFormData.event.startDate.trim(),
+          endDate: nextFormData.event.endDate?.trim() || undefined,
+          location: nextFormData.event.location?.trim() || undefined,
+          description: nextFormData.event.description?.trim() || undefined,
+          attendees: nextFormData.event.attendees || [],
+        }
+      : null;
+
+    const data: NewsletterFormData = {
+      ...nextFormData,
+      poll: sanitizedPoll,
+      event: sanitizedEvent,
+      status,
+    };
     
     if (isEditing && newsletter && onUpdate) {
       onUpdate(newsletter.id, data);
@@ -297,6 +382,123 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
       e.preventDefault();
       addTag();
     }
+  };
+
+  const handleAddPoll = () => {
+    setFormData((prev) => ({
+      ...prev,
+      poll: {
+        id: `poll-${Date.now()}`,
+        question: '',
+        options: [
+          { id: 'opt-1', text: '', votes: 0, voterUserIds: [] },
+          { id: 'opt-2', text: '', votes: 0, voterUserIds: [] },
+        ],
+        createdAt: new Date().toISOString(),
+      },
+    }));
+  };
+
+  const handleRemovePoll = () => {
+    setFormData((prev) => ({
+      ...prev,
+      poll: null,
+    }));
+  };
+
+  const handleUpdatePollQuestion = (question: string) => {
+    setFormData((prev) => (prev.poll ? {
+      ...prev,
+      poll: {
+        ...prev.poll,
+        question,
+      },
+    } : prev));
+  };
+
+  const handleAddPollOption = () => {
+    setFormData((prev) => {
+      if (!prev.poll) return prev;
+      const nextId = `opt-${prev.poll.options.length + 1}`;
+      return {
+        ...prev,
+        poll: {
+          ...prev.poll,
+          options: [...prev.poll.options, { id: nextId, text: '', votes: 0, voterUserIds: [] }],
+        },
+      };
+    });
+  };
+
+  const handleUpdatePollOption = (index: number, text: string) => {
+    setFormData((prev) => {
+      if (!prev.poll) return prev;
+      const nextOptions = [...prev.poll.options];
+      if (nextOptions[index]) {
+        nextOptions[index] = { ...nextOptions[index], text };
+      }
+      return {
+        ...prev,
+        poll: {
+          ...prev.poll,
+          options: nextOptions,
+        },
+      };
+    });
+  };
+
+  const handleRemovePollOption = (index: number) => {
+    setFormData((prev) => {
+      if (!prev.poll || prev.poll.options.length <= 2) return prev;
+      return {
+        ...prev,
+        poll: {
+          ...prev.poll,
+          options: prev.poll.options.filter((_, i) => i !== index),
+        },
+      };
+    });
+  };
+
+  const handleAddEvent = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(14, 0, 0, 0);
+    const startStr = tomorrow.toISOString().slice(0, 16);
+
+    const endHour = new Date(tomorrow);
+    endHour.setHours(15, 30, 0, 0);
+    const endStr = endHour.toISOString().slice(0, 16);
+
+    setFormData((prev) => ({
+      ...prev,
+      event: {
+        id: `event-${Date.now()}`,
+        title: prev.title.trim() ? `${prev.title.trim()}` : '',
+        description: '',
+        startDate: startStr,
+        endDate: endStr,
+        location: '',
+        attendees: [],
+      },
+    }));
+  };
+
+  const handleRemoveEvent = () => {
+    setFormData((prev) => ({
+      ...prev,
+      event: null,
+    }));
+  };
+
+  const handleUpdateEvent = (fields: Partial<NewsletterEvent>) => {
+    setFormData((prev) => (prev.event ? {
+      ...prev,
+      event: {
+        ...prev.event,
+        ...fields,
+      },
+    } : prev));
   };
 
   if (showPreview) {
@@ -375,6 +577,28 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
               className="newsletter-article"
               dir="auto"
             />
+
+            {/* Event Preview */}
+            {formData.event && formData.event.title && formData.event.startDate && (
+              <div className="mt-8">
+                <NewsletterEventCard
+                  event={formData.event}
+                  newsletterId={autoSaveDraftId || 'preview'}
+                  isInteractive={false}
+                />
+              </div>
+            )}
+
+            {/* Poll Preview */}
+            {formData.poll && formData.poll.question && (
+              <div className="mt-8">
+                <NewsletterPollCard
+                  poll={formData.poll}
+                  newsletterId={autoSaveDraftId || 'preview'}
+                  isInteractive={false}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -531,6 +755,202 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
             title={formData.title || t('manager.editorTitleFallback')}
             onUploadPresentation={handleUploadPresentation}
           />
+        </div>
+
+        {/* Interactive Add-ons (Poll & Event) */}
+        <div className="space-y-4 rounded-xl border border-[#E5E5E5] bg-[#FAFAFA] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-[#171717]">
+                {t('viewer.poll')} &amp; {t('viewer.event')}
+              </h3>
+              <p className="text-xs text-[#737373]">
+                {t('manager.eventDescriptionPlaceholder')}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {!formData.poll && (
+                <button
+                  type="button"
+                  onClick={handleAddPoll}
+                  className="btn-secondary flex items-center gap-1.5 text-xs py-1.5"
+                >
+                  <HugeiconsIcon icon={BarChartIcon} className="w-3.5 h-3.5 -scale-y-100 text-[#D93A3A]" />
+                  <span>{t('manager.addPoll')}</span>
+                </button>
+              )}
+              {!formData.event && (
+                <button
+                  type="button"
+                  onClick={handleAddEvent}
+                  className="btn-secondary flex items-center gap-1.5 text-xs py-1.5"
+                >
+                  <HugeiconsIcon icon={Calendar01Icon} className="w-3.5 h-3.5 text-[#D93A3A]" />
+                  <span>{t('manager.addEvent')}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Poll Editor Card */}
+          {formData.poll && (
+            <div className="rounded-xl border border-[#E5E5E5] bg-white p-4 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-[#F0F0F0]">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-[#D93A3A]">
+                    <HugeiconsIcon icon={BarChartIcon} className="w-4 h-4 -scale-y-100" />
+                  </div>
+                  <span className="font-semibold text-sm text-[#171717]">{t('manager.pollQuestion')}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemovePoll}
+                  className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1 cursor-pointer"
+                >
+                  <HugeiconsIcon icon={Delete02Icon} className="w-3.5 h-3.5" />
+                  <span>{t('manager.removePoll')}</span>
+                </button>
+              </div>
+
+              <div>
+                <input
+                  type="text"
+                  value={formData.poll.question}
+                  onChange={(e) => handleUpdatePollQuestion(e.target.value)}
+                  dir={isRTL ? 'rtl' : 'ltr'}
+                  placeholder={t('manager.pollQuestionPlaceholder')}
+                  className="w-full text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-[#525252]">
+                  {t('manager.pollOptions')}
+                </label>
+                {formData.poll.options.map((opt, idx) => (
+                  <div key={opt.id || idx} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={opt.text}
+                      onChange={(e) => handleUpdatePollOption(idx, e.target.value)}
+                      dir={isRTL ? 'rtl' : 'ltr'}
+                      placeholder={t('manager.pollOptionPlaceholder', { index: idx + 1 })}
+                      className="flex-1 text-sm py-1.5"
+                    />
+                    {formData.poll!.options.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePollOption(idx)}
+                        className="p-1.5 text-[#A3A3A3] hover:text-red-600 transition-colors cursor-pointer"
+                        title={t('manager.removeOption')}
+                      >
+                        <HugeiconsIcon icon={Delete02Icon} className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={handleAddPollOption}
+                  className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[#D93A3A] hover:text-[#B91C1C] transition-colors cursor-pointer"
+                >
+                  <HugeiconsIcon icon={Add01Icon} className="w-3.5 h-3.5" />
+                  <span>{t('manager.addOption')}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Event Editor Card */}
+          {formData.event && (
+            <div className="rounded-xl border border-[#E5E5E5] bg-white p-4 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-[#F0F0F0]">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-[#D93A3A]">
+                    <HugeiconsIcon icon={Calendar03Icon} className="w-4 h-4" />
+                  </div>
+                  <span className="font-semibold text-sm text-[#171717]">{t('viewer.event')}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveEvent}
+                  className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1 cursor-pointer"
+                >
+                  <HugeiconsIcon icon={Delete02Icon} className="w-3.5 h-3.5" />
+                  <span>{t('manager.removeEvent')}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-[#525252] mb-1">
+                    {t('manager.eventTitle')} *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.event.title}
+                    onChange={(e) => handleUpdateEvent({ title: e.target.value })}
+                    dir={isRTL ? 'rtl' : 'ltr'}
+                    placeholder={t('manager.eventTitlePlaceholder')}
+                    className="w-full text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#525252] mb-1">
+                    {t('manager.eventStartDate')} *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={eventDateTimeInput(formData.event.startDate)}
+                    onChange={(e) => handleUpdateEvent({ startDate: e.target.value })}
+                    className="w-full text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#525252] mb-1">
+                    {t('manager.eventEndDate')}
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={eventDateTimeInput(formData.event.endDate)}
+                    onChange={(e) => handleUpdateEvent({ endDate: e.target.value })}
+                    className="w-full text-sm"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-[#525252] mb-1">
+                    {t('manager.eventLocation')}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.event.location || ''}
+                    onChange={(e) => handleUpdateEvent({ location: e.target.value })}
+                    dir={isRTL ? 'rtl' : 'ltr'}
+                    placeholder={t('manager.eventLocationPlaceholder')}
+                    className="w-full text-sm"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-[#525252] mb-1">
+                    {t('manager.eventDescription')}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formData.event.description || ''}
+                    onChange={(e) => handleUpdateEvent({ description: e.target.value })}
+                    dir={isRTL ? 'rtl' : 'ltr'}
+                    placeholder={t('manager.eventDescriptionPlaceholder')}
+                    className="w-full text-sm rounded-lg border border-[#E5E5E5] p-2.5 focus:border-[#D93A3A] focus:outline-hidden"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}

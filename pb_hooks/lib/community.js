@@ -156,7 +156,10 @@ function createPost(e) {
   c.enforceRateLimit(app, kind === 'reply' ? 'reply' : 'post', authorId);
 
   var mediaIds = Array.isArray(body.mediaIds) ? body.mediaIds : [];
-  var validation = c.validatePostInput(body.body, mediaIds.length, Boolean(quotedPostId));
+  var poll = body.poll && typeof body.poll === 'object' && body.poll.question ? body.poll : null;
+  var event = body.event && typeof body.event === 'object' && body.event.title ? body.event : null;
+  var hasAddon = Boolean(poll || event);
+  var validation = c.validatePostInput(body.body, mediaIds.length, Boolean(quotedPostId), hasAddon);
   if (!validation.ok) {
     throw new BadRequestError(validation.message);
   }
@@ -248,6 +251,8 @@ function createPost(e) {
       status: 'published',
       sensitive: body.sensitive === true,
       clientId: clientId,
+      poll: poll || {},
+      event: event || {},
     });
     tx.save(record);
 
@@ -278,35 +283,6 @@ function createPost(e) {
   }
 
   content().touchHashtags(app, parsed.hashtags, displayMap, 1);
-
-  function notify(userId, kind) {
-    content().createNotification(app, {
-      userId: userId,
-      kind: kind,
-      actorId: authorId,
-      actorHandle: profile.getString('handle'),
-      actorName: profile.getString('displayName'),
-      actorAvatarUrl: c.profileAvatarUrl(app, profile),
-      postId: String(created.id),
-      rootId: created.getString('rootId') || String(created.id),
-      preview: c.buildPreview(validation.body),
-    });
-  }
-
-  if (parent) {
-    notify(parent.getString('authorId'), 'reply');
-  }
-
-  if (quoted) {
-    notify(quoted.getString('authorId'), 'quote');
-  }
-
-  mentionIds.forEach(function (userId) {
-    if (parent && userId === parent.getString('authorId')) {
-      return;
-    }
-    notify(userId, 'mention');
-  });
 
   return content().serializePosts(app, [created], authorId, c.getAuthRole(e.auth))[0];
 }
@@ -621,6 +597,130 @@ function toggleBookmark(e, postId) {
   });
 }
 
+function votePoll(e, postId) {
+  var c = core();
+  var app = e.app;
+  var viewer = viewerContext(e);
+  c.requireAuth(e.auth);
+  var body = e.requestInfo().body || {};
+  var optionId = c.asText(body.optionId).trim();
+  if (!optionId) {
+    throw new BadRequestError('optionId is required.');
+  }
+
+  var post = c.findByIdOrNull(app, 'community_posts', postId);
+  if (!post || post.getString('status') !== 'published') {
+    throw new NotFoundError('That post is no longer available.');
+  }
+
+  var poll = c.readJson(post, 'poll', null);
+  if (!poll || !Array.isArray(poll.options) || !poll.options.length) {
+    throw new BadRequestError('This post does not have a poll.');
+  }
+  if (poll.closed) {
+    throw new BadRequestError('This poll is closed.');
+  }
+
+  var userId = viewer.id;
+  var existingVotedOptionId = null;
+  poll.options.forEach(function (opt) {
+    var voters = Array.isArray(opt.voterUserIds) ? opt.voterUserIds : [];
+    if (voters.indexOf(userId) !== -1) {
+      existingVotedOptionId = opt.id;
+    }
+  });
+
+  var isUnvoting = existingVotedOptionId === optionId;
+  var nextOptions = poll.options.map(function (opt) {
+    var voters = Array.isArray(opt.voterUserIds) ? opt.voterUserIds.filter(function (id) { return id !== userId; }) : [];
+    if (!isUnvoting && opt.id === optionId) {
+      voters.push(userId);
+    }
+    return {
+      id: opt.id,
+      text: opt.text,
+      votes: voters.length,
+      voterUserIds: voters,
+    };
+  });
+
+  var updatedPoll = {
+    id: poll.id,
+    question: poll.question,
+    options: nextOptions,
+    closed: Boolean(poll.closed),
+    createdAt: poll.createdAt,
+  };
+
+  app.runInTransaction(function (tx) {
+    post.set('poll', updatedPoll);
+    tx.save(post);
+  });
+
+  return { ok: true, poll: updatedPoll };
+}
+
+function rsvpEvent(e, postId) {
+  var c = core();
+  var app = e.app;
+  var viewer = viewerContext(e);
+  c.requireAuth(e.auth);
+
+  var post = c.findByIdOrNull(app, 'community_posts', postId);
+  if (!post || post.getString('status') !== 'published') {
+    throw new NotFoundError('That post is no longer available.');
+  }
+
+  var event = c.readJson(post, 'event', null);
+  if (!event || !event.title) {
+    throw new BadRequestError('This post does not have a scheduled event.');
+  }
+
+  var profile = c.findProfileByUserId(app, viewer.id);
+  var name = profile ? (profile.getString('displayName') || profile.getString('handle')) : 'User';
+  var avatar = profile ? c.profileAvatarUrl(app, profile) : '';
+
+  var attendees = Array.isArray(event.attendees) ? event.attendees : [];
+  var existingIdx = -1;
+  attendees.forEach(function (att, idx) {
+    if (att && att.userId === viewer.id) {
+      existingIdx = idx;
+    }
+  });
+
+  var nextAttendees = attendees.slice();
+  var attending = false;
+  if (existingIdx !== -1) {
+    nextAttendees.splice(existingIdx, 1);
+    attending = false;
+  } else {
+    nextAttendees.push({
+      userId: viewer.id,
+      name: name,
+      avatar: avatar,
+      rsvpAt: new Date().toISOString(),
+    });
+    attending = true;
+  }
+
+  var updatedEvent = {
+    id: event.id,
+    title: event.title,
+    description: event.description || '',
+    startDate: event.startDate,
+    endDate: event.endDate || '',
+    location: event.location || '',
+    attendees: nextAttendees,
+  };
+
+  app.runInTransaction(function (tx) {
+    post.set('event', updatedEvent);
+    tx.save(post);
+  });
+
+  return { ok: true, attending: attending, event: updatedEvent };
+}
+
 function toggleFollow(e, handle) {
   var c = core();
   var app = e.app;
@@ -857,7 +957,7 @@ function getMe(e) {
   var unread = 0;
 
   try {
-    unread = app.findRecordsByFilter('community_notifications', 'userId = {:userId} && isRead = false', '', 0, 0, { userId: viewer.id }).length;
+    unread = app.countRecords('community_notifications', $dbx.hashExp({ userId: viewer.id, isRead: false }));
   } catch (_) {}
 
   return {
@@ -1145,7 +1245,7 @@ function listNotifications(e) {
 
   var unread = 0;
   try {
-    unread = app.findRecordsByFilter('community_notifications', 'userId = {:userId} && isRead = false', '', 0, 0, { userId: viewer.id }).length;
+    unread = app.countRecords('community_notifications', $dbx.hashExp({ userId: viewer.id, isRead: false }));
   } catch (_) {}
 
   var result = pageResult(records, limit, function (page) {
@@ -1162,6 +1262,9 @@ function markNotificationsRead(e) {
   c.requireAuth(e.auth);
 
   var body = e.requestInfo().body || {};
+  if (body.ids !== undefined && (!Array.isArray(body.ids) || body.ids.length > 200 || body.ids.some(function (id) { return typeof id !== 'string' || !id; }))) {
+    throw new BadRequestError('Provide up to 200 notification ids, or an empty array to mark all read.');
+  }
   var ids = Array.isArray(body.ids) ? c.uniqueStrings(body.ids).slice(0, 200) : [];
   var updated = 0;
 
@@ -1173,7 +1276,7 @@ function markNotificationsRead(e) {
       params.userId = viewer.id;
       records = tx.findRecordsByFilter('community_notifications', built.filter + ' && userId = {:userId}', '', 200, 0, params);
     } else {
-      records = tx.findRecordsByFilter('community_notifications', 'userId = {:userId} && isRead = false', '', 500, 0, { userId: viewer.id });
+      records = tx.findRecordsByFilter('community_notifications', 'userId = {:userId} && isRead = false', '', 0, 0, { userId: viewer.id });
     }
 
     records.forEach(function (record) {
@@ -1628,6 +1731,8 @@ module.exports = {
   toggleLike: toggleLike,
   toggleRepost: toggleRepost,
   toggleBookmark: toggleBookmark,
+  votePoll: votePoll,
+  rsvpEvent: rsvpEvent,
   toggleFollow: toggleFollow,
   listFeed: listFeed,
   getThread: getThread,

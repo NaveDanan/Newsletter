@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Add01Icon, CheckmarkCircle02Icon, Clock01Icon, Delete02Icon, Edit02Icon, FileAttachmentIcon, Globe02Icon, GlobeXIcon, Loading02Icon, Mail01Icon, Search01Icon, ViewIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, BarChartIcon, Calendar03Icon, CheckmarkCircle02Icon, Clock01Icon, Delete02Icon, Edit02Icon, FileAttachmentIcon, Globe02Icon, GlobeXIcon, Loading02Icon, Mail01Icon, Search01Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -274,6 +274,18 @@ export function NewsletterList({
                           </span>
                         )}
                       </span>
+                      {newsletter.event && (
+                        <span className="flex-shrink-0 flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          <HugeiconsIcon icon={Calendar03Icon} className="w-3 h-3" />
+                          {t('viewer.event')}
+                        </span>
+                      )}
+                      {newsletter.poll && (
+                        <span className="flex-shrink-0 flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          <HugeiconsIcon icon={BarChartIcon} className="w-3 h-3 -scale-y-100" />
+                          {t('viewer.poll')}
+                        </span>
+                      )}
                     </div>
 
                     {/* Meta */}

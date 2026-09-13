@@ -347,33 +347,7 @@ function handleLinkPreview(e) {
 // ---------------------------------------------------------------------------
 
 function createNotification(app, options) {
-  var c = core();
-  var userId = c.asText(options.userId);
-  var actorId = c.asText(options.actorId);
-
-  if (!userId || !actorId || userId === actorId) {
-    return;
-  }
-
-  try {
-    var record = c.newRecord(app, 'community_notifications');
-    c.setValues(record, {
-      userId: userId,
-      actorId: actorId,
-      actorHandle: c.asText(options.actorHandle),
-      actorName: c.asText(options.actorName),
-      actorAvatarUrl: c.asText(options.actorAvatarUrl),
-      kind: c.asText(options.kind),
-      postId: c.asText(options.postId),
-      rootId: c.asText(options.rootId),
-      preview: c.truncate(c.asText(options.preview), 300),
-      isRead: false,
-    });
-    app.save(record);
-  } catch (_) {
-    // The unique (userId, actorId, kind, postId) index collapses repeats such as
-    // an unlike/like cycle into a single notification.
-  }
+  return require(__hooks + '/lib/notifications.js').create(app, options);
 }
 
 function removeNotification(app, userId, actorId, kind, postId) {
@@ -406,6 +380,7 @@ function serializeNotification(record) {
     postId: record.getString('postId'),
     rootId: record.getString('rootId'),
     preview: record.getString('preview'),
+    targetPath: record.getString('targetPath'),
     isRead: record.getBool('isRead'),
     createdAt: record.getString('created'),
   };
@@ -605,6 +580,8 @@ function serializePost(app, post, ctx) {
     reposted: Boolean(viewerState.reposts[id]),
     bookmarked: Boolean(viewerState.bookmarks[id]),
     removedReason: post.getString('removedReason'),
+    poll: c.readJson(post, 'poll', null),
+    event: c.readJson(post, 'event', null),
     author: {
       userId: authorId,
       handle: post.getString('authorHandle'),

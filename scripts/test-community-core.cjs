@@ -157,6 +157,7 @@ assert.equal(community.validatePostInput('', 0, false).ok, false);
 assert.equal(community.validatePostInput('   ', 0, false).ok, false);
 assert.equal(community.validatePostInput('', 1, false).ok, true, 'media-only posts are allowed');
 assert.equal(community.validatePostInput('', 0, true).ok, true, 'quote-only posts are allowed');
+assert.equal(community.validatePostInput('', 0, false, true).ok, true, 'poll or event addon-only posts are allowed');
 assert.equal(community.validatePostInput('hi', 5, false).ok, false, 'at most four attachments');
 assert.equal(community.validatePostInput('x'.repeat(5001), 0, false).ok, false);
 assert.equal(community.validatePostInput('x'.repeat(5000), 0, false).ok, true);
@@ -258,7 +259,7 @@ assert.match(community.hashKey('https://example.com'), /^[0-9a-f]{32}$/);
 assert.deepEqual(Array.from(community.FEED_TABS), ['for-you', 'following', 'latest']);
 assert.deepEqual(Array.from(community.PROFILE_TABS), ['posts', 'replies', 'reposts', 'media', 'likes']);
 assert.deepEqual(Array.from(community.POST_KINDS), ['post', 'reply', 'quote']);
-assert.deepEqual(Array.from(community.NOTIFICATION_KINDS), ['like', 'reply', 'repost', 'quote', 'follow', 'mention']);
+assert.deepEqual(Array.from(community.NOTIFICATION_KINDS), ['like', 'reply', 'repost', 'quote', 'follow', 'mention', 'comment', 'following_post', 'event', 'newsletter']);
 assert.equal(community.MAX_BODY_LENGTH, 5000);
 assert.equal(community.MAX_MEDIA_PER_POST, 4);
 

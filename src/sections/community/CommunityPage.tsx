@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useCommunityEngagement } from '@/hooks/useCommunityEngagement';
+import { useNotificationCount } from '@/contexts/NotificationsContext';
 import { useCommunitySession } from '@/hooks/useCommunitySession';
 import {
   communityBookmarksPath,
@@ -169,7 +170,7 @@ export function CommunityPage({
     session,
   ]);
 
-  const unreadCount = session ? session.unreadNotifications : 0;
+  const unreadCount = useNotificationCount();
 
   const renderSection = () => {
     if (route.section === 'post') {

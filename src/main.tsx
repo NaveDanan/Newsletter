@@ -6,6 +6,7 @@ import { BootErrorBoundary } from './components/BootErrorBoundary.tsx'
 import { AuthProvider } from './contexts/AuthContext.tsx'
 import { LocaleProvider } from './contexts/LocaleContext.tsx'
 import { NavigationDataProvider } from './contexts/NavigationDataContext.tsx'
+import { NotificationsProvider } from './contexts/NotificationsContext.tsx'
 import { bootLogger } from './lib/bootLogger.ts'
 
 bootLogger.once('bootstrap:module-evaluated', () => {
@@ -59,7 +60,7 @@ root.render(
       <LocaleProvider>
         <AuthProvider>
           <NavigationDataProvider>
-            <App />
+            <NotificationsProvider><App /></NotificationsProvider>
           </NavigationDataProvider>
         </AuthProvider>
       </LocaleProvider>

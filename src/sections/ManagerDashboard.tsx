@@ -172,6 +172,17 @@ export function ManagerDashboard({
     return sendNewsletterUpdate(id);
   };
 
+  const handleTogglePublish = (newsletter: Newsletter) => {
+    const nextStatus = newsletter.status === 'published' ? 'draft' : 'published';
+    const patchData: Partial<NewsletterFormData> = {
+      status: nextStatus,
+    };
+    if (nextStatus === 'published' && (!newsletter.publishedAt || newsletter.publishedAt === '-')) {
+      patchData.publishedAt = new Date().toISOString().split('T')[0];
+    }
+    return updateNewsletter(newsletter.id, patchData);
+  };
+
   const handleBackToList = () => {
     setViewMode('list');
     setEditingNewsletter(null);
@@ -252,6 +263,7 @@ export function ManagerDashboard({
             onDelete={handleDeleteNewsletter}
             onSendUpdate={handleSendNewsletterUpdate}
             onView={handleViewNewsletter}
+            onTogglePublish={handleTogglePublish}
             canCreate={canCreateNewsletter(currentUserRole)}
             canEdit={(newsletter) => canEditNewsletter(currentUserRole, currentUser?.id, newsletter)}
             canDelete={() => canDeleteNewsletter(currentUserRole)}
@@ -268,6 +280,7 @@ export function ManagerDashboard({
           onDelete={handleDeleteNewsletter}
           onSendUpdate={handleSendNewsletterUpdate}
           onView={handleViewNewsletter}
+          onTogglePublish={handleTogglePublish}
           canCreate={canCreateNewsletter(currentUserRole)}
           canEdit={(newsletter) => canEditNewsletter(currentUserRole, currentUser?.id, newsletter)}
           canDelete={() => canDeleteNewsletter(currentUserRole)}

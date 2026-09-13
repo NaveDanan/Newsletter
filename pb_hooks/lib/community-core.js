@@ -26,7 +26,7 @@ var REPORT_REASONS = ['spam', 'abuse', 'harassment', 'misinformation', 'sensitiv
 var REPORT_STATUSES = ['open', 'resolved', 'dismissed'];
 var NOTIFICATION_KINDS = ['like', 'reply', 'repost', 'quote', 'follow', 'mention'];
 var FEED_TABS = ['for-you', 'following', 'latest'];
-var PROFILE_TABS = ['posts', 'replies', 'media', 'likes'];
+var PROFILE_TABS = ['posts', 'replies', 'reposts', 'media', 'likes'];
 
 // Word characters for hashtags and handles. Goja does not reliably support
 // unicode property escapes, so the Hebrew and Arabic blocks are listed out.

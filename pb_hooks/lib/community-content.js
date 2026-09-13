@@ -594,6 +594,8 @@ function serializePost(app, post, ctx) {
     sensitive: post.getBool('sensitive'),
     createdAt: post.getString('created'),
     updatedAt: post.getString('updated'),
+    isEdited: post.getBool('isEdited') || Boolean(post.getString('editedAt')),
+    editedAt: post.getString('editedAt'),
     likeCount: post.getInt('likeCount'),
     replyCount: post.getInt('replyCount'),
     repostCount: post.getInt('repostCount'),

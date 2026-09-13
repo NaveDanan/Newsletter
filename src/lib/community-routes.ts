@@ -125,6 +125,21 @@ export function parseCommunityRoute(pathname: string): CommunityRoute | null {
     return { ...DEFAULT_ROUTE, section: 'post', postId, pathname: communityPostPath(postId) };
   }
 
+  if (head === 'profile') {
+    const modifier = rest[0] ?? '';
+    const profileTab = (COMMUNITY_PROFILE_TABS as readonly string[]).includes(modifier)
+      ? (modifier as CommunityProfileTab)
+      : 'posts';
+
+    return {
+      ...DEFAULT_ROUTE,
+      section: 'profile',
+      handle: 'me',
+      profileTab,
+      pathname: `${COMMUNITY_ROOT}/profile${profileTab === 'posts' ? '' : '/' + profileTab}`,
+    };
+  }
+
   if (head === 'u' && rest[0]) {
     const handle = decode(rest[0]).toLowerCase();
     const modifier = rest[1] ?? '';

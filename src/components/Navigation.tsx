@@ -63,6 +63,7 @@ export function Navigation({
   const { t } = useLocale();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { dropdowns, links: navigationLinks } = useNavigationData();
+  const isCommunityRoute = activeTab === 'community';
 
   const resolvedDropdowns = useMemo(() => {
     const items = [...dropdowns];
@@ -274,18 +275,22 @@ export function Navigation({
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            <ExpandingSearchDock
-              onSearch={onSearch}
-              onQueryChange={onSearchChange}
-              placeholder={t('nav.searchPlaceholder')}
-            />
-            <AccountMenu
-              onProfileClick={onProfileClick}
-              onManagerClick={onManagerClick}
-              onSignInClick={onSignInClick}
-              onSignOut={onSignOut}
-              className="hidden sm:block"
-            />
+            {isCommunityRoute ? null : (
+              <>
+                <ExpandingSearchDock
+                  onSearch={onSearch}
+                  onQueryChange={onSearchChange}
+                  placeholder={t('nav.searchPlaceholder')}
+                />
+                <AccountMenu
+                  onProfileClick={onProfileClick}
+                  onManagerClick={onManagerClick}
+                  onSignInClick={onSignInClick}
+                  onSignOut={onSignOut}
+                  className="hidden sm:block"
+                />
+              </>
+            )}
 
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

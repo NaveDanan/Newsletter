@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Add01Icon, CheckmarkCircle02Icon, Clock01Icon, Delete02Icon, Edit02Icon, FileAttachmentIcon, Loading02Icon, Mail01Icon, Search01Icon, ViewIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, CheckmarkCircle02Icon, Clock01Icon, Delete02Icon, Edit02Icon, FileAttachmentIcon, Globe02Icon, GlobeXIcon, Loading02Icon, Mail01Icon, Search01Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -13,6 +13,7 @@ interface NewsletterListProps {
   onDelete: (id: string) => Promise<boolean> | boolean;
   onSendUpdate: (id: string) => Promise<number | null> | number | null;
   onView: (newsletter: Newsletter) => void;
+  onTogglePublish: (newsletter: Newsletter) => Promise<Newsletter | boolean | null> | Newsletter | boolean | null;
   canCreate: boolean;
   canEdit: (newsletter: Newsletter) => boolean;
   canDelete: () => boolean;
@@ -26,6 +27,7 @@ export function NewsletterList({
   onDelete,
   onSendUpdate,
   onView,
+  onTogglePublish,
   canCreate,
   canEdit,
   canDelete,
@@ -37,6 +39,7 @@ export function NewsletterList({
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sendingUpdateId, setSendingUpdateId] = useState<string | null>(null);
+  const [togglingPublishId, setTogglingPublishId] = useState<string | null>(null);
 
   const filteredNewsletters = newsletters
     .filter(n => filter === 'all' ? true : n.status === filter)
@@ -92,6 +95,31 @@ export function NewsletterList({
       // The send callback handles user-facing error messages.
     } finally {
       setSendingUpdateId(null);
+    }
+  };
+
+  const handleTogglePublish = async (newsletter: Newsletter) => {
+    if (togglingPublishId) {
+      return;
+    }
+
+    setTogglingPublishId(newsletter.id);
+    const isPublishing = newsletter.status !== 'published';
+
+    try {
+      const result = await onTogglePublish(newsletter);
+
+      if (result) {
+        toast.success(
+          isPublishing
+            ? t('manager.newsletterPublished')
+            : t('manager.newsletterUnpublished')
+        );
+      }
+    } catch {
+      // The update callback handles user-facing error messages.
+    } finally {
+      setTogglingPublishId(null);
     }
   };
 
@@ -195,6 +223,7 @@ export function NewsletterList({
               const canDeleteCurrent = canDelete();
               const canSendUpdateCurrent = canSendUpdate() && newsletter.status === 'published';
               const isSendingUpdate = sendingUpdateId === newsletter.id;
+              const isTogglingPublish = togglingPublishId === newsletter.id;
 
               return (
                 <div
@@ -295,6 +324,39 @@ export function NewsletterList({
                         title={t('manager.edit')}
                       >
                         <HugeiconsIcon icon={Edit02Icon} className="w-4 h-4" />
+                      </button>
+                    )}
+                    {canEditCurrent && (
+                      <button
+                        onClick={() => handleTogglePublish(newsletter)}
+                        disabled={Boolean(togglingPublishId)}
+                        className={cn(
+                          'p-2 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-60',
+                          newsletter.status === 'published'
+                            ? 'text-[#737373] hover:text-amber-600 hover:bg-amber-50'
+                            : 'text-[#737373] hover:text-green-600 hover:bg-green-50'
+                        )}
+                        title={
+                          newsletter.status === 'published'
+                            ? t('manager.unpublish')
+                            : t('manager.publish')
+                        }
+                        aria-label={
+                          newsletter.status === 'published'
+                            ? t('manager.unpublish')
+                            : t('manager.publish')
+                        }
+                      >
+                        <HugeiconsIcon
+                          icon={
+                            isTogglingPublish
+                              ? Loading02Icon
+                              : newsletter.status === 'published'
+                              ? GlobeXIcon
+                              : Globe02Icon
+                          }
+                          className={cn('w-4 h-4', isTogglingPublish && 'animate-spin')}
+                        />
                       </button>
                     )}
                     {canSendUpdateCurrent && (

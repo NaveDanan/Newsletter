@@ -96,6 +96,8 @@ export const COMMUNITY_POSTS_SCHEMA = {
     number('bookmarkCount', 0, { onlyInt: true }),
     text('status', 20),
     bool('sensitive'),
+    bool('isEdited'),
+    text('editedAt', 40),
     text('removedById', 255),
     text('removedReason', 500),
     text('removedAt', 40),

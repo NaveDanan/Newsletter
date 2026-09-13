@@ -4,7 +4,6 @@ import {
   DashboardSquare01Icon,
   GlobeIcon,
   Logout01Icon,
-  UserIcon,
 } from '@hugeicons/core-free-icons';
 import { UserAvatarCircle } from '@/components/UserAvatarCircle';
 import {
@@ -113,11 +112,6 @@ export function AccountMenu({
         </DropdownMenuItem>
 
         <DropdownMenuSeparator className="my-1.5 bg-[#E5E5E5]" />
-
-        <DropdownMenuItem className={ITEM_CLASS} onSelect={() => { run(onProfileClick); }}>
-          <HugeiconsIcon icon={UserIcon} className="size-4 text-[#737373]" />
-          {t('account.profile')}
-        </DropdownMenuItem>
 
         {showManage ? (
           <DropdownMenuItem className={ITEM_CLASS} onSelect={() => { run(onManagerClick); }}>

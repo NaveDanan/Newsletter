@@ -6,16 +6,17 @@ interface CommunityAvatarProps {
   handle: string;
   displayName: string;
   avatarUrl: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   className?: string;
   onClick?: () => void;
 }
 
-const SIZE_CLASS: Record<'sm' | 'md' | 'lg' | 'xl', string> = {
+const SIZE_CLASS: Record<'sm' | 'md' | 'lg' | 'xl' | '2xl', string> = {
   sm: 'size-8',
   md: 'size-10',
   lg: 'size-12',
   xl: 'size-24 border-4 border-white',
+  '2xl': 'size-28 sm:size-36 border-4 border-white shadow-sm ring-1 ring-black/5',
 };
 
 // Falls back to the first letter of the display name, then of the handle. A
@@ -48,7 +49,7 @@ export function CommunityAvatar({
         alt={displayName || handle || 'Avatar'}
         className="object-cover"
       />
-      <AvatarFallback className="bg-gradient-to-br from-[#D93A3A] to-[#B91C1C] text-sm font-semibold text-white">
+      <AvatarFallback className={cn("bg-gradient-to-br from-[#D93A3A] to-[#B91C1C] font-semibold text-white", size === '2xl' ? 'text-3xl sm:text-4xl' : size === 'xl' ? 'text-xl' : 'text-sm')}>
         {initialsOf(displayName, handle)}
       </AvatarFallback>
     </Avatar>

@@ -256,7 +256,7 @@ assert.match(community.hashKey('https://example.com'), /^[0-9a-f]{32}$/);
 // --- Constants -------------------------------------------------------------
 
 assert.deepEqual(Array.from(community.FEED_TABS), ['for-you', 'following', 'latest']);
-assert.deepEqual(Array.from(community.PROFILE_TABS), ['posts', 'replies', 'media', 'likes']);
+assert.deepEqual(Array.from(community.PROFILE_TABS), ['posts', 'replies', 'reposts', 'media', 'likes']);
 assert.deepEqual(Array.from(community.POST_KINDS), ['post', 'reply', 'quote']);
 assert.deepEqual(Array.from(community.NOTIFICATION_KINDS), ['like', 'reply', 'repost', 'quote', 'follow', 'mention']);
 assert.equal(community.MAX_BODY_LENGTH, 5000);

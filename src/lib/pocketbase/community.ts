@@ -204,6 +204,8 @@ export function mapCommunityPost(raw: unknown, depth = 0): CommunityPost {
     sensitive: bool(value.sensitive),
     createdAt: str(value.createdAt),
     updatedAt: str(value.updatedAt),
+    isEdited: bool(value.isEdited) || Boolean(str(value.editedAt)),
+    editedAt: str(value.editedAt),
     likeCount: num(value.likeCount),
     replyCount: num(value.replyCount),
     repostCount: num(value.repostCount),
@@ -460,6 +462,18 @@ export async function createCommunityPost(draft: {
     sensitive: draft.sensitive === true,
   };
   return mapCommunityPost(await sendJson('/api/community/posts', 'POST', payload));
+}
+
+export async function updateCommunityPost(
+  postId: string,
+  patch: { body: string; mediaIds?: string[]; sensitive?: boolean },
+): Promise<CommunityPost> {
+  const payload = {
+    body: patch.body,
+    mediaIds: patch.mediaIds,
+    sensitive: patch.sensitive,
+  };
+  return mapCommunityPost(await sendJson(`/api/community/posts/${encodeURIComponent(postId)}`, 'PATCH', payload));
 }
 
 export async function deleteCommunityPost(postId: string): Promise<void> {

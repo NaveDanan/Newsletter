@@ -50,6 +50,10 @@ routerAdd('POST', '/api/community/posts', function (e) {
   return e.json(200, require(__hooks + '/lib/community.js').createPost(e));
 }, $apis.bodyLimit(131072), $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
 
+routerAdd('PATCH', '/api/community/posts/{id}', function (e) {
+  return e.json(200, require(__hooks + '/lib/community.js').updatePost(e, e.request.pathValue('id')));
+}, $apis.bodyLimit(131072), $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
+
 routerAdd('DELETE', '/api/community/posts/{id}', function (e) {
   return e.json(200, require(__hooks + '/lib/community.js').deletePost(e, e.request.pathValue('id')));
 }, $apis.requireAuth('users'), $apis.skipSuccessActivityLog());

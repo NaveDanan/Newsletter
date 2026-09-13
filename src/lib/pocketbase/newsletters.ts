@@ -101,6 +101,7 @@ function buildNewsletterCorePayload(data: NewsletterFormData) {
     textAlignment: inferNewsletterTextAlignment(data.content),
     tags: data.tags,
     status: data.status,
+    ...(data.publishedAt ? { publishedAt: data.publishedAt } : {}),
   };
 }
 

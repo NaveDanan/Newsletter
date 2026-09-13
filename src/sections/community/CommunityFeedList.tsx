@@ -26,6 +26,9 @@ interface CommunityFeedListProps {
   emptyMessage: string;
   onModerated?: (postId: string, status: CommunityPost['status']) => void;
   className?: string;
+  repostedBy?: string | ((post: CommunityPost) => string | undefined);
+  emptyContent?: React.ReactNode;
+  afterFeedContent?: React.ReactNode;
 }
 
 function PostSkeleton() {
@@ -53,6 +56,9 @@ export function CommunityFeedList({
   emptyMessage,
   onModerated,
   className,
+  repostedBy,
+  emptyContent,
+  afterFeedContent,
 }: CommunityFeedListProps) {
   const { t } = useLocale();
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -106,6 +112,9 @@ export function CommunityFeedList({
   }
 
   if (posts.length === 0) {
+    if (emptyContent) {
+      return <div className={className}>{emptyContent}</div>;
+    }
     return (
       <div className={cn('px-6 py-16 text-center text-[15px] text-[#737373]', className)}>
         {emptyMessage}
@@ -115,9 +124,20 @@ export function CommunityFeedList({
 
   return (
     <div className={className}>
-      {posts.map((post) => (
-        <CommunityPostCard key={post.id} post={post} actions={actions} onModerated={onModerated} />
-      ))}
+      {posts.map((post) => {
+        const postRepostedBy = typeof repostedBy === 'function' ? repostedBy(post) : repostedBy;
+        return (
+          <CommunityPostCard
+            key={post.id}
+            post={post}
+            actions={actions}
+            onModerated={onModerated}
+            repostedBy={postRepostedBy}
+          />
+        );
+      })}
+
+      {afterFeedContent}
 
       <div ref={sentinelRef} aria-hidden className="h-px" />
 

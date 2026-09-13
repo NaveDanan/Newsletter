@@ -122,7 +122,7 @@ function resolveMentionProfiles(app, handles) {
   return profiles;
 }
 
-function claimMedia(app, ownerId, mediaIds) {
+function claimMedia(app, ownerId, mediaIds, existingPostId) {
   var c = core();
   var claimed = [];
   c.uniqueStrings(mediaIds || []).slice(0, c.MAX_MEDIA_PER_POST).forEach(function (id) {
@@ -133,7 +133,8 @@ function claimMedia(app, ownerId, mediaIds) {
     if (record.getString('ownerId') !== ownerId) {
       throw new ForbiddenError('You can only attach media you uploaded.');
     }
-    if (record.getString('postId')) {
+    var attachedPostId = record.getString('postId');
+    if (attachedPostId && (!existingPostId || attachedPostId !== String(existingPostId))) {
       throw new BadRequestError('That attachment is already used by another post.');
     }
     claimed.push(record);
@@ -308,6 +309,126 @@ function createPost(e) {
   });
 
   return content().serializePosts(app, [created], authorId, c.getAuthRole(e.auth))[0];
+}
+
+function updatePost(e, postId) {
+  var c = core();
+  var app = e.app;
+  var viewer = viewerContext(e);
+  c.requireAuth(e.auth);
+
+  var post = c.findByIdOrNull(app, 'community_posts', postId);
+  if (!post || post.getString('status') !== 'published') {
+    throw new NotFoundError('That post is no longer available.');
+  }
+
+  var isAuthor = post.getString('authorId') === viewer.id;
+  if (!isAuthor && !c.canModerate(viewer.role)) {
+    throw new ForbiddenError('You can only edit your own posts.');
+  }
+
+  var authorId = post.getString('authorId');
+  var body = e.requestInfo().body || {};
+  var oldMediaIds = c.readJsonArray(post, 'mediaIds');
+  var requestedMediaIds = Array.isArray(body.mediaIds) ? body.mediaIds : oldMediaIds;
+  var claimedMedia = claimMedia(app, authorId, requestedMediaIds, postId);
+  var newMediaIds = claimedMedia.map(function (item) { return String(item.id); });
+
+  var quotedPostId = post.getString('quotedPostId');
+  var validation = c.validatePostInput(body.body, newMediaIds.length, Boolean(quotedPostId));
+  if (!validation.ok) {
+    throw new BadRequestError(validation.message);
+  }
+
+  var parsed = c.parseEntities(validation.body);
+  var mentionProfiles = resolveMentionProfiles(app, parsed.handles);
+  var mentionIds = mentionProfiles.map(function (record) { return record.getString('userId'); });
+
+  var oldHashtags = c.readJsonArray(post, 'hashtags');
+  var newHashtags = parsed.hashtags;
+
+  var removedTags = [];
+  oldHashtags.forEach(function (tag) {
+    if (newHashtags.indexOf(tag) === -1) {
+      removedTags.push(tag);
+    }
+  });
+
+  var addedTags = [];
+  var displayMap = {};
+  parsed.entities.forEach(function (entity) {
+    if (entity.type === 'hashtag') {
+      displayMap[entity.value] = entity.display;
+    }
+  });
+  newHashtags.forEach(function (tag) {
+    if (oldHashtags.indexOf(tag) === -1) {
+      addedTags.push(tag);
+    }
+  });
+
+  var linkPreview = c.readJson(post, 'linkPreview', null);
+  if (parsed.urls.length && !newMediaIds.length && !quotedPostId) {
+    if (!linkPreview || linkPreview.url !== parsed.urls[0]) {
+      linkPreview = content().fetchLinkPreview(app, parsed.urls[0]);
+      if (linkPreview && linkPreview.status !== 'ok') {
+        linkPreview = null;
+      }
+    }
+  } else {
+    linkPreview = null;
+  }
+
+  app.runInTransaction(function (tx) {
+    var record = c.findByIdOrNull(tx, 'community_posts', postId);
+    if (!record) {
+      return;
+    }
+
+    oldMediaIds.forEach(function (id) {
+      if (newMediaIds.indexOf(id) === -1) {
+        var mediaRecord = c.findByIdOrNull(tx, 'community_media', id);
+        if (mediaRecord) {
+          try { tx.delete(mediaRecord); } catch (_) {}
+        }
+      }
+    });
+
+    claimedMedia.forEach(function (item) {
+      if (item.getString('postId') !== String(record.id)) {
+        item.set('postId', String(record.id));
+        item.set('status', 'attached');
+        tx.save(item);
+      }
+    });
+
+    record.set('body', validation.body);
+    record.set('entities', parsed.entities);
+    record.set('hashtags', newHashtags);
+    record.set('mentionIds', mentionIds);
+    record.set('mediaIds', newMediaIds);
+    if (linkPreview) {
+      record.set('linkPreview', linkPreview);
+    } else {
+      record.set('linkPreview', {});
+    }
+    if (typeof body.sensitive === 'boolean') {
+      record.set('sensitive', body.sensitive);
+    }
+    record.set('isEdited', true);
+    record.set('editedAt', c.nowIso());
+    tx.save(record);
+    post = record;
+  });
+
+  if (removedTags.length) {
+    content().touchHashtags(app, removedTags, {}, -1);
+  }
+  if (addedTags.length) {
+    content().touchHashtags(app, addedTags, displayMap, 1);
+  }
+
+  return content().serializePosts(app, [post], viewer.id, viewer.role)[0];
 }
 
 function deletePost(e, postId) {
@@ -750,7 +871,7 @@ function getProfile(e, handle) {
   var c = core();
   var app = e.app;
   var viewer = viewerContext(e);
-  var profile = c.findProfileByHandle(app, handle);
+  var profile = handle === 'me' && viewer.id ? c.findProfileByUserId(app, viewer.id) : c.findProfileByHandle(app, handle);
 
   if (!profile) {
     throw new NotFoundError('That account does not exist.');
@@ -852,7 +973,7 @@ function listProfilePosts(e, handle) {
   var c = core();
   var app = e.app;
   var viewer = viewerContext(e);
-  var profile = c.findProfileByHandle(app, handle);
+  var profile = handle === 'me' && viewer.id ? c.findProfileByUserId(app, viewer.id) : c.findProfileByHandle(app, handle);
 
   if (!profile) {
     throw new NotFoundError('That account does not exist.');
@@ -863,6 +984,34 @@ function listProfilePosts(e, handle) {
   var tab = c.includes(c.PROFILE_TABS, String(query.tab || '')) ? String(query.tab) : 'posts';
   var limit = c.clampPageSize(query.perPage, c.FEED_PAGE_SIZE, c.MAX_FEED_PAGE_SIZE);
   var cursor = c.decodeCursor(query.cursor);
+
+  if (tab === 'reposts') {
+    var repostParams = { userId: targetUserId };
+    var repostRows = app.findRecordsByFilter(
+      'community_reposts',
+      applyCursor('userId = {:userId}', repostParams, cursor),
+      '-created,-id',
+      limit + 1,
+      0,
+      repostParams
+    );
+    var repostHasMore = repostRows.length > limit;
+    var repostPage = repostHasMore ? repostRows.slice(0, limit) : repostRows;
+    var repostedMap = content().loadPostsByIds(app, repostPage.map(function (row) { return row.getString('postId'); }));
+    var repostedPosts = [];
+    repostPage.forEach(function (row) {
+      var post = repostedMap[row.getString('postId')];
+      if (post && content().isVisible(post, viewer.id, viewer.role)) {
+        repostedPosts.push(post);
+      }
+    });
+    var lastRepost = repostPage.length ? repostPage[repostPage.length - 1] : null;
+    return {
+      items: content().serializePosts(app, repostedPosts, viewer.id, viewer.role),
+      hasMore: repostHasMore,
+      cursor: lastRepost ? c.encodeCursor(lastRepost.getString('created'), String(lastRepost.id)) : '',
+    };
+  }
 
   if (tab === 'likes') {
     if (viewer.id !== targetUserId && !c.canModerate(viewer.role)) {
@@ -1474,6 +1623,7 @@ module.exports = {
   blockedUserIds: blockedUserIds,
   appendBlockExclusion: appendBlockExclusion,
   createPost: createPost,
+  updatePost: updatePost,
   deletePost: deletePost,
   toggleLike: toggleLike,
   toggleRepost: toggleRepost,

@@ -6,7 +6,7 @@
 export const COMMUNITY_FEED_TABS = ['for-you', 'following', 'latest'] as const;
 export type CommunityFeedTab = (typeof COMMUNITY_FEED_TABS)[number];
 
-export const COMMUNITY_PROFILE_TABS = ['posts', 'replies', 'media', 'likes'] as const;
+export const COMMUNITY_PROFILE_TABS = ['posts', 'replies', 'reposts', 'media', 'likes'] as const;
 export type CommunityProfileTab = (typeof COMMUNITY_PROFILE_TABS)[number];
 
 export const COMMUNITY_POST_KINDS = ['post', 'reply', 'quote'] as const;
@@ -106,6 +106,8 @@ export interface CommunityPost {
   sensitive: boolean;
   createdAt: string;
   updatedAt: string;
+  isEdited?: boolean;
+  editedAt?: string;
   likeCount: number;
   replyCount: number;
   repostCount: number;

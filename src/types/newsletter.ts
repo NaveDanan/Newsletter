@@ -58,4 +58,5 @@ export interface NewsletterFormData {
   coverImage: string;
   tags: string[];
   status: 'draft' | 'published';
+  publishedAt?: string;
 }

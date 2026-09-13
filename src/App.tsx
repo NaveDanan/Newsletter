@@ -500,7 +500,11 @@ function App() {
   };
 
   const handleProfileClick = () => {
-    navigateTo('/profile');
+    if (currentRoute.view === 'community') {
+      navigateTo('/community/profile');
+    } else {
+      navigateTo('/profile');
+    }
   };
 
   const handleSignOut = () => {

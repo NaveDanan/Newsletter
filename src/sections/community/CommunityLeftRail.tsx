@@ -2,6 +2,8 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import {
   ArrowLeft01Icon,
   Bookmark01Icon,
+  DashboardSquare01Icon,
+  GlobeIcon,
   Home01Icon,
   Logout01Icon,
   MoreHorizontalIcon,
@@ -21,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { hasManagerAccess } from '@/lib/auth/permissions';
 import {
   communityBookmarksPath,
   communityFeedPath,
@@ -61,7 +64,7 @@ export function CommunityLeftRail({
   onLeave,
   onOpenModeration,
 }: CommunityLeftRailProps) {
-  const { t, formatNumber, dir, isRTL } = useLocale();
+  const { t, formatNumber, dir, isRTL, toggleLocale } = useLocale();
   const { isAuthenticated, profile, canModerate, navigate, requireAuth } = useCommunity();
   const { user, isAuthenticated: isAuthAuthenticated, logout } = useAuth();
 
@@ -69,6 +72,8 @@ export function CommunityLeftRail({
   const userAvatarUrl = profile?.avatarUrl || user?.avatar || '';
   const userDisplayName = profile?.displayName || user?.name || user?.email?.split('@')[0] || t('account.profile');
   const userHandle = profile?.handle || (user?.name ? user.name.toLowerCase().replace(/\s+/g, '') : (user?.email ? user.email.split('@')[0] : 'user'));
+  const profilePath = profile?.handle ? communityProfilePath(profile.handle) : (userHandle ? communityProfilePath(userHandle) : '/community/profile');
+  const showManage = Boolean(user && hasManagerAccess(user.role));
 
   const items: RailItem[] = [
     { key: 'feed', label: t('community.nav.feed'), icon: Home01Icon, path: communityFeedPath() },
@@ -88,7 +93,7 @@ export function CommunityLeftRail({
       key: 'profile',
       label: t('community.nav.profile'),
       icon: UserIcon,
-      path: communityProfilePath(userHandle),
+      path: profilePath,
     });
   }
 
@@ -107,13 +112,13 @@ export function CommunityLeftRail({
       aria-label={t('community.title')}
     >
       {/* Top action and navigation links */}
-      <div className="flex flex-col gap-1 w-full">
+      <div className="flex w-full flex-col gap-2">
         {/* Back to site / logo header */}
         <button
           type="button"
           aria-label={t('community.nav.backToSite')}
           title={t('community.nav.backToSite')}
-          className="group flex size-12 items-center justify-center rounded-full text-[#171717] transition-colors hover:bg-[#F5F5F5] xl:size-auto xl:w-full xl:justify-start xl:gap-4 xl:px-4 xl:py-3 mb-1"
+          className="group flex size-12 shrink-0 items-center justify-center rounded-full text-[#171717] transition-colors hover:bg-[#F5F5F5] xl:size-auto xl:w-full xl:justify-start xl:gap-4 xl:px-4 xl:py-3"
           onClick={onLeave}
         >
           <HugeiconsIcon icon={ArrowLeft01Icon} className="size-6 shrink-0 rtl:rotate-180" />
@@ -134,7 +139,7 @@ export function CommunityLeftRail({
               aria-label={item.label}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'group flex size-12 items-center justify-center rounded-full transition-colors hover:bg-[#F5F5F5] xl:size-auto xl:w-full xl:justify-start xl:gap-4 xl:px-4 xl:py-3',
+                'group flex size-12 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[#F5F5F5] xl:size-auto xl:w-full xl:justify-start xl:gap-4 xl:px-4 xl:py-3',
                 isActive ? 'font-bold text-[#171717]' : 'font-normal text-[#171717]',
               )}
               onClick={() => {
@@ -167,7 +172,7 @@ export function CommunityLeftRail({
         })}
 
         {/* Post button */}
-        <div className="mt-4 w-full">
+        <div className="w-full shrink-0">
           {/* Collapsed circle button on lg */}
           <button
             type="button"
@@ -203,7 +208,8 @@ export function CommunityLeftRail({
       </div>
 
       {/* Bottom user profile card pinned to bottom of the screen */}
-      <div className="mt-auto pt-4 pb-1 w-full">
+      <div className="mt-3 w-full shrink-0 pb-1">
+        <div aria-hidden="true" className="mx-2 mb-3 h-px bg-[#E5E5E5] xl:mx-4" />
         {isLoggedIn ? (
           <DropdownMenu dir={dir}>
             <DropdownMenuTrigger asChild>
@@ -243,10 +249,10 @@ export function CommunityLeftRail({
             >
               <DropdownMenuItem
                 className="flex items-center gap-3 rounded-xl p-2.5 cursor-pointer hover:bg-[#F5F5F5] focus:bg-[#F5F5F5]"
-                onSelect={() => navigate(communityProfilePath(userHandle))}
+                onSelect={() => navigate(profilePath)}
               >
                 <CommunityAvatar
-                  handle={userHandle}
+                  handle={profile?.handle || userHandle}
                   displayName={userDisplayName}
                   avatarUrl={userAvatarUrl}
                   size="sm"
@@ -263,20 +269,22 @@ export function CommunityLeftRail({
 
               <DropdownMenuSeparator className="my-1 bg-[#E5E5E5]" />
 
-              <DropdownMenuItem
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-[#171717] cursor-pointer hover:bg-[#F5F5F5] focus:bg-[#F5F5F5]"
-                onSelect={() => navigate(communityProfilePath(userHandle))}
-              >
-                <HugeiconsIcon icon={UserIcon} className="size-4 text-[#737373]" />
-                <span>{t('community.nav.profile')}</span>
-              </DropdownMenuItem>
+              {showManage ? (
+                <DropdownMenuItem
+                  className="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-[#171717] hover:bg-[#F5F5F5] focus:bg-[#F5F5F5]"
+                  onSelect={() => navigate('/manager')}
+                >
+                  <HugeiconsIcon icon={DashboardSquare01Icon} className="size-4 text-[#737373]" />
+                  <span>{t('account.manage')}</span>
+                </DropdownMenuItem>
+              ) : null}
 
               <DropdownMenuItem
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-[#171717] cursor-pointer hover:bg-[#F5F5F5] focus:bg-[#F5F5F5]"
-                onSelect={onLeave}
+                className="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-[#171717] hover:bg-[#F5F5F5] focus:bg-[#F5F5F5]"
+                onSelect={toggleLocale}
               >
-                <HugeiconsIcon icon={ArrowLeft01Icon} className="size-4 text-[#737373] rtl:rotate-180" />
-                <span>{t('community.nav.backToSite')}</span>
+                <HugeiconsIcon icon={GlobeIcon} className="size-4 text-[#737373]" />
+                <span>{isRTL ? t('common.switchToEnglish') : t('common.switchToHebrew')}</span>
               </DropdownMenuItem>
 
               <DropdownMenuSeparator className="my-1 bg-[#E5E5E5]" />

@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { ArrowLeft01Icon, Camera01Icon, Delete02Icon, GlobeIcon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, Camera01Icon, Delete02Icon, GlobeIcon, PencilEdit01Icon } from '@hugeicons/core-free-icons';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { UserAvatarCircle } from '@/components/UserAvatarCircle';
@@ -9,6 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { removeUserAvatar, uploadUserAvatar } from '@/lib/pocketbase/profile';
@@ -21,10 +28,11 @@ interface ProfilePageProps {
 
 export function ProfilePage({ onBack }: ProfilePageProps) {
   const { user, updateProfile } = useAuth();
-  const { t, isRTL, toggleLocale } = useLocale();
+  const { t, dir, isRTL, toggleLocale } = useLocale();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isPreparingAvatar, setIsPreparingAvatar] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
   // Seeded once, deliberately not synced from an effect: this page is the only
   // writer of `user.name`, and `react-hooks/set-state-in-effect` is an error here.
@@ -64,6 +72,28 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
       toast.error(error instanceof Error ? error.message : t('profile.avatarFailed'));
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleEditAvatar = async () => {
+    if (!user.avatar || isUploading || isPreparingAvatar) {
+      return;
+    }
+
+    setIsPreparingAvatar(true);
+    try {
+      const response = await fetch(user.avatar);
+      if (!response.ok) {
+        throw new Error(t('profile.avatarEditFailed'));
+      }
+
+      const blob = await response.blob();
+      setPendingFile(new File([blob], 'profile-avatar', { type: blob.type || 'image/png' }));
+    } catch (error) {
+      console.error('Avatar edit preparation failed:', error);
+      toast.error(error instanceof Error ? error.message : t('profile.avatarEditFailed'));
+    } finally {
+      setIsPreparingAvatar(false);
     }
   };
 
@@ -130,41 +160,49 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
           <CardContent className="flex flex-wrap items-center gap-5">
             <div className="relative">
               <UserAvatarCircle name={user.name} email={user.email} src={user.avatar} size={96} />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                aria-label={t('profile.changePicture')}
-                className="absolute -bottom-1 -end-1 flex size-8 items-center justify-center rounded-full border border-[#E5E5E5] bg-white text-[#737373] shadow-sm transition-colors hover:text-[#171717] disabled:opacity-50"
-              >
-                <HugeiconsIcon icon={Camera01Icon} className="size-4" />
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-              >
-                {user.avatar ? t('profile.changePicture') : t('profile.uploadPicture')}
-              </Button>
-              {user.avatar ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1.5 text-[#D93A3A] hover:bg-[#FEE2E2] hover:text-[#B91C1C]"
-                  onClick={() => {
-                    void handleRemoveAvatar();
-                  }}
-                  disabled={isUploading}
+              <DropdownMenu dir={dir}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={isUploading || isPreparingAvatar}
+                    aria-label={t('profile.pictureActions')}
+                    className="absolute -bottom-1 -end-1 flex size-8 items-center justify-center rounded-full border border-[#E5E5E5] bg-white text-[#737373] shadow-sm transition-colors hover:text-[#171717] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93A3A] focus-visible:ring-offset-2 disabled:opacity-50"
+                  >
+                    <HugeiconsIcon icon={Camera01Icon} className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align={isRTL ? 'end' : 'start'}
+                  sideOffset={8}
+                  className="w-48 rounded-xl border border-[#E5E5E5] bg-white p-1.5 shadow-lg"
                 >
-                  <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-                  {t('profile.removePicture')}
-                </Button>
-              ) : null}
+                  <DropdownMenuItem
+                    className="cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
+                    onSelect={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    <HugeiconsIcon icon={Camera01Icon} className="size-4 text-[#737373]" />
+                    {t('profile.uploadImage')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
+                    onSelect={() => { void handleEditAvatar(); }}
+                    disabled={!user.avatar || isUploading || isPreparingAvatar}
+                  >
+                    <HugeiconsIcon icon={PencilEdit01Icon} className="size-4 text-[#737373]" />
+                    {t('profile.editImage')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-1 bg-[#E5E5E5]" />
+                  <DropdownMenuItem
+                    className="cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[#D93A3A] focus:bg-[#FEE2E2] focus:text-[#B91C1C]"
+                    onSelect={() => { void handleRemoveAvatar(); }}
+                    disabled={!user.avatar || isUploading}
+                  >
+                    <HugeiconsIcon icon={Delete02Icon} className="size-4 text-current" />
+                    {t('profile.removeImage')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <input
               ref={fileInputRef}

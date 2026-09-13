@@ -10,6 +10,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useCommunityEngagement } from '@/hooks/useCommunityEngagement';
 import { useCommunitySession } from '@/hooks/useCommunitySession';
@@ -176,10 +177,27 @@ export function CommunityPage({
     }
 
     if (route.section === 'profile') {
+      const targetHandle = (route.handle === 'me' || !route.handle) ? (profile?.handle || '') : route.handle;
+      if (!targetHandle && isLoading) {
+        return (
+          <div className="space-y-4 p-4">
+            <Skeleton className="h-48 sm:h-52 w-full rounded-none" />
+            <div className="flex items-start justify-between px-4">
+              <Skeleton className="size-28 sm:size-36 rounded-full -mt-14" />
+              <Skeleton className="h-9 w-28 rounded-full mt-3" />
+            </div>
+            <div className="space-y-2 px-4">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-64 mt-3" />
+            </div>
+          </div>
+        );
+      }
       return (
         <CommunityProfileScreen
-          key={route.handle + ':' + route.profileTab}
-          handle={route.handle}
+          key={targetHandle + ':' + route.profileTab}
+          handle={targetHandle}
           tab={route.profileTab}
           onEditProfile={() => setIsEditorOpen(true)}
         />
@@ -230,7 +248,7 @@ export function CommunityPage({
       key: 'profile',
       label: t('community.nav.profile'),
       icon: UserIcon,
-      path: profile ? communityProfilePath(profile.handle) : communityFeedPath(),
+      path: profile ? communityProfilePath(profile.handle) : '/community/profile',
       guarded: true,
     },
   ];

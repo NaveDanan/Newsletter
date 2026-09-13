@@ -6,6 +6,7 @@ import {
   toggleCommunityBookmark,
   toggleCommunityLike,
   toggleCommunityRepost,
+  updateCommunityPost,
 } from '@/lib/pocketbase/community';
 import type { CommunityEngagementResult, CommunityPost } from '@/types/community';
 
@@ -28,6 +29,10 @@ export interface UseCommunityEngagementResult {
   toggleRepost: (post: CommunityPost) => Promise<void>;
   toggleBookmark: (post: CommunityPost) => Promise<void>;
   deletePost: (post: CommunityPost) => Promise<void>;
+  editPost: (
+    post: CommunityPost,
+    patch: { body: string; mediaIds?: string[]; sensitive?: boolean } | string,
+  ) => Promise<boolean>;
 }
 
 export function useCommunityEngagement({
@@ -110,5 +115,27 @@ export function useCommunityEngagement({
     }
   }, [isAuthenticated, onRequireAuth, removePost, translate]);
 
-  return { toggleLike, toggleRepost, toggleBookmark, deletePost };
+  const editPost = useCallback(async (
+    post: CommunityPost,
+    patch: { body: string; mediaIds?: string[]; sensitive?: boolean } | string,
+  ): Promise<boolean> => {
+    if (!isAuthenticated) {
+      onRequireAuth();
+      return false;
+    }
+
+    const payload = typeof patch === 'string' ? { body: patch } : patch;
+
+    try {
+      const updated = await updateCommunityPost(post.id, payload);
+      patchPost(post.id, updated);
+      toast.success(translate('community.post.editedSuccess'));
+      return true;
+    } catch (caught) {
+      toast.error(getPocketBaseErrorMessage(caught, translate('community.post.editFailed')));
+      return false;
+    }
+  }, [isAuthenticated, onRequireAuth, patchPost, translate]);
+
+  return { toggleLike, toggleRepost, toggleBookmark, deletePost, editPost };
 }

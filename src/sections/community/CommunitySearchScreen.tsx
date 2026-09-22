@@ -118,7 +118,7 @@ export function CommunitySearchScreen({ query, type }: CommunitySearchScreenProp
 
   return (
     <div>
-      <div className="sticky top-[104px] z-10 border-b border-[#E5E5E5] bg-white/85 backdrop-blur">
+      <div className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/85 backdrop-blur-md">
         <form
           role="search"
           className="relative px-4 py-3"
@@ -129,7 +129,7 @@ export function CommunitySearchScreen({ query, type }: CommunitySearchScreenProp
         >
           <HugeiconsIcon
             icon={Search01Icon}
-            className="pointer-events-none absolute start-8 top-1/2 size-4 -translate-y-1/2 text-[#737373]"
+            className="pointer-events-none absolute start-8 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]"
           />
           <input
             type="search"
@@ -137,7 +137,7 @@ export function CommunitySearchScreen({ query, type }: CommunitySearchScreenProp
             onChange={(event) => setTerm(event.target.value)}
             placeholder={t('community.search.placeholder')}
             aria-label={t('community.search.placeholder')}
-            className="w-full rounded-full border border-transparent bg-[#F5F5F5] py-2.5 pe-4 ps-11 text-[15px] outline-none transition-colors focus:border-[#D93A3A] focus:bg-white"
+            className="w-full rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] py-2.5 pe-4 ps-11 text-[15px] text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none transition-colors focus:border-[var(--primary-accent)]"
           />
         </form>
 
@@ -150,14 +150,14 @@ export function CommunitySearchScreen({ query, type }: CommunitySearchScreenProp
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                className="relative flex-1 px-2 py-3 text-[15px] transition-colors hover:bg-[#FAFAFA]"
+                className="relative flex-1 px-2 py-3 text-[15px] transition-colors hover:bg-[var(--bg-card-hover)]"
                 onClick={() => navigate(communitySearchPath(query, value))}
               >
-                <span className={cn(isActive ? 'font-bold text-[#171717]' : 'text-[#737373]')}>
+                <span className={cn(isActive ? 'font-bold text-[var(--primary-accent)]' : 'text-[var(--text-secondary)]')}>
                   {t('community.search.tab.' + value)}
                 </span>
                 {isActive ? (
-                  <span className="absolute inset-x-0 bottom-0 mx-auto h-1 w-14 rounded-full bg-[#D93A3A]" />
+                  <span className="absolute inset-x-0 bottom-0 mx-auto h-1 w-14 rounded-full bg-[var(--primary-accent)]" />
                 ) : null}
               </button>
             );

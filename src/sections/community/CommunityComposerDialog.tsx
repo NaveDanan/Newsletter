@@ -29,9 +29,9 @@ export function CommunityComposerDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) { onClose(); } }}>
-      <DialogContent className="max-h-[85vh] gap-0 overflow-y-auto p-0 sm:max-w-xl">
-        <DialogHeader className="border-b border-[#E5E5E5] px-4 py-3">
-          <DialogTitle className="text-base">
+      <DialogContent className="max-h-[85vh] gap-0 overflow-y-auto p-0 sm:max-w-xl bg-[var(--bg-card)] border-[var(--border-subtle)] text-[var(--text-primary)]">
+        <DialogHeader className="border-b border-[var(--border-subtle)] px-4 py-3">
+          <DialogTitle className="text-base text-[var(--text-primary)]">
             {t(mode === 'quote' ? 'community.post.quote' : 'community.post.reply')}
           </DialogTitle>
         </DialogHeader>

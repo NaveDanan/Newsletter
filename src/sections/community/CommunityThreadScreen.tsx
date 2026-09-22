@@ -1,19 +1,27 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Alert01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
+import { Alert01Icon, ArrowDown01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useCommunityEngagement } from '@/hooks/useCommunityEngagement';
 import { fetchCommunityThread, getPocketBaseErrorMessage } from '@/lib/pocketbase/community';
+import { buildCommentTree, type CommentSort } from '@/lib/community-comments';
+import { CommunityCommentItem } from './CommunityCommentItem';
 import { CommunityComposer } from './CommunityComposer';
 import { useCommunity } from './CommunityContext';
 import { CommunityPostCard } from './CommunityPostCard';
 import type { CommunityPost, CommunityThread } from '@/types/community';
 
 // A thread is one request: the post, its ancestors up to the root, and the
-// first page of replies. Paging replies reuses the same route with a cursor,
-// so nothing here needs the generic post pager.
+// first page of replies. Replies come back flat and are assembled into a
+// nested tree here so the conversation renders as indented comment threads.
 
 interface CommunityThreadScreenProps {
   postId: string;
@@ -38,7 +46,9 @@ export function CommunityThreadScreen({ postId }: CommunityThreadScreenProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<CommentSort>('most-relevant');
   const requestRef = useRef(0);
+  const composerRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async (cursor: string) => {
     const requestId = requestRef.current + 1;
@@ -51,7 +61,7 @@ export function CommunityThreadScreen({ postId }: CommunityThreadScreenProps) {
     }
 
     try {
-      const next = await fetchCommunityThread(postId, { cursor: cursor || undefined });
+      const next = await fetchCommunityThread(postId, { cursor: cursor || undefined, tree: true });
       if (requestRef.current !== requestId) {
         return;
       }
@@ -121,18 +131,55 @@ export function CommunityThreadScreen({ postId }: CommunityThreadScreenProps) {
     translate: t,
   });
 
+  // Replies arrive flat; the nesting is rebuilt from parentId on the client.
+  const commentTree = useMemo(
+    () => (thread ? buildCommentTree(thread.replies, thread.post.id, sortMode) : []),
+    [sortMode, thread],
+  );
+
+  const addReply = useCallback((reply: CommunityPost) => {
+    setThread((current) => {
+      if (!current || current.replies.some((item) => item.id === reply.id)) {
+        return current;
+      }
+      const isDirect = reply.parentId === current.post.id;
+      return {
+        ...current,
+        post: isDirect
+          ? { ...current.post, replyCount: current.post.replyCount + 1 }
+          : current.post,
+        replies: current.replies
+          .map((item) => (item.id === reply.parentId
+            ? { ...item, replyCount: item.replyCount + 1 }
+            : item))
+          .concat(reply),
+      };
+    });
+  }, []);
+
+  const sortLabels: Record<CommentSort, string> = {
+    'most-relevant': t('community.comments.mostRelevant'),
+    newest: t('community.comments.newest'),
+    all: t('community.comments.allComments'),
+  };
+
+  const focusComposer = useCallback(() => {
+    composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    composerRef.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus();
+  }, []);
+
   return (
     <div>
-      <div className="sticky top-[104px] z-10 flex items-center gap-4 border-b border-[#E5E5E5] bg-white/85 px-4 py-3 backdrop-blur">
+      <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/85 px-4 py-3 backdrop-blur-md">
         <button
           type="button"
           aria-label={t('community.thread.back')}
-          className="rounded-full p-2 text-[#171717] transition-colors hover:bg-[#F5F5F5]"
+          className="rounded-full p-2 text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-card-hover)]"
           onClick={() => window.history.back()}
         >
           <HugeiconsIcon icon={ArrowLeft01Icon} className="size-5 rtl:rotate-180" />
         </button>
-        <h1 className="text-xl font-bold text-[#171717]">{t('community.thread.title')}</h1>
+        <h1 className="text-xl font-bold text-[var(--text-primary)]">{t('community.thread.title')}</h1>
       </div>
 
       {isLoading && !thread ? (
@@ -145,8 +192,8 @@ export function CommunityThreadScreen({ postId }: CommunityThreadScreenProps) {
 
       {error && !thread ? (
         <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-          <HugeiconsIcon icon={Alert01Icon} className="size-8 text-[#D93A3A]" />
-          <p className="text-[15px] text-[#737373]">{error}</p>
+          <HugeiconsIcon icon={Alert01Icon} className="size-8 text-[var(--primary-accent)]" />
+          <p className="text-[15px] text-[var(--text-secondary)]">{error}</p>
           <Button variant="outline" size="sm" onClick={() => void load('')}>
             {t('community.feed.retry')}
           </Button>
@@ -170,40 +217,66 @@ export function CommunityThreadScreen({ postId }: CommunityThreadScreenProps) {
             actions={actions}
             variant="detail"
             onModerated={(id, status) => patchPost(id, { status })}
+            onReplyClick={isAuthenticated ? focusComposer : requireAuth}
           />
 
           {isAuthenticated ? (
-            <div className="border-b border-[#E5E5E5]">
+            <div ref={composerRef} className="border-b border-[var(--border-subtle)]">
               <CommunityComposer
                 parent={thread.post}
                 compact
-                onPosted={(reply) => {
-                  setThread((current) => (current
-                    ? {
-                      ...current,
-                      post: { ...current.post, replyCount: current.post.replyCount + 1 },
-                      replies: [reply, ...current.replies],
-                    }
-                    : current));
-                }}
+                onPosted={addReply}
               />
             </div>
           ) : null}
 
-          <h2 className="sr-only">{t('community.thread.replies')}</h2>
+          <div className="px-4 pb-10 pt-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                {thread.post.replyCount === 1
+                  ? t('community.comments.commentsCountSingle')
+                  : t('community.comments.commentsCount', { count: thread.post.replyCount })}
+              </h2>
 
-          {thread.replies.length === 0 ? (
-            <p className="px-6 py-12 text-center text-[15px] text-[#737373]">{t('community.thread.noReplies')}</p>
-          ) : null}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-pill-hover)] hover:text-[var(--text-primary)]"
+                  >
+                    {sortLabels[sortMode]}
+                    <HugeiconsIcon icon={ArrowDown01Icon} className="size-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-[var(--bg-card)] border-[var(--border-subtle)]">
+                  {(['most-relevant', 'newest', 'all'] as CommentSort[]).map((mode) => (
+                    <DropdownMenuItem key={mode} onSelect={() => setSortMode(mode)}>
+                      {sortLabels[mode]}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
-          {thread.replies.map((reply) => (
-            <CommunityPostCard
-              key={reply.id}
-              post={reply}
-              actions={actions}
-              onModerated={(id, status) => patchPost(id, { status })}
-            />
-          ))}
+            {commentTree.length === 0 ? (
+              <p className="py-10 text-center text-[15px] text-[var(--text-muted)]">
+                {t('community.thread.noReplies')}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {commentTree.map((node) => (
+                  <CommunityCommentItem
+                    key={node.comment.id}
+                    node={node}
+                    postAuthorId={thread.post.author?.userId}
+                    actions={actions}
+                    onModerated={(id, status) => patchPost(id, { status })}
+                    onReplyAdded={addReply}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
 
           {thread.hasMore ? (
             <div className="flex justify-center py-6">

@@ -31,6 +31,7 @@ import { getPocketBaseErrorMessage, moderateCommunityPost } from '@/lib/pocketba
 import { cn } from '@/lib/utils';
 import { CommunityAvatar } from './CommunityAvatar';
 import { CommunityBody } from './CommunityBody';
+import { CommunityComposer } from './CommunityComposer';
 import { useCommunity } from './CommunityContext';
 import { CommunityEditPostDialog } from './CommunityEditPostDialog';
 import { CommunityLinkPreviewCard } from './CommunityLinkPreviewCard';
@@ -51,6 +52,8 @@ interface CommunityPostCardProps {
   showThreadLine?: boolean;
   onModerated?: (postId: string, status: CommunityPost['status']) => void;
   repostedBy?: string;
+  /** Replaces the built-in inline composer, e.g. to focus a composer the screen already renders. */
+  onReplyClick?: () => void;
 }
 
 export function CommunityPostCard({
@@ -60,17 +63,19 @@ export function CommunityPostCard({
   showThreadLine = false,
   onModerated,
   repostedBy,
+  onReplyClick,
 }: CommunityPostCardProps) {
   const { formatDate, formatRelativeTime, t } = useLocale();
-  const { openPost, openProfile, openHashtag, openReport, canModerate, requireAuth } = useCommunity();
+  const { openPost, openProfile, openHashtag, openReport, canModerate, isAuthenticated, requireAuth } = useCommunity();
   const { user } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isReplying, setIsReplying] = useState(false);
   const isDetail = variant === 'detail';
 
   if (post.status !== 'published' || !post.author) {
     return (
-      <article className="border-b border-[#E5E5E5] px-4 py-4 text-sm text-[#737373]">
+      <article className="border-b border-[var(--border-subtle)] px-4 py-4 text-sm text-[var(--text-muted)]">
         {post.status === 'removed' ? t('community.post.removed') : t('community.post.unavailable')}
       </article>
     );
@@ -91,14 +96,14 @@ export function CommunityPostCard({
   return (
     <article
       className={cn(
-        'relative border-b border-[#E5E5E5] px-4 transition-colors',
-        isDetail ? 'py-4' : 'cursor-pointer py-3 hover:bg-[#FAFAFA]',
+        'feed-post-card relative transition-all',
+        isDetail ? 'py-5' : 'cursor-pointer hover:border-[var(--border-highlight)]',
       )}
       onClick={isDetail ? undefined : () => openPost(post.id)}
     >
       {repostedBy ? (
-        <div className="flex items-center gap-2 mb-1 ps-6 text-xs font-semibold text-[#737373]">
-          <HugeiconsIcon icon={RepeatIcon} className="size-3.5 text-[#737373]" />
+        <div className="flex items-center gap-2 mb-1.5 ps-6 text-xs font-semibold text-[var(--text-muted)]">
+          <HugeiconsIcon icon={RepeatIcon} className="size-3.5 text-[var(--primary-accent)]" />
           <span>{repostedBy}</span>
         </div>
       ) : null}
@@ -111,7 +116,7 @@ export function CommunityPostCard({
             size={isDetail ? 'lg' : 'md'}
             onClick={() => openProfile(author.handle)}
           />
-          {showThreadLine ? <span className="mt-1 w-px flex-1 bg-[#E5E5E5]" aria-hidden /> : null}
+          {showThreadLine ? <span className="mt-1 w-px flex-1 bg-[var(--border-subtle)]" aria-hidden /> : null}
         </div>
 
         <div className="min-w-0 flex-1">
@@ -119,7 +124,7 @@ export function CommunityPostCard({
             <div className={cn('min-w-0', isDetail ? 'flex flex-col' : 'flex flex-wrap items-center gap-x-1.5')}>
               <button
                 type="button"
-                className="truncate text-[15px] font-semibold text-[#171717] hover:underline"
+                className="truncate text-[15px] font-bold text-[var(--text-primary)] hover:text-[var(--primary-accent)] transition-colors"
                 onClick={(event) => {
                   event.stopPropagation();
                   openProfile(author.handle);
@@ -127,12 +132,12 @@ export function CommunityPostCard({
               >
                 {author.displayName || author.handle}
               </button>
-              <span className="truncate text-[15px] text-[#737373]">@{author.handle}</span>
+              <span className="truncate text-xs text-[var(--text-muted)]">@{author.handle}</span>
               {!isDetail ? (
                 <>
-                  <span className="text-[15px] text-[#737373]">·</span>
+                  <span className="text-xs text-[var(--text-muted)]">·</span>
                   <time
-                    className="whitespace-nowrap text-[15px] text-[#737373]"
+                    className="whitespace-nowrap text-xs font-semibold text-[var(--primary-accent)]"
                     dateTime={post.createdAt}
                     title={formatDate(post.createdAt, { dateStyle: 'long', timeStyle: 'short' })}
                   >
@@ -140,9 +145,9 @@ export function CommunityPostCard({
                   </time>
                   {post.isEdited ? (
                     <>
-                      <span className="text-[15px] text-[#737373]">·</span>
+                      <span className="text-xs text-[var(--text-muted)]">·</span>
                       <span
-                        className="inline-flex items-center rounded bg-[#F5F5F5] px-1.5 py-0.5 text-[11px] font-medium text-[#737373] ring-1 ring-inset ring-[#E5E5E5]"
+                        className="inline-flex items-center rounded-full bg-[var(--bg-pill)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)] border border-[var(--border-subtle)]"
                         title={post.editedAt ? formatDate(post.editedAt, { dateStyle: 'long', timeStyle: 'short' }) : undefined}
                       >
                         {t('community.post.edited')}
@@ -158,13 +163,13 @@ export function CommunityPostCard({
                 <button
                   type="button"
                   aria-label={t('community.post.moreActions')}
-                  className="rounded-full p-1 text-[#737373] transition-colors hover:bg-[#F5F5F5] hover:text-[#171717]"
+                  className="rounded-full p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-pill-hover)] hover:text-[var(--text-primary)]"
                   onClick={(event) => event.stopPropagation()}
                 >
                   <HugeiconsIcon icon={MoreHorizontalIcon} className="size-4" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+              <DropdownMenuContent align="end" className="bg-[var(--bg-card)] border-[var(--border-subtle)]" onClick={(event) => event.stopPropagation()}>
                 {post.isAuthor ? (
                   <>
                     <DropdownMenuItem onSelect={() => setIsEditing(true)}>
@@ -195,7 +200,7 @@ export function CommunityPostCard({
           {post.kind === 'reply' && post.parentId ? (
             <button
               type="button"
-              className="mt-0.5 block text-sm text-[#737373] hover:underline"
+              className="mt-0.5 block text-xs text-[var(--text-secondary)] hover:text-[var(--primary-accent)]"
               onClick={(event) => {
                 event.stopPropagation();
                 openPost(post.parentId);
@@ -271,7 +276,32 @@ export function CommunityPostCard({
             </div>
           ) : null}
 
-          <CommunityPostActions post={post} actions={actions} />
+          <CommunityPostActions
+            post={post}
+            actions={actions}
+            onReply={onReplyClick ?? (isDetail ? undefined : () => {
+              if (!isAuthenticated) {
+                requireAuth();
+                return;
+              }
+              setIsReplying((open) => !open);
+            })}
+          />
+
+          {isReplying && !isDetail && !onReplyClick ? (
+            <div
+              className="composer-slide-open mt-2 overflow-hidden rounded-[var(--radius-card)] bg-[var(--bg-card-alt)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <CommunityComposer
+                autoFocus
+                compact
+                parent={post}
+                onPosted={() => setIsReplying(false)}
+                onCancel={() => setIsReplying(false)}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 

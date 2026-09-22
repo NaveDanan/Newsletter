@@ -132,31 +132,31 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
   const isNameDirty = name.trim() !== user.name && name.trim().length > 0;
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA]">
-      <header className="sticky top-0 z-50 border-b border-[#E5E5E5] bg-white">
-        <div className="mx-auto flex h-14 max-w-3xl items-center gap-3 px-4 sm:px-6">
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+      <header className="sticky top-0 z-50 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-3xl items-center gap-3 px-4 sm:px-6">
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center gap-1.5 text-sm font-medium text-[#737373] transition-colors hover:text-[#171717]"
+            className="flex items-center gap-1.5 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
           >
             <HugeiconsIcon icon={ArrowLeft01Icon} className="rtl-rotate-180 size-4" />
             {t('common.back')}
           </button>
-          <h1 className="ms-auto text-sm font-semibold text-[#171717]">{t('profile.title')}</h1>
+          <h1 className="ms-auto text-sm font-bold text-[var(--text-primary)]">{t('profile.title')}</h1>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
         <div>
-          <h2 className="text-2xl font-bold text-[#171717]">{t('profile.title')}</h2>
-          <p className="mt-1 text-sm text-[#737373]">{t('profile.subtitle')}</p>
+          <h2 className="text-2xl font-extrabold text-[var(--text-primary)] tracking-tight">{t('profile.title')}</h2>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">{t('profile.subtitle')}</p>
         </div>
 
-        <Card className="border-[#E5E5E5] bg-white">
+        <Card className="border-[var(--border-subtle)] bg-[var(--bg-card)] rounded-3xl shadow-[var(--shadow-card)]">
           <CardHeader>
-            <CardTitle className="text-base text-[#171717]">{t('profile.pictureTitle')}</CardTitle>
-            <CardDescription className="text-[#737373]">{t('profile.pictureHint')}</CardDescription>
+            <CardTitle className="text-base font-bold text-[var(--text-primary)]">{t('profile.pictureTitle')}</CardTitle>
+            <CardDescription className="text-[var(--text-secondary)]">{t('profile.pictureHint')}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center gap-5">
             <div className="relative">
@@ -167,7 +167,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                     type="button"
                     disabled={isUploading || isPreparingAvatar}
                     aria-label={t('profile.pictureActions')}
-                    className="absolute -bottom-1 -end-1 flex size-8 items-center justify-center rounded-full border border-[#E5E5E5] bg-white text-[#737373] shadow-sm transition-colors hover:text-[#171717] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93A3A] focus-visible:ring-offset-2 disabled:opacity-50"
+                    className="absolute -bottom-1 -end-1 flex size-8 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] shadow-sm transition-colors hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)] disabled:opacity-50"
                   >
                     <HugeiconsIcon icon={Camera01Icon} className="size-4" />
                   </button>
@@ -175,27 +175,27 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                 <DropdownMenuContent
                   align={isRTL ? 'end' : 'start'}
                   sideOffset={8}
-                  className="w-48 rounded-xl border border-[#E5E5E5] bg-white p-1.5 shadow-lg"
+                  className="w-48 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5 shadow-xl backdrop-blur-xl"
                 >
                   <DropdownMenuItem
-                    className="cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
+                    className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] focus:bg-[var(--bg-pill-hover)]"
                     onSelect={() => fileInputRef.current?.click()}
                     disabled={isUploading}
                   >
-                    <HugeiconsIcon icon={Camera01Icon} className="size-4 text-[#737373]" />
+                    <HugeiconsIcon icon={Camera01Icon} className="size-4 text-[var(--text-secondary)]" />
                     {t('profile.uploadImage')}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className="cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]"
+                    className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] focus:bg-[var(--bg-pill-hover)]"
                     onSelect={() => { void handleEditAvatar(); }}
                     disabled={!user.avatar || isUploading || isPreparingAvatar}
                   >
-                    <HugeiconsIcon icon={PencilEdit01Icon} className="size-4 text-[#737373]" />
+                    <HugeiconsIcon icon={PencilEdit01Icon} className="size-4 text-[var(--text-secondary)]" />
                     {t('profile.editImage')}
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="my-1 bg-[#E5E5E5]" />
+                  <DropdownMenuSeparator className="my-1 bg-[var(--border-subtle)]" />
                   <DropdownMenuItem
-                    className="cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[#D93A3A] focus:bg-[#FEE2E2] focus:text-[#B91C1C]"
+                    className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-sm text-[var(--primary-accent)] hover:bg-[var(--primary-accent)]/10 focus:bg-[var(--primary-accent)]/10"
                     onSelect={() => { void handleRemoveAvatar(); }}
                     disabled={!user.avatar || isUploading}
                   >
@@ -215,14 +215,14 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-[#E5E5E5] bg-white">
+        <Card className="border-[var(--border-subtle)] bg-[var(--bg-card)] rounded-3xl shadow-[var(--shadow-card)]">
           <CardHeader>
-            <CardTitle className="text-base text-[#171717]">{t('profile.detailsTitle')}</CardTitle>
-            <CardDescription className="text-[#737373]">{t('profile.detailsHint')}</CardDescription>
+            <CardTitle className="text-base font-bold text-[var(--text-primary)]">{t('profile.detailsTitle')}</CardTitle>
+            <CardDescription className="text-[var(--text-secondary)]">{t('profile.detailsHint')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="profile-name" className="text-[#171717]">
+              <Label htmlFor="profile-name" className="text-sm font-semibold text-[var(--text-primary)]">
                 {t('profile.nameLabel')}
               </Label>
               <Input
@@ -233,11 +233,12 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                   setName(event.target.value);
                 }}
                 maxLength={80}
+                className="bg-[var(--bg-input)] border-[var(--border-subtle)] text-[var(--text-primary)] rounded-full px-4 h-10"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="profile-email" className="text-[#171717]">
+              <Label htmlFor="profile-email" className="text-sm font-semibold text-[var(--text-primary)]">
                 {t('profile.emailLabel')}
               </Label>
               <div className="flex flex-wrap items-center gap-2">
@@ -246,28 +247,30 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                   value={user.email}
                   readOnly
                   disabled
-                  className="max-w-sm bg-[#F3F4F6]"
+                  className="max-w-sm bg-[var(--bg-input)] opacity-75 border-[var(--border-subtle)] text-[var(--text-muted)] rounded-full px-4 h-10"
                 />
                 {!user.verified ? (
-                  <Badge variant="outline" className="border-[#F59E0B] text-[#B45309]">
+                  <Badge variant="outline" className="border-amber-500/40 text-amber-500 bg-amber-500/10 rounded-full px-3 py-1">
                     {t('profile.notVerified')}
                   </Badge>
                 ) : null}
               </div>
-              <p className="text-xs text-[#737373]">{t('profile.emailHint')}</p>
+              <p className="text-xs text-[var(--text-muted)]">{t('profile.emailHint')}</p>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-[#171717]">{t('profile.roleLabel')}</Label>
+              <Label className="text-sm font-semibold text-[var(--text-primary)]">{t('profile.roleLabel')}</Label>
               <div>
-                <Badge variant="secondary">{t(`role.${user.role}`)}</Badge>
+                <Badge variant="secondary" className="bg-[var(--bg-pill)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-full px-3 py-1">
+                  {t(`role.${user.role}`)}
+                </Badge>
               </div>
             </div>
 
             <div className="flex justify-end">
               <Button
                 type="button"
-                className="bg-[#D93A3A] text-white hover:bg-[#B91C1C]"
+                className="btn-hire-me"
                 onClick={() => {
                   void handleSaveName();
                 }}
@@ -279,15 +282,20 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-[#E5E5E5] bg-white">
+        <Card className="border-[var(--border-subtle)] bg-[var(--bg-card)] rounded-3xl shadow-[var(--shadow-card)]">
           <CardHeader>
-            <CardTitle className="text-base text-[#171717]">{t('profile.languageTitle')}</CardTitle>
-            <CardDescription className="text-[#737373]">
+            <CardTitle className="text-base font-bold text-[var(--text-primary)]">{t('profile.languageTitle')}</CardTitle>
+            <CardDescription className="text-[var(--text-secondary)]">
               {t('profile.languageHint')}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button type="button" variant="outline" className="gap-2" onClick={toggleLocale}>
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 rounded-full border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-pill-hover)] text-[var(--text-primary)]"
+              onClick={toggleLocale}
+            >
               <HugeiconsIcon icon={GlobeIcon} className="size-4" />
               {isRTL ? t('common.switchToEnglish') : t('common.switchToHebrew')}
             </Button>

@@ -282,7 +282,13 @@ function createPost(e) {
     throw new BadRequestError('The post could not be saved. Try again.');
   }
 
-  content().touchHashtags(app, parsed.hashtags, displayMap, 1);
+  // Trend bookkeeping runs after the post is committed, so a failure here must
+  // not report the published post as an error.
+  try {
+    content().touchHashtags(app, parsed.hashtags, displayMap, 1);
+  } catch (err) {
+    $app.logger().warn('community: hashtag update skipped', 'error', String(err));
+  }
 
   return content().serializePosts(app, [created], authorId, c.getAuthRole(e.auth))[0];
 }
@@ -541,21 +547,29 @@ function toggleJoin(e, options) {
     active = true;
   });
 
+  // The engagement itself is already committed, so a failing notification must
+  // not turn a successful like into an error response.
   if (options.notificationKind) {
-    if (active) {
-      content().createNotification(app, {
-        userId: post.getString('authorId'),
-        actorId: userId,
-        actorHandle: profile.getString('handle'),
-        actorName: profile.getString('displayName'),
-        actorAvatarUrl: c.profileAvatarUrl(app, profile),
-        kind: options.notificationKind,
-        postId: postId,
-        rootId: post.getString('rootId') || postId,
-        preview: c.buildPreview(post.getString('body')),
-      });
-    } else {
-      content().removeNotification(app, post.getString('authorId'), userId, options.notificationKind, postId);
+    var threadId = post.getString('rootId') || postId;
+    try {
+      if (active) {
+        content().createNotification(app, {
+          userId: post.getString('authorId'),
+          actorId: userId,
+          actorHandle: profile.getString('handle'),
+          actorName: profile.getString('displayName'),
+          actorAvatarUrl: c.profileAvatarUrl(app, profile),
+          kind: options.notificationKind,
+          postId: postId,
+          rootId: threadId,
+          preview: c.buildPreview(post.getString('body')),
+          targetPath: '/community/post/' + threadId,
+        });
+      } else {
+        content().removeNotification(app, post.getString('authorId'), userId, options.notificationKind, postId);
+      }
+    } catch (err) {
+      $app.logger().warn('community: notification skipped', 'error', String(err));
     }
   }
 
@@ -869,8 +883,16 @@ function getThread(e, postId) {
   var query = e.requestInfo().query || {};
   var limit = c.clampPageSize(query.perPage, c.FEED_PAGE_SIZE, c.MAX_FEED_PAGE_SIZE);
   var cursor = c.decodeCursor(query.cursor);
-  var params = { parentId: String(postId) };
-  var filter = appendBlockExclusion('parentId = {:parentId}', params, blockedUserIds(app, viewer.id));
+  var includeTree = query.tree === '1' || query.tree === 'true';
+  var params = includeTree
+    ? { parentId: String(postId), rootId: String(postId), selfId: String(postId) }
+    : { parentId: String(postId) };
+  // The tree form also returns deeper descendants, minus the post itself,
+  // whose own rootId points at itself.
+  var baseCondition = includeTree
+    ? '(parentId = {:parentId} || rootId = {:rootId}) && id != {:selfId}'
+    : 'parentId = {:parentId}';
+  var filter = appendBlockExclusion(baseCondition, params, blockedUserIds(app, viewer.id));
   var replyRecords = app.findRecordsByFilter(
     'community_posts',
     applyCursor(filter, params, cursor),

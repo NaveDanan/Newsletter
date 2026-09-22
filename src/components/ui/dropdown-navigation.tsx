@@ -154,11 +154,11 @@ export function DropdownNavigation({ navItems, className }: DropdownNavigationPr
                   className="absolute top-full z-50 pt-3"
                   style={{ insetInlineStart: 0 }}
                 >
-                  <div className="w-max rounded-2xl border border-[#E5E5E5] bg-white p-5 shadow-[0_18px_40px_rgba(23,23,23,0.08)]">
+                  <div className="w-max rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-card)] backdrop-blur-xl">
                     <div className="flex flex-wrap gap-8">
                       {navItem.subMenus.map((subMenu) => (
                         <div key={subMenu.title} className="min-w-64 max-w-72">
-                          <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#A3A3A3]">
+                          <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                             {subMenu.title}
                           </h3>
                           <ul className="space-y-3">
@@ -170,10 +170,10 @@ export function DropdownNavigation({ navItems, className }: DropdownNavigationPr
                                 <li key={item.label}>
                                   <a
                                     href={item.href ?? '#'}
-                                    className="group flex items-start gap-3 rounded-xl p-2 transition-colors duration-200 hover:bg-[#FAFAFA]"
+                                    className="group flex items-start gap-3 rounded-xl p-2 transition-colors duration-200 hover:bg-[var(--bg-card-hover)]"
                                     onClick={(event) => handleLeafItemClick(event, item.onSelect)}
                                   >
-                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#E5E5E5] text-[#171717] transition-colors duration-200 group-hover:border-[#D93A3A] group-hover:bg-[#FFF5F5] group-hover:text-[#D93A3A]">
+                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200 group-hover:border-[var(--primary-accent)] group-hover:text-[var(--primary-accent)]">
                                       {item.imageSrc ? (
                                         <img
                                           src={item.imageSrc}
@@ -187,10 +187,10 @@ export function DropdownNavigation({ navItems, className }: DropdownNavigationPr
                                       )}
                                     </span>
                                     <span className="min-w-0">
-                                      <span className="block text-sm font-semibold text-[#171717]">
+                                      <span className="block text-sm font-semibold text-[var(--text-primary)]">
                                         {item.label}
                                       </span>
-                                      <span className="mt-1 block text-xs leading-5 text-[#737373] transition-colors duration-200 group-hover:text-[#171717]">
+                                      <span className="mt-1 block text-xs leading-5 text-[var(--text-secondary)] transition-colors duration-200 group-hover:text-[var(--text-primary)]">
                                         {item.description}
                                       </span>
                                     </span>

@@ -321,7 +321,7 @@ export function CommunityEditPostDialog({
                 aria-label={t('community.composer.addImage')}
                 title={t('community.composer.addImage')}
                 disabled={items.length >= COMMUNITY_MAX_MEDIA_PER_POST || isSubmitting}
-                className="rounded-full p-2 text-[#D93A3A] transition-colors hover:bg-[#D93A3A]/10 disabled:opacity-40"
+                className="rounded-full p-2 text-[var(--primary-accent)] transition-colors hover:bg-[var(--primary-accent)]/10 disabled:opacity-40"
                 onClick={() => imageInputRef.current?.click()}
               >
                 <HugeiconsIcon icon={ImageAdd01Icon} className="size-5" />
@@ -332,7 +332,7 @@ export function CommunityEditPostDialog({
                 aria-label={t('community.composer.addVideo')}
                 title={t('community.composer.addVideo')}
                 disabled={items.length >= COMMUNITY_MAX_MEDIA_PER_POST || isSubmitting}
-                className="rounded-full p-2 text-[#D93A3A] transition-colors hover:bg-[#D93A3A]/10 disabled:opacity-40"
+                className="rounded-full p-2 text-[var(--primary-accent)] transition-colors hover:bg-[var(--primary-accent)]/10 disabled:opacity-40"
                 onClick={() => videoInputRef.current?.click()}
               >
                 <HugeiconsIcon icon={Video01Icon} className="size-5" />
@@ -345,7 +345,7 @@ export function CommunityEditPostDialog({
                   title={t('community.composer.sensitive')}
                   className={cn(
                     'rounded-full p-2 transition-colors',
-                    sensitive ? 'bg-[#D93A3A]/10 text-[#D93A3A]' : 'text-[#737373] hover:bg-[#F5F5F5]',
+                    sensitive ? 'bg-[var(--primary-accent)]/15 text-[var(--primary-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-pill-hover)]',
                   )}
                   onClick={() => setSensitive((current) => !current)}
                 >
@@ -356,7 +356,7 @@ export function CommunityEditPostDialog({
 
             <div className="flex items-center gap-3 ms-auto">
               <span
-                className={`text-xs ${isOverLimit ? 'font-bold text-[#D93A3A]' : 'text-[#737373]'}`}
+                className={`text-xs ${isOverLimit ? 'font-bold text-[var(--primary-accent)]' : 'text-[var(--text-muted)]'}`}
               >
                 {isOverLimit
                   ? t('community.composer.overLimit')
@@ -366,16 +366,15 @@ export function CommunityEditPostDialog({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="rounded-full font-medium"
+                className="rounded-full font-medium text-[var(--text-secondary)]"
                 onClick={onClose}
                 disabled={isSubmitting}
               >
                 {t('common.cancel')}
               </Button>
-              <Button
+              <button
                 type="submit"
-                size="sm"
-                className="rounded-full bg-[#D93A3A] px-5 font-bold text-white hover:bg-[#C13232]"
+                className="btn-hire-me text-xs py-1.5 px-5 disabled:opacity-40"
                 disabled={!canSubmit}
               >
                 {isSubmitting ? (
@@ -386,7 +385,7 @@ export function CommunityEditPostDialog({
                 ) : (
                   t('community.post.saveEdit')
                 )}
-              </Button>
+              </button>
             </div>
           </DialogFooter>
         </form>

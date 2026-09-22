@@ -20,9 +20,9 @@ import { hasManagerAccess } from '@/lib/auth/permissions';
 import { cn } from '@/lib/utils';
 import { useNotificationCount } from '@/contexts/NotificationsContext';
 
-/** Overrides the stock `focus:bg-accent`, which in this theme is the brand red. */
+/** Overrides the stock `focus:bg-accent` */
 const ITEM_CLASS =
-  'cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[#171717] focus:bg-[#F3F4F6] focus:text-[#171717]';
+  'cursor-pointer gap-2.5 rounded-xl px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] focus:bg-[var(--bg-pill-hover)] focus:text-[var(--text-primary)] transition-colors';
 
 interface AccountMenuProps {
   onProfileClick: () => void;
@@ -52,7 +52,7 @@ export function AccountMenu({
   const unreadCount = useNotificationCount();
 
   if (isLoading && !user) {
-    return <div className={cn('size-9 animate-pulse rounded-full bg-[#F3F4F6]', className)} />;
+    return <div className={cn('size-9 animate-pulse rounded-full bg-[var(--bg-pill)]', className)} />;
   }
 
   if (!isAuthenticated || !user) {
@@ -61,8 +61,8 @@ export function AccountMenu({
         type="button"
         onClick={onSignInClick}
         className={cn(
-          'text-sm font-medium text-[#171717] transition-colors hover:text-[#D93A3A]',
-          variant === 'header' ? 'hidden sm:block' : 'block py-2 font-medium',
+          'btn-pill-action btn-thanks-yellow text-xs font-bold px-4 py-2',
+          variant === 'header' ? 'hidden sm:inline-flex' : 'block py-2 font-medium',
           className,
         )}
       >
@@ -75,80 +75,102 @@ export function AccountMenu({
   const run = onNavigate ?? ((action: () => void) => { action(); });
   const showManage = showManagerItem && hasManagerAccess(user.role);
 
+  const goToNotifications = () => {
+    run(() => {
+      window.history.pushState({}, '', '/community/notifications');
+      window.dispatchEvent(new Event('app:navigate'));
+    });
+  };
+
   return (
-    <div className="flex items-center gap-3">
-      <button type="button" aria-label={t('notifications.badge', { count: unreadCount })} className="relative flex size-9 shrink-0 items-center justify-center rounded-full text-[#737373] hover:bg-[#F3F4F6] hover:text-[#D93A3A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93A3A]" onClick={() => run(() => { window.history.pushState({}, '', '/community/notifications'); window.dispatchEvent(new Event('app:navigate')); })}>
-        <HugeiconsIcon icon={Notification01Icon} className="size-5" />
-        {unreadCount > 0 ? <span aria-hidden="true" className="absolute -end-1 -top-1 min-w-4 rounded-full bg-[#D93A3A] px-1 text-center text-[10px] font-semibold leading-4 text-white">{unreadCount > 99 ? '99+' : unreadCount}</span> : null}
-      </button>
-    <DropdownMenu dir={dir}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={t('account.menuLabel')}
-          className={cn(
-            'rounded-full outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[#D93A3A] focus-visible:ring-offset-2',
-            className,
-          )}
+    <div className="flex items-center gap-2 sm:gap-3">
+      <DropdownMenu dir={dir}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={t('account.menuLabel')}
+            className={cn(
+              'user-top-chip outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)]',
+              className,
+            )}
+          >
+            <span className="relative flex shrink-0">
+              <UserAvatarCircle
+                name={user.name}
+                email={user.email}
+                src={user.avatar}
+                size={28}
+              />
+              {unreadCount > 0 ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute -end-0.5 -top-0.5 size-2.5 rounded-full bg-[var(--primary-accent)] ring-2 ring-[var(--bg-app)]"
+                />
+              ) : null}
+            </span>
+            <span className="user-top-name max-w-[110px] truncate hidden sm:inline">
+              {user.name}
+            </span>
+            <span className="user-top-chevron text-xs opacity-70">▾</span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align={isRTL ? 'start' : 'end'}
+          sideOffset={8}
+          className="w-64 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2 shadow-[var(--shadow-card)] backdrop-blur-xl"
         >
-          <UserAvatarCircle
-            name={user.name}
-            email={user.email}
-            src={user.avatar}
-            size={variant === 'mobile' ? 36 : 32}
-          />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align={isRTL ? 'start' : 'end'}
-        sideOffset={8}
-        className="w-64 rounded-xl border border-[#E5E5E5] bg-white p-1.5 shadow-lg"
-      >
-        <DropdownMenuItem
-          className={cn(ITEM_CLASS, 'items-center gap-3 py-2.5')}
-          onSelect={() => { run(onProfileClick); }}
-        >
-          <UserAvatarCircle name={user.name} email={user.email} src={user.avatar} size={32} />
-          <span className="flex min-w-0 flex-col text-start">
-            <span className="truncate text-sm font-semibold text-[#171717]">{user.name}</span>
-            <span className="truncate text-xs text-[#737373]">{user.email}</span>
-          </span>
-          <HugeiconsIcon
-            icon={ArrowRight01Icon}
-            className="rtl-rotate-180 ms-auto size-4 shrink-0 text-[#A3A3A3]"
-          />
-        </DropdownMenuItem>
-
-        <DropdownMenuSeparator className="my-1.5 bg-[#E5E5E5]" />
-
-        {showManage ? (
-          <DropdownMenuItem className={ITEM_CLASS} onSelect={() => { run(onManagerClick); }}>
-            <HugeiconsIcon icon={DashboardSquare01Icon} className="size-4 text-[#737373]" />
-            {t('account.manage')}
+          <DropdownMenuItem
+            className={cn(ITEM_CLASS, 'items-center gap-3 py-2.5')}
+            onSelect={() => { run(onProfileClick); }}
+          >
+            <UserAvatarCircle name={user.name} email={user.email} src={user.avatar} size={32} />
+            <span className="flex min-w-0 flex-col text-start">
+              <span className="truncate text-sm font-semibold text-[var(--text-primary)]">{user.name}</span>
+              <span className="truncate text-xs text-[var(--text-secondary)]">{user.email}</span>
+            </span>
+            <HugeiconsIcon
+              icon={ArrowRight01Icon}
+              className="rtl-rotate-180 ms-auto size-4 shrink-0 text-[var(--text-muted)]"
+            />
           </DropdownMenuItem>
-        ) : null}
 
-        {/* Deliberately not wrapped in `run`: switching language navigates nowhere,
-            so it must never raise the unsaved-changes prompt. */}
-        <DropdownMenuItem className={ITEM_CLASS} onSelect={() => { toggleLocale(); }}>
-          <HugeiconsIcon icon={GlobeIcon} className="size-4 text-[#737373]" />
-          {isRTL ? t('common.switchToEnglish') : t('common.switchToHebrew')}
-        </DropdownMenuItem>
+          <DropdownMenuSeparator className="my-1.5 bg-[var(--border-subtle)]" />
+          <DropdownMenuItem className={ITEM_CLASS} onSelect={goToNotifications}>
+            <HugeiconsIcon icon={Notification01Icon} className="size-4 text-[var(--text-secondary)]" />
+            {t('community.notifications.title')}
+            {unreadCount > 0 ? (
+              <span className="ms-auto min-w-5 rounded-full bg-[var(--primary-accent)] px-1.5 text-center text-[10px] font-bold leading-5 text-[var(--accent-contrast)]">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            ) : null}
+          </DropdownMenuItem>
+          {showManage ? (
+            <DropdownMenuItem className={ITEM_CLASS} onSelect={() => { run(onManagerClick); }}>
+              <HugeiconsIcon icon={DashboardSquare01Icon} className="size-4 text-[var(--text-secondary)]" />
+              {t('account.manage')}
+            </DropdownMenuItem>
+          ) : null}
 
-        <DropdownMenuSeparator className="my-1.5 bg-[#E5E5E5]" />
+          {/* Language toggle item */}
+          <DropdownMenuItem className={ITEM_CLASS} onSelect={() => { toggleLocale(); }}>
+            <HugeiconsIcon icon={GlobeIcon} className="size-4 text-[var(--text-secondary)]" />
+            {isRTL ? t('common.switchToEnglish') : t('common.switchToHebrew')}
+          </DropdownMenuItem>
 
-        <DropdownMenuItem
-          className={cn(
-            ITEM_CLASS,
-            'text-[#D93A3A] focus:bg-[#FEE2E2] focus:text-[#B91C1C]',
-          )}
-          onSelect={() => { run(onSignOut); }}
-        >
-          <HugeiconsIcon icon={Logout01Icon} className="size-4 text-current" />
-          {t('nav.signOut')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuSeparator className="my-1.5 bg-[var(--border-subtle)]" />
+
+          <DropdownMenuItem
+            className={cn(
+              ITEM_CLASS,
+              'text-[var(--primary-accent)] hover:bg-[var(--primary-accent)]/10 focus:bg-[var(--primary-accent)]/10',
+            )}
+            onSelect={() => { run(onSignOut); }}
+          >
+            <HugeiconsIcon icon={Logout01Icon} className="size-4 text-current" />
+            {t('nav.signOut')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

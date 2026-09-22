@@ -954,17 +954,17 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E5E5E5]">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-subtle)]">
           <button
             onClick={() => handleSave('draft')}
-            className="btn-secondary flex items-center gap-2"
+            className="btn-secondary flex items-center gap-2 text-xs sm:text-sm py-2 px-5"
           >
             <HugeiconsIcon icon={FloppyDiskIcon} className="w-4 h-4" />
             {t('manager.saveAsDraft')}
           </button>
           <button
             onClick={() => handleSave('published')}
-            className="btn-primary flex items-center gap-2"
+            className="btn-hire-me flex items-center gap-2 text-xs sm:text-sm py-2 px-6"
           >
             <HugeiconsIcon icon={FloppyDiskIcon} className="w-4 h-4" />
             {t('manager.publishNewsletter')}

@@ -65,29 +65,29 @@ export function NewsletterPollCard({
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-2xl border border-[#E5E5E5] bg-gradient-to-b from-[#FAFAFA] to-white p-5 shadow-xs sm:p-6',
+        'overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 shadow-sm sm:p-6',
         className
       )}
     >
       {/* Header */}
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#D93A3A]/10 text-[#D93A3A]">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--primary-accent)]/15 text-[var(--primary-accent)]">
             <HugeiconsIcon icon={BarChartIcon} className="h-5 w-5 -scale-y-100" />
           </div>
           <div>
-            <span className="inline-block text-xs font-semibold tracking-wider uppercase text-[#D93A3A]">
+            <span className="inline-block text-xs font-bold tracking-wider uppercase text-[var(--primary-accent)]">
               {t('viewer.poll')}
             </span>
             {isClosed && (
-              <span className="ml-2 inline-block rounded-md bg-neutral-200 px-2 py-0.5 text-[11px] font-medium text-neutral-600">
+              <span className="ml-2 inline-block rounded-md bg-[var(--bg-pill)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
                 {t('viewer.pollClosed')}
               </span>
             )}
           </div>
         </div>
 
-        <div className="text-right text-xs font-medium text-[#737373]">
+        <div className="text-right text-xs font-medium text-[var(--text-secondary)]">
           {totalVotes === 1
             ? t('viewer.oneVote')
             : t('viewer.totalVotes', { count: formatNumber(totalVotes) })}
@@ -96,7 +96,7 @@ export function NewsletterPollCard({
 
       {/* Question */}
       <h3
-        className="mb-4 text-lg font-bold text-[#171717] sm:text-xl"
+        className="mb-4 text-lg font-bold text-[var(--text-primary)] sm:text-xl"
         dir="auto"
       >
         {poll.question}
@@ -119,8 +119,8 @@ export function NewsletterPollCard({
               className={cn(
                 'group relative w-full overflow-hidden rounded-xl border text-left transition-all',
                 isSelected
-                  ? 'border-[#D93A3A] bg-[#FFF5F5] shadow-xs'
-                  : 'border-[#E5E5E5] bg-white hover:border-[#D4D4D4] hover:bg-[#F9FAFB]',
+                  ? 'border-[var(--primary-accent)] bg-[var(--primary-accent)]/10 shadow-xs'
+                  : 'border-[var(--border-subtle)] bg-[var(--bg-card-alt)] hover:border-[var(--primary-accent)]/40',
                 (!isInteractive || isClosed) && 'cursor-default'
               )}
             >
@@ -130,8 +130,8 @@ export function NewsletterPollCard({
                   'absolute inset-y-0 transition-all duration-500 ease-out',
                   isRTL ? 'right-0' : 'left-0',
                   isSelected
-                    ? 'bg-[#D93A3A]/15'
-                    : 'bg-[#E5E5E5]/50 group-hover:bg-[#E5E5E5]/70'
+                    ? 'bg-[var(--primary-accent)]/20'
+                    : 'bg-[var(--bg-pill)]/60 group-hover:bg-[var(--bg-pill)]'
                 )}
                 style={{ width: `${percentage}%` }}
               />
@@ -139,19 +139,19 @@ export function NewsletterPollCard({
               {/* Content row */}
               <div className="relative flex items-center justify-between gap-3 px-4 py-3 sm:px-5 sm:py-3.5">
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="shrink-0 text-[#737373]">
+                  <span className="shrink-0 text-[var(--text-secondary)]">
                     {isSubmitting ? (
-                      <HugeiconsIcon icon={Loading02Icon} className="h-4 w-4 animate-spin text-[#D93A3A]" />
+                      <HugeiconsIcon icon={Loading02Icon} className="h-4 w-4 animate-spin text-[var(--primary-accent)]" />
                     ) : isSelected ? (
-                      <HugeiconsIcon icon={CheckmarkCircle02Icon} className="h-4 w-4 text-[#D93A3A]" />
+                      <HugeiconsIcon icon={CheckmarkCircle02Icon} className="h-4 w-4 text-[var(--primary-accent)]" />
                     ) : (
-                      <HugeiconsIcon icon={CircleIcon} className="h-4 w-4 text-[#A3A3A3] group-hover:text-[#737373]" />
+                      <HugeiconsIcon icon={CircleIcon} className="h-4 w-4 text-[var(--text-muted)] group-hover:text-[var(--text-primary)]" />
                     )}
                   </span>
                   <span
                     className={cn(
                       'text-sm font-medium sm:text-base break-words',
-                      isSelected ? 'font-semibold text-[#171717]' : 'text-[#262626]'
+                      isSelected ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
                     )}
                     dir="auto"
                   >
@@ -162,8 +162,8 @@ export function NewsletterPollCard({
                 <div className="flex shrink-0 items-center gap-2 font-mono text-xs sm:text-sm">
                   {(hasUserVoted || isClosed || !isAuthenticated) && (
                     <>
-                      <span className="font-semibold text-[#171717]">{percentage}%</span>
-                      <span className="text-xs text-[#737373]">({optVotes})</span>
+                      <span className="font-semibold text-[var(--text-primary)]">{percentage}%</span>
+                      <span className="text-xs text-[var(--text-muted)]">({optVotes})</span>
                     </>
                   )}
                 </div>

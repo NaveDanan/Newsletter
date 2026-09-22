@@ -132,17 +132,17 @@ export function CommunityProfileEditor({ open, profile, onSave, onClose }: Commu
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) { onClose(); } }}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg bg-[var(--bg-card)] border-[var(--border-subtle)] text-[var(--text-primary)]">
         <DialogHeader>
-          <DialogTitle>{t('community.editor.title')}</DialogTitle>
+          <DialogTitle className="text-[var(--text-primary)]">{t('community.editor.title')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <Label className="mb-2 block">{t('community.editor.banner')}</Label>
+            <Label className="mb-2 block text-[var(--text-primary)]">{t('community.editor.banner')}</Label>
             <button
               type="button"
-              className="block h-32 w-full overflow-hidden rounded-xl border border-[#E5E5E5] bg-[#F5F5F5]"
+              className="block h-32 w-full overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card-alt)]"
               onClick={() => bannerInputRef.current?.click()}
             >
               {bannerPreview || (profile && profile.bannerUrl) ? (
@@ -152,7 +152,7 @@ export function CommunityProfileEditor({ open, profile, onSave, onClose }: Commu
                   className="h-32 w-full object-cover"
                 />
               ) : (
-                <span className="text-sm text-[#737373]">{t('community.editor.pickImage')}</span>
+                <span className="text-sm text-[var(--text-secondary)]">{t('community.editor.pickImage')}</span>
               )}
             </button>
             <input
@@ -251,12 +251,12 @@ export function CommunityProfileEditor({ open, profile, onSave, onClose }: Commu
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button type="button" variant="ghost" onClick={onClose} className="text-[var(--text-secondary)]">
             {t('common.cancel')}
           </Button>
-          <Button type="button" disabled={isSaving} onClick={() => void submit()}>
+          <button type="button" disabled={isSaving} onClick={() => void submit()} className="btn-hire-me text-xs py-2 px-5">
             {isSaving ? t('community.editor.saving') : t('community.editor.save')}
-          </Button>
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

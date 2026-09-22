@@ -127,17 +127,17 @@ export function NewsletterEventCard({
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-2xl border border-[#E5E5E5] bg-gradient-to-br from-white via-[#FAFAFA] to-white p-5 shadow-xs sm:p-6',
+        'overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 shadow-sm sm:p-6',
         className
       )}
     >
       {/* Top Banner / Type label */}
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-[#D93A3A]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--primary-accent)]/15 text-[var(--primary-accent)]">
             <HugeiconsIcon icon={Calendar03Icon} className="h-4.5 w-4.5" />
           </div>
-          <span className="text-xs font-semibold tracking-wider uppercase text-[#D93A3A]">
+          <span className="text-xs font-bold tracking-wider uppercase text-[var(--primary-accent)]">
             {t('viewer.upcomingEvent')}
           </span>
         </div>
@@ -147,43 +147,43 @@ export function NewsletterEventCard({
           <button
             type="button"
             onClick={() => setIsCalendarMenuOpen((prev) => !prev)}
-            className="flex items-center gap-1.5 rounded-lg border border-[#E5E5E5] bg-white px-3 py-1.5 text-xs font-medium text-[#171717] shadow-2xs transition-colors hover:border-[#D4D4D4] hover:bg-[#F5F5F5]"
+            className="flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card-alt)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--primary-accent)]"
           >
-            <HugeiconsIcon icon={Calendar01Icon} className="h-3.5 w-3.5 text-[#737373]" />
+            <HugeiconsIcon icon={Calendar01Icon} className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
             <span>{t('viewer.addToCalendar')}</span>
-            <HugeiconsIcon icon={ArrowDown01Icon} className="h-3 w-3 text-[#A3A3A3]" />
+            <HugeiconsIcon icon={ArrowDown01Icon} className="h-3 w-3 text-[var(--text-muted)]" />
           </button>
 
           {isCalendarMenuOpen && (
             <div
               className={cn(
-                'absolute z-20 mt-1.5 w-52 rounded-xl border border-[#E5E5E5] bg-white p-1.5 shadow-lg',
+                'absolute z-20 mt-1.5 w-52 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5 shadow-xl backdrop-blur-xl',
                 isRTL ? 'left-0' : 'right-0'
               )}
             >
               <button
                 type="button"
                 onClick={handleOpenGoogleCalendar}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-[#171717] hover:bg-[#F5F5F5]"
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]"
               >
-                <HugeiconsIcon icon={Calendar01Icon} className="h-4 w-4 text-blue-600" />
+                <HugeiconsIcon icon={Calendar01Icon} className="h-4 w-4 text-blue-500" />
                 <span>{t('viewer.googleCalendar')}</span>
               </button>
               <button
                 type="button"
                 onClick={handleOpenOutlookCalendar}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-[#171717] hover:bg-[#F5F5F5]"
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]"
               >
-                <HugeiconsIcon icon={Calendar03Icon} className="h-4 w-4 text-sky-600" />
+                <HugeiconsIcon icon={Calendar03Icon} className="h-4 w-4 text-sky-500" />
                 <span>{t('viewer.outlookCalendar')}</span>
               </button>
-              <div className="my-1 border-t border-[#E5E5E5]" />
+              <div className="my-1 border-t border-[var(--border-subtle)]" />
               <button
                 type="button"
                 onClick={handleDownloadIcs}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-[#171717] hover:bg-[#F5F5F5]"
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]"
               >
-                <HugeiconsIcon icon={Download01Icon} className="h-4 w-4 text-neutral-600" />
+                <HugeiconsIcon icon={Download01Icon} className="h-4 w-4 text-[var(--text-muted)]" />
                 <span>{t('viewer.downloadIcs')}</span>
               </button>
             </div>
@@ -195,17 +195,17 @@ export function NewsletterEventCard({
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
         {/* Date Badge */}
         {isValidDate && (
-          <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:justify-center sm:rounded-xl sm:border sm:border-[#E5E5E5] sm:bg-white sm:px-4 sm:py-3.5 sm:text-center sm:shadow-2xs">
-            <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-[#D93A3A] text-white shadow-2xs sm:h-auto sm:w-auto sm:bg-transparent sm:text-inherit sm:shadow-none">
-              <span className="text-[10px] font-bold tracking-widest uppercase text-white/90 sm:text-xs sm:text-[#D93A3A]">
+          <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:justify-center sm:rounded-2xl sm:border sm:border-[var(--border-subtle)] sm:bg-[var(--bg-card-alt)] sm:px-4 sm:py-3.5 sm:text-center sm:shadow-xs">
+            <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-[var(--primary-accent)] text-[var(--accent-contrast)] sm:h-auto sm:w-auto sm:bg-transparent sm:text-inherit">
+              <span className="text-[10px] font-bold tracking-widest uppercase text-white/90 sm:text-xs sm:text-[var(--primary-accent)]">
                 {formatDate(startDateObj, { month: 'short' })}
               </span>
-              <span className="text-xl font-extrabold sm:text-3xl sm:font-black sm:text-[#171717]">
+              <span className="text-xl font-extrabold sm:text-3xl sm:font-black sm:text-[var(--text-primary)]">
                 {formatDate(startDateObj, { day: 'numeric' })}
               </span>
             </div>
             <div className="sm:hidden">
-              <div className="font-semibold text-[#171717]">
+              <div className="font-bold text-[var(--text-primary)]">
                 {formatDate(startDateObj, { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}
               </div>
               <div className="text-xs text-[#737373]">
@@ -309,7 +309,7 @@ export function NewsletterEventCard({
             <button
               type="button"
               onClick={onRequireAuth}
-              className="flex items-center gap-1.5 rounded-xl border border-[#D93A3A] bg-white px-4 py-2 text-xs font-semibold text-[#D93A3A] shadow-2xs transition-all hover:bg-[#D93A3A] hover:text-white"
+              className="flex items-center gap-1.5 rounded-full border border-[var(--primary-accent)] bg-transparent px-4 py-2 text-xs font-bold text-[var(--primary-accent)] transition-all hover:bg-[var(--primary-accent)] hover:text-[var(--accent-contrast)]"
             >
               <HugeiconsIcon icon={UserIcon} className="h-3.5 w-3.5" />
               <span>{t('viewer.signInToAttend')}</span>
@@ -320,10 +320,10 @@ export function NewsletterEventCard({
               disabled={!isInteractive || isSubmittingRsvp}
               onClick={handleRsvpClick}
               className={cn(
-                'flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold shadow-2xs transition-all disabled:opacity-70',
+                'flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold shadow-md transition-all disabled:opacity-70',
                 isAttending
-                  ? 'border border-green-300 bg-green-50 text-green-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700'
-                  : 'bg-[#D93A3A] text-white hover:bg-[#B91C1C]'
+                  ? 'border border-emerald-500/30 bg-emerald-500/15 text-emerald-400'
+                  : 'btn-hire-me'
               )}
             >
               {isSubmittingRsvp ? (

@@ -21,6 +21,9 @@ export interface CommunityContextValue {
   openReply: (post: CommunityPost) => void;
   openQuote: (post: CommunityPost) => void;
   openReport: (input: { postId?: string; handle?: string }) => void;
+  /** Trend pills the reader has pinned; an empty list means "show everything". */
+  selectedTags: string[];
+  toggleTag: (tag: string) => void;
 }
 
 const CommunityContext = createContext<CommunityContextValue | null>(null);

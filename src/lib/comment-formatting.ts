@@ -91,3 +91,56 @@ export function formatCommentBodyToHtml(value: string): string {
 
   return legacyMarkupToHtml(value);
 }
+
+const MARKUP_TAGS: Record<string, string> = {
+  strong: '**',
+  b: '**',
+  em: '*',
+  i: '*',
+  u: '++',
+  s: '~~',
+  strike: '~~',
+  del: '~~',
+};
+
+function nodeToMarkup(node: ChildNode): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent ?? '';
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return '';
+  }
+
+  const element = node as HTMLElement;
+  const tagName = element.tagName.toLowerCase();
+
+  if (tagName === 'br') {
+    return '\n';
+  }
+
+  const children = Array.from(element.childNodes).map(nodeToMarkup).join('');
+  const marker = MARKUP_TAGS[tagName];
+
+  if (marker && children.trim()) {
+    return marker + children + marker;
+  }
+
+  return tagName === 'p' || tagName === 'div' ? children + '\n' : children;
+}
+
+// The inverse of legacyMarkupToHtml: a rich-text editor can drive a field that
+// is stored, searched and entity-scanned as plain text.
+export function htmlToCommentMarkup(value: string): string {
+  if (!value || typeof window === 'undefined') {
+    return value;
+  }
+
+  const document = new DOMParser().parseFromString(value, 'text/html');
+
+  return Array.from(document.body.childNodes)
+    .map(nodeToMarkup)
+    .join('')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\s+$/, '');
+}

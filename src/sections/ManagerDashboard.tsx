@@ -316,7 +316,7 @@ export function ManagerDashboard({
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
       <AlertDialog
         open={showUnsavedDialog}
         onOpenChange={(open) => {
@@ -326,15 +326,16 @@ export function ManagerDashboard({
           }
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-[var(--bg-card)] border-[var(--border-subtle)] text-[var(--text-primary)]">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('manager.unsavedTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-[var(--text-primary)]">{t('manager.unsavedTitle')}</AlertDialogTitle>
+            <AlertDialogDescription className="text-[var(--text-secondary)]">
               {t('manager.unsavedDescription')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel
+              className="bg-[var(--bg-pill)] text-[var(--text-primary)] border-[var(--border-subtle)] hover:bg-[var(--bg-pill-hover)]"
               onClick={() => {
                 pendingLeaveActionRef.current = null;
               }}
@@ -342,13 +343,13 @@ export function ManagerDashboard({
               {t('manager.keepEditing')}
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-[#737373] hover:bg-[#525252]"
+              className="bg-[var(--bg-pill)] text-[var(--text-secondary)] hover:bg-[var(--bg-pill-hover)] hover:text-[var(--text-primary)]"
               onClick={handleDiscardAndLeave}
             >
               {t('manager.discardChanges')}
             </AlertDialogAction>
             <AlertDialogAction
-              className="bg-[#D93A3A] hover:bg-[#B91C1C]"
+              className="btn-hire-me"
               onClick={handleConfirmSaveAndLeave}
             >
               {t('manager.saveChanges')}
@@ -358,29 +359,31 @@ export function ManagerDashboard({
       </AlertDialog>
 
       {/* Top bar */}
-      <header className="sticky top-0 z-50 bg-white border-b border-[#E5E5E5]">
-        <div className="flex items-center justify-between px-4 lg:px-8 h-14">
+      <header className="sticky top-0 z-50 bg-[var(--bg-app)]/90 backdrop-blur-md border-b border-[var(--border-subtle)]">
+        <div className="flex items-center justify-between px-4 lg:px-8 h-16">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowMobileMenu(!showMobileMenu)}
               aria-label={showMobileMenu ? t('nav.closeMenu') : t('nav.openMenu')}
-              className="lg:hidden p-2 text-[#737373]"
+              className="lg:hidden p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]"
             >
               {showMobileMenu ? <HugeiconsIcon icon={Cancel01Icon} className="w-5 h-5" /> : <HugeiconsIcon icon={Menu01Icon} className="w-5 h-5" />}
             </button>
             <button
               onClick={() => requestLeaveEditor(onHomeClick)}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              className="flex items-center gap-3 group text-start"
             >
-              <img 
-                src="/logo.gif" 
-                alt="AI Maor Break" 
-                className="w-8 h-8 object-contain"
-              />
-              <span className="font-bold text-[#171717]">AI-BREAK</span>
+              <div className="brand-logo group-hover:scale-105 transition-transform">
+                <img 
+                  src="/logo.gif" 
+                  alt="AI-BREAK" 
+                  className="w-7 h-7 object-contain rounded-lg"
+                />
+              </div>
+              <span className="font-extrabold text-base sm:text-lg text-[var(--text-primary)] tracking-tight">AI-BREAK</span>
             </button>
-            <span className="text-[#D4D4D4] hidden sm:inline">|</span>
-            <span className="text-xs text-[#737373] uppercase tracking-wider hidden sm:inline">{t('manager.dashboard')}</span>
+            <span className="text-[var(--border-highlight)] hidden sm:inline">|</span>
+            <span className="text-xs font-bold text-[var(--primary-accent)] uppercase tracking-wider hidden sm:inline">{t('manager.dashboard')}</span>
           </div>
           <div className="flex items-center gap-4">
             <LanguageToggleButton compact />
@@ -399,8 +402,8 @@ export function ManagerDashboard({
         {/* Sidebar */}
         <aside className={cn(
           showMobileMenu ? 'block' : 'hidden',
-          'w-64 fixed lg:sticky top-14 h-[calc(100vh-3.5rem)] bg-white z-40 overflow-y-auto lg:block',
-          isRTL ? 'right-0 border-l border-[#E5E5E5]' : 'left-0 border-r border-[#E5E5E5]',
+          'w-64 fixed lg:sticky top-16 h-[calc(100vh-4rem)] bg-[var(--bg-card)] border-[var(--border-subtle)] z-40 overflow-y-auto lg:block shadow-lg lg:shadow-none',
+          isRTL ? 'right-0 border-l' : 'left-0 border-r',
         )}>
           <nav className="p-4 space-y-1">
             {tabs.map((tab) => (
@@ -415,35 +418,35 @@ export function ManagerDashboard({
                     setShowMobileMenu(false);
                   });
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
                   activeTab === tab.id
-                    ? 'bg-[#D93A3A]/10 text-[#D93A3A]'
-                    : 'text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717]'
+                    ? 'bg-[var(--primary-accent)]/15 text-[var(--primary-accent)]'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-pill-hover)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                <HugeiconsIcon icon={tab.icon} className="w-5 h-5" />
-                <span className="font-medium">{tab.label}</span>
+                <HugeiconsIcon icon={tab.icon} className="w-5 h-5 shrink-0" />
+                <span className="truncate">{tab.label}</span>
               </button>
             ))}
           </nav>
 
           {/* Quick stats */}
-          <div className="p-4 border-t border-[#E5E5E5]">
-            <p className="text-xs text-[#737373] uppercase tracking-wider mb-4">{t('manager.quickStats')}</p>
+          <div className="p-4 border-t border-[var(--border-subtle)]">
+            <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">{t('manager.quickStats')}</p>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[#737373]">
-                  <HugeiconsIcon icon={FileAttachmentIcon} className="w-4 h-4" />
-                  <span className="text-sm">{t('manager.published')}</span>
+                <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                  <HugeiconsIcon icon={FileAttachmentIcon} className="w-4 h-4 text-[var(--primary-accent)]" />
+                  <span>{t('manager.published')}</span>
                 </div>
-                <span className="font-semibold text-[#171717]">{formatNumber(publishedNewsletterCount)}</span>
+                <span className="font-bold text-sm text-[var(--text-primary)]">{formatNumber(publishedNewsletterCount)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[#737373]">
-                  <HugeiconsIcon icon={UserGroupIcon} className="w-4 h-4" />
-                  <span className="text-sm">{t('manager.subscribers')}</span>
+                <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                  <HugeiconsIcon icon={UserGroupIcon} className="w-4 h-4 text-[var(--primary-accent)]" />
+                  <span>{t('manager.subscribers')}</span>
                 </div>
-                <span className="font-semibold text-[#171717]">{subscriberCount === null ? '...' : formatNumber(subscriberCount)}</span>
+                <span className="font-bold text-sm text-[var(--text-primary)]">{subscriberCount === null ? '...' : formatNumber(subscriberCount)}</span>
               </div>
             </div>
           </div>
@@ -452,7 +455,7 @@ export function ManagerDashboard({
         {/* Overlay for mobile */}
         {showMobileMenu && (
           <div 
-            className="fixed inset-0 bg-black/20 z-30 lg:hidden"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden"
             onClick={() => setShowMobileMenu(false)}
           />
         )}

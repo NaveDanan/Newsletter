@@ -1,6 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  ArrowLeft01Icon,
   Bookmark01Icon,
   DashboardSquare01Icon,
   GlobeIcon,
@@ -45,7 +44,6 @@ interface CommunityLeftRailProps {
   section: CommunitySection;
   unreadCount: number;
   onCompose: () => void;
-  onLeave: () => void;
   onOpenModeration: () => void;
 }
 
@@ -61,7 +59,6 @@ export function CommunityLeftRail({
   section,
   unreadCount,
   onCompose,
-  onLeave,
   onOpenModeration,
 }: CommunityLeftRailProps) {
   const { t, formatNumber, dir, isRTL, toggleLocale } = useLocale();
@@ -113,18 +110,6 @@ export function CommunityLeftRail({
     >
       {/* Top action and navigation links */}
       <div className="flex w-full flex-col gap-2">
-        {/* Back to site / logo header */}
-        <button
-          type="button"
-          aria-label={t('community.nav.backToSite')}
-          title={t('community.nav.backToSite')}
-          className="group flex size-12 shrink-0 items-center justify-center rounded-full text-[#171717] transition-colors hover:bg-[#F5F5F5] xl:size-auto xl:w-full xl:justify-start xl:gap-4 xl:px-4 xl:py-3"
-          onClick={onLeave}
-        >
-          <HugeiconsIcon icon={ArrowLeft01Icon} className="size-6 shrink-0 rtl:rotate-180" />
-          <span className="hidden text-base font-medium xl:inline">{t('community.nav.backToSite')}</span>
-        </button>
-
         {/* Primary nav buttons */}
         {items.map((item) => {
           const isActive = item.key === section
@@ -139,8 +124,8 @@ export function CommunityLeftRail({
               aria-label={item.label}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'group flex size-12 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[#F5F5F5] xl:size-auto xl:w-full xl:justify-start xl:gap-4 xl:px-4 xl:py-3',
-                isActive ? 'font-bold text-[#171717]' : 'font-normal text-[#171717]',
+                'group flex size-12 shrink-0 items-center justify-center rounded-2xl transition-colors hover:bg-[var(--bg-card-hover)] xl:size-auto xl:w-full xl:justify-start xl:gap-4 xl:px-4 xl:py-3',
+                isActive ? 'font-bold text-[var(--primary-accent)] bg-[var(--primary-accent)]/10' : 'font-medium text-[var(--text-primary)]',
               )}
               onClick={() => {
                 if (item.key === 'moderation') {
@@ -157,16 +142,16 @@ export function CommunityLeftRail({
               <span className="relative flex items-center justify-center">
                 <HugeiconsIcon
                   icon={item.icon}
-                  className="size-7 shrink-0 text-[#171717]"
+                  className={cn("size-7 shrink-0", isActive ? "text-[var(--primary-accent)]" : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]")}
                   strokeWidth={isActive ? 2.5 : 1.75}
                 />
                 {item.badge && item.badge > 0 ? (
-                  <span className="absolute -top-1 -end-1.5 min-w-[18px] h-[18px] rounded-full bg-[#D93A3A] px-1 text-center text-[10px] font-bold leading-[18px] text-white">
+                  <span className="absolute -top-1 -end-1.5 min-w-[18px] h-[18px] rounded-full bg-[var(--primary-accent)] px-1 text-center text-[10px] font-bold leading-[18px] text-[var(--accent-contrast)]">
                     {item.badge > 99 ? '99+' : formatNumber(item.badge)}
                   </span>
                 ) : null}
               </span>
-              <span className="hidden text-[19px] xl:inline leading-none">{item.label}</span>
+              <span className="hidden text-[17px] xl:inline leading-none">{item.label}</span>
             </button>
           );
         })}
@@ -178,7 +163,7 @@ export function CommunityLeftRail({
             type="button"
             aria-label={t('community.composer.post')}
             title={t('community.composer.post')}
-            className="flex size-12 items-center justify-center rounded-full bg-[#D93A3A] text-white shadow-sm transition-all hover:bg-[#C13232] active:scale-[0.98] xl:hidden"
+            className="flex size-12 items-center justify-center rounded-2xl bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-lg transition-all hover:scale-105 active:scale-95 xl:hidden"
             onClick={() => {
               if (!isLoggedIn) {
                 requireAuth();
@@ -193,7 +178,7 @@ export function CommunityLeftRail({
           {/* Full-width pill button on xl */}
           <Button
             type="button"
-            className="hidden w-full rounded-full bg-[#D93A3A] py-6 text-[17px] font-bold text-white shadow-sm transition-all hover:bg-[#C13232] active:scale-[0.98] xl:flex justify-center"
+            className="hidden w-full rounded-full bg-[var(--primary-accent)] py-6 text-[16px] font-bold text-[var(--accent-contrast)] shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] xl:flex justify-center"
             onClick={() => {
               if (!isLoggedIn) {
                 requireAuth();
@@ -207,98 +192,9 @@ export function CommunityLeftRail({
         </div>
       </div>
 
-      {/* Bottom user profile card pinned to bottom of the screen */}
-      <div className="mt-3 w-full shrink-0 pb-1">
-        <div aria-hidden="true" className="mx-2 mb-3 h-px bg-[#E5E5E5] xl:mx-4" />
-        {isLoggedIn ? (
-          <DropdownMenu dir={dir}>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label={userDisplayName || userHandle}
-                className={cn(
-                  'group flex items-center gap-3 rounded-full transition-colors hover:bg-[#F5F5F5] outline-none focus-visible:ring-2 focus-visible:ring-[#D93A3A]',
-                  'size-12 p-1 justify-center xl:size-auto xl:w-full xl:justify-start xl:p-2.5',
-                )}
-              >
-                <CommunityAvatar
-                  handle={userHandle}
-                  displayName={userDisplayName}
-                  avatarUrl={userAvatarUrl}
-                  size="md"
-                />
-                <div className="hidden min-w-0 flex-1 flex-col text-start leading-tight xl:flex">
-                  <span className="truncate text-[15px] font-bold text-[#171717]">
-                    {userDisplayName}
-                  </span>
-                  <span className="truncate text-[14px] text-[#737373]">
-                    @{userHandle}
-                  </span>
-                </div>
-                <HugeiconsIcon
-                  icon={MoreHorizontalIcon}
-                  className="hidden size-5 shrink-0 text-[#171717] ms-auto xl:block"
-                />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align={isRTL ? 'end' : 'start'}
-              side="top"
-              sideOffset={12}
-              className="w-64 rounded-2xl border border-[#E5E5E5] bg-white p-2 shadow-xl"
-            >
-              <DropdownMenuItem
-                className="flex items-center gap-3 rounded-xl p-2.5 cursor-pointer hover:bg-[#F5F5F5] focus:bg-[#F5F5F5]"
-                onSelect={() => navigate(profilePath)}
-              >
-                <CommunityAvatar
-                  handle={profile?.handle || userHandle}
-                  displayName={userDisplayName}
-                  avatarUrl={userAvatarUrl}
-                  size="sm"
-                />
-                <div className="flex min-w-0 flex-1 flex-col text-start leading-tight">
-                  <span className="truncate text-sm font-bold text-[#171717]">
-                    {userDisplayName}
-                  </span>
-                  <span className="truncate text-xs text-[#737373]">
-                    @{userHandle}
-                  </span>
-                </div>
-              </DropdownMenuItem>
-
-              <DropdownMenuSeparator className="my-1 bg-[#E5E5E5]" />
-
-              {showManage ? (
-                <DropdownMenuItem
-                  className="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-[#171717] hover:bg-[#F5F5F5] focus:bg-[#F5F5F5]"
-                  onSelect={() => navigate('/manager')}
-                >
-                  <HugeiconsIcon icon={DashboardSquare01Icon} className="size-4 text-[#737373]" />
-                  <span>{t('account.manage')}</span>
-                </DropdownMenuItem>
-              ) : null}
-
-              <DropdownMenuItem
-                className="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-[#171717] hover:bg-[#F5F5F5] focus:bg-[#F5F5F5]"
-                onSelect={toggleLocale}
-              >
-                <HugeiconsIcon icon={GlobeIcon} className="size-4 text-[#737373]" />
-                <span>{isRTL ? t('common.switchToEnglish') : t('common.switchToHebrew')}</span>
-              </DropdownMenuItem>
-
-              <DropdownMenuSeparator className="my-1 bg-[#E5E5E5]" />
-
-              <DropdownMenuItem
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-[#D93A3A] cursor-pointer hover:bg-[#FEF2F2] focus:bg-[#FEF2F2] focus:text-[#D93A3A]"
-                onSelect={logout}
-              >
-                <HugeiconsIcon icon={Logout01Icon} className="size-4 text-[#D93A3A]" />
-                <span>{t('nav.signOut')} @{userHandle}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
+      {/* Signed-in users get their account menu from the app header instead. */}
+      {!isLoggedIn ? (
+        <div className="mt-3 w-full shrink-0 pb-1">
           <div>
             <button
               type="button"
@@ -317,8 +213,8 @@ export function CommunityLeftRail({
               {t('community.signIn.action')}
             </Button>
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
     </nav>
   );
 }

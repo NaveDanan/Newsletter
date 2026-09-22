@@ -318,7 +318,7 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
             <h2 className="text-lg font-semibold text-[#171717]">{t('linksPage.dropdownCategories')}</h2>
             <p className="text-xs text-[#737373]">{t('linksPage.dropdownCategoriesHint')}</p>
           </div>
-          <button onClick={openCreateDropdownDialog} className="btn-primary flex items-center gap-2 text-sm">
+          <button onClick={openCreateDropdownDialog} className="btn-hire-me flex items-center gap-2 text-xs sm:text-sm py-2 px-5">
             <HugeiconsIcon icon={Add01Icon} className="w-4 h-4" />
             {t('linksPage.addDropdown')}
           </button>

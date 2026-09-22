@@ -286,15 +286,15 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
     }
 
     return (
-      <div className="border-t border-[#E5E5E5] bg-white">
+      <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-card)]">
         <div className="px-4 pt-4 pb-2">
-          <h3 className="text-xl font-bold text-[#171717]">{t('community.profile.whoToFollow')}</h3>
+          <h3 className="text-xl font-bold text-[var(--text-primary)]">{t('community.profile.whoToFollow')}</h3>
         </div>
-        <div className="divide-y divide-[#F0F0F0]">
+        <div className="divide-y divide-[var(--border-subtle)]">
           {displayedSuggestions.map((item) => (
             <div
               key={item.id}
-              className="flex items-start justify-between gap-3 px-4 py-3 transition-colors hover:bg-[#FAFAFA] cursor-pointer"
+              className="flex items-start justify-between gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-card-hover)] cursor-pointer"
               onClick={() => navigate(communityProfilePath(item.handle))}
             >
               <div className="flex items-start gap-3 min-w-0">
@@ -307,14 +307,14 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1">
-                    <span className="truncate text-[15px] font-bold text-[#171717] hover:underline">
+                    <span className="truncate text-[15px] font-bold text-[var(--text-primary)] hover:underline">
                       {item.displayName || item.handle}
                     </span>
                     <VerifiedBadge className="size-4" />
                   </div>
-                  <p className="truncate text-sm text-[#737373]">@{item.handle}</p>
+                  <p className="truncate text-sm text-[var(--text-secondary)]">@{item.handle}</p>
                   {item.bio ? (
-                    <p className="mt-1 line-clamp-2 text-sm text-[#171717]">{item.bio}</p>
+                    <p className="mt-1 line-clamp-2 text-sm text-[var(--text-primary)]">{item.bio}</p>
                   ) : null}
                 </div>
               </div>
@@ -331,7 +331,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
         </div>
         <button
           type="button"
-          className="w-full px-4 py-3 text-start text-sm font-semibold text-[#D93A3A] transition-colors hover:bg-[#FAFAFA]"
+          className="w-full px-4 py-3 text-start text-sm font-semibold text-[var(--primary-accent)] transition-colors hover:bg-[var(--bg-card-hover)]"
           onClick={() => navigate(communitySearchPath(''))}
         >
           {t('community.profile.showMore')}
@@ -343,12 +343,12 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
   return (
     <div>
       {/* Top sticky header bar */}
-      <div className="sticky top-[104px] z-10 flex items-center justify-between border-b border-[#E5E5E5] bg-white/85 px-4 py-2 backdrop-blur">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/85 px-4 py-2 backdrop-blur">
         <div className="flex items-center gap-6 min-w-0">
           <button
             type="button"
             aria-label={t('community.thread.back')}
-            className="rounded-full p-2 text-[#171717] transition-colors hover:bg-[#F5F5F5]"
+            className="rounded-full p-2 text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-card-hover)]"
             onClick={() => {
               if (window.history.length > 1) {
                 window.history.back();
@@ -361,12 +361,12 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
           </button>
           <div className="min-w-0">
             <div className="flex items-center gap-1">
-              <h1 className="truncate text-xl font-bold text-[#171717]">
+              <h1 className="truncate text-xl font-bold text-[var(--text-primary)]">
                 {profile.displayName || profile.handle}
               </h1>
               <VerifiedBadge className="size-4" />
             </div>
-            <p className="truncate text-xs sm:text-sm text-[#737373]">
+            <p className="truncate text-xs sm:text-sm text-[var(--text-secondary)]">
               {profile.postCount === 1
                 ? t('community.profile.postCountOne')
                 : t('community.profile.postCount', { count: formatNumber(profile.postCount) })}
@@ -376,7 +376,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
         <button
           type="button"
           aria-label={t('community.nav.explore')}
-          className="rounded-full p-2 text-[#171717] transition-colors hover:bg-[#F5F5F5]"
+          className="rounded-full p-2 text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-card-hover)]"
           onClick={() => navigate(communitySearchPath(''))}
         >
           <HugeiconsIcon icon={Search01Icon} className="size-5" />
@@ -384,7 +384,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
       </div>
 
       {/* Header cover banner */}
-      <div className="relative h-48 sm:h-52 w-full bg-[#333639] overflow-hidden">
+      <div className="relative h-48 sm:h-52 w-full bg-[var(--bg-card-alt)] overflow-hidden">
         {profile.bannerUrl ? (
           <img
             src={resolveCommunityFileUrl(profile.bannerUrl)}
@@ -392,7 +392,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="h-full w-full bg-gradient-to-r from-[#202327] via-[#2f3336] to-[#202327]" />
+          <div className="h-full w-full bg-gradient-to-r from-[var(--bg-outer)] via-[var(--bg-card)] to-[var(--bg-outer)]" />
         )}
       </div>
 
@@ -415,12 +415,12 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
                   <button
                     type="button"
                     aria-label={t('community.post.moreActions')}
-                    className="rounded-full border border-[#E5E5E5] p-2 text-[#171717] transition-colors hover:bg-[#F5F5F5]"
+                    className="rounded-full border border-[var(--border-subtle)] p-2 text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-card-hover)]"
                   >
                     <HugeiconsIcon icon={MoreHorizontalIcon} className="size-4" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="bg-[var(--bg-card)] border-[var(--border-subtle)]">
                   <DropdownMenuItem onSelect={() => void block()}>
                     {t('community.profile.block')}
                   </DropdownMenuItem>
@@ -441,7 +441,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-full border border-[#CFD9DE] px-4 py-1.5 text-sm font-bold text-[#171717] transition-colors hover:bg-[#F5F5F5]"
+                className="rounded-full border border-[var(--border-subtle)] px-4 py-1.5 text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-card)] transition-colors hover:bg-[var(--bg-pill-hover)]"
                 onClick={onEditProfile}
               >
                 {t('community.profile.editProfile')}
@@ -467,7 +467,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
         <div className="mt-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5">
-              <h2 className="text-xl sm:text-2xl font-bold text-[#171717]">
+              <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">
                 {profile.displayName || profile.handle}
               </h2>
               <VerifiedBadge className="size-5" />
@@ -476,26 +476,26 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
               <button
                 type="button"
                 onClick={() => toast.info('Verified badges are awarded to recognized contributors.')}
-                className="rounded-full border border-[#CFD9DE] px-3 py-0.5 text-xs font-bold text-[#171717] transition-colors hover:bg-[#F5F5F5]"
+                className="rounded-full border border-[var(--border-subtle)] px-3 py-0.5 text-xs font-bold text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-pill-hover)]"
               >
                 {t('community.profile.getVerified')}
               </button>
             ) : null}
           </div>
-          <p className="text-[15px] text-[#737373]">@{profile.handle}</p>
+          <p className="text-[15px] text-[var(--text-secondary)]">@{profile.handle}</p>
           {profile.isFollowedBy && !profile.isSelf ? (
-            <span className="mt-1 inline-block rounded bg-[#EFF3F4] px-1.5 py-0.5 text-xs font-medium text-[#536471]">
+            <span className="mt-1 inline-block rounded bg-[var(--bg-pill)] px-1.5 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
               {t('community.profile.followsYou')}
             </span>
           ) : null}
         </div>
 
         {profile.bio ? (
-          <p className="mt-3 whitespace-pre-wrap text-[15px] text-[#171717]">{profile.bio}</p>
+          <p className="mt-3 whitespace-pre-wrap text-[15px] text-[var(--text-primary)]">{profile.bio}</p>
         ) : null}
 
         {/* Metadata row */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[15px] text-[#737373]">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[15px] text-[var(--text-secondary)]">
           {profile.location ? (
             <span className="flex items-center gap-1">
               <HugeiconsIcon icon={Location01Icon} className="size-4" />
@@ -507,7 +507,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
               href={profile.website}
               target="_blank"
               rel="noopener noreferrer nofollow ugc"
-              className="flex items-center gap-1 text-[#D93A3A] hover:underline"
+              className="flex items-center gap-1 text-[var(--primary-accent)] hover:underline"
             >
               <HugeiconsIcon icon={Globe02Icon} className="size-4" />
               {profile.website.replace(/^https?:[/][/]/, '')}
@@ -520,7 +520,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
                 date: formatDate(profile.createdAt, { month: 'long', year: 'numeric' }),
               })}
             </span>
-            <HugeiconsIcon icon={ArrowRight01Icon} className="size-3.5 rtl:rotate-180 text-[#737373]" />
+            <HugeiconsIcon icon={ArrowRight01Icon} className="size-3.5 rtl:rotate-180 text-[var(--text-muted)]" />
           </span>
         </div>
 
@@ -531,28 +531,28 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
             className="hover:underline"
             onClick={() => navigate(communityConnectionsPath(profile.handle, 'following'))}
           >
-            <span className="font-bold text-[#171717]">{formatNumber(profile.followingCount)}</span>{' '}
-            <span className="text-[#737373]">{t('community.profile.following')}</span>
+            <span className="font-bold text-[var(--text-primary)]">{formatNumber(profile.followingCount)}</span>{' '}
+            <span className="text-[var(--text-secondary)]">{t('community.profile.following')}</span>
           </button>
           <button
             type="button"
             className="hover:underline"
             onClick={() => navigate(communityConnectionsPath(profile.handle, 'followers'))}
           >
-            <span className="font-bold text-[#171717]">{formatNumber(profile.followerCount)}</span>{' '}
-            <span className="text-[#737373]">{t('community.profile.followers')}</span>
+            <span className="font-bold text-[var(--text-primary)]">{formatNumber(profile.followerCount)}</span>{' '}
+            <span className="text-[var(--text-secondary)]">{t('community.profile.followers')}</span>
           </button>
         </div>
       </div>
 
       {profile.isSuspended ? (
-        <p className="border-y border-[#E5E5E5] bg-[#FAFAFA] px-4 py-6 text-center text-[15px] text-[#737373]">
+        <p className="border-y border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-6 text-center text-[15px] text-[var(--text-secondary)]">
           {t('community.profile.suspended')}
         </p>
       ) : (
         <>
           {/* Tabs row */}
-          <div role="tablist" aria-label={t('community.profile.tab.posts')} className="flex border-b border-[#E5E5E5]">
+          <div role="tablist" aria-label={t('community.profile.tab.posts')} className="flex border-b border-[var(--border-subtle)]">
             {DISPLAY_TABS.map((value) => {
               const isActive = value === tab;
               return (
@@ -561,19 +561,19 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
                   type="button"
                   role="tab"
                   aria-selected={isActive}
-                  className="relative flex-1 px-2 py-3.5 text-[15px] transition-colors hover:bg-[#F5F5F5]/60"
+                  className="relative flex-1 px-2 py-3.5 text-[15px] transition-colors hover:bg-[var(--bg-card-hover)]"
                   onClick={() => navigate(communityProfilePath(profile.handle, value))}
                 >
                   <div className="flex items-center justify-center gap-1">
-                    <span className={cn(isActive ? 'font-bold text-[#171717]' : 'font-medium text-[#737373]')}>
+                    <span className={cn(isActive ? 'font-bold text-[var(--text-primary)]' : 'font-medium text-[var(--text-secondary)]')}>
                       {t('community.profile.tab.' + value)}
                     </span>
                     {value === 'posts' ? (
-                      <HugeiconsIcon icon={ArrowDown01Icon} className="size-3.5 text-[#737373] opacity-75" />
+                      <HugeiconsIcon icon={ArrowDown01Icon} className="size-3.5 text-[var(--text-muted)] opacity-75" />
                     ) : null}
                   </div>
                   {isActive ? (
-                    <span className="absolute inset-x-0 bottom-0 mx-auto h-1 w-14 rounded-full bg-[#D93A3A]" />
+                    <span className="absolute inset-x-0 bottom-0 mx-auto h-1 w-14 rounded-full bg-[var(--primary-accent)]" />
                   ) : null}
                 </button>
               );

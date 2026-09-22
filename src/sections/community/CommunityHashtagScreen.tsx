@@ -33,16 +33,16 @@ export function CommunityHashtagScreen({ tag }: CommunityHashtagScreenProps) {
 
   return (
     <div>
-      <div className="sticky top-[104px] z-10 flex items-center gap-4 border-b border-[#E5E5E5] bg-white/85 px-4 py-3 backdrop-blur">
+      <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/85 px-4 py-3 backdrop-blur-md">
         <button
           type="button"
           aria-label={t('community.thread.back')}
-          className="rounded-full p-2 text-[#171717] transition-colors hover:bg-[#F5F5F5]"
+          className="rounded-full p-2 text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-card-hover)]"
           onClick={() => window.history.back()}
         >
           <HugeiconsIcon icon={ArrowLeft01Icon} className="size-5 rtl:rotate-180" />
         </button>
-        <h1 className="truncate text-xl font-bold text-[#171717]">#{tag}</h1>
+        <h1 className="truncate text-xl font-bold text-[var(--text-primary)]">#{tag}</h1>
       </div>
 
       <CommunityFeedList

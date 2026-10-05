@@ -1,9 +1,8 @@
 import PocketBase from 'pocketbase';
 import { APP_COLLECTION_SCHEMAS } from './pocketbase/app-schema.mjs';
 import { loadProjectEnv, resolvePocketBaseUrl } from './pocketbase/load-env.mjs';
+import { buildUsersCollectionUpdate, USER_LOCALES } from './pocketbase/users-schema.mjs';
 
-const USER_ROLES = ['viewer', 'author', 'manager', 'general_manager', 'admin'];
-const USER_LOCALES = ['he', 'en'];
 const DEFAULT_USER_LOCALE = 'he';
 const SCHEDULED_DIGEST_JOB_KEY = 'newsletter_publication_digest';
 
@@ -54,31 +53,6 @@ function mergeFields(existingFields = [], desiredFields = []) {
   ];
 }
 
-function upsertSelectField(fields, fieldName, values) {
-  const desiredField = {
-    name: fieldName,
-    type: 'select',
-    required: false,
-    hidden: false,
-    maxSelect: 1,
-    values,
-  };
-  const existingIndex = fields.findIndex((field) => field.name === fieldName);
-
-  if (existingIndex === -1) {
-    return [...fields, desiredField];
-  }
-
-  const nextFields = [...fields];
-  nextFields[existingIndex] = {
-    ...fields[existingIndex],
-    ...desiredField,
-    id: fields[existingIndex].id,
-  };
-
-  return nextFields;
-}
-
 async function syncCollection(pb, schema, dryRun) {
   let existingCollection = null;
 
@@ -118,20 +92,8 @@ async function syncAppSchema(pb, dryRun) {
 
 async function syncUsersSchema(pb, dryRun) {
   const usersCollection = await pb.collections.getOne('users');
-  const nextFields = upsertSelectField(
-    upsertSelectField(usersCollection.fields, 'role', USER_ROLES),
-    'locale',
-    USER_LOCALES,
-  );
-  const payload = {
-    fields: nextFields,
-    createRule: '@request.body.role:isset = false || @request.body.role = "viewer"',
-    listRule: 'id = @request.auth.id || @request.auth.role = "admin"',
-    viewRule: 'id = @request.auth.id || @request.auth.role = "admin"',
-    updateRule: '(@request.auth.id = id && @request.body.role:changed = false) || @request.auth.role = "admin"',
-    deleteRule: 'id = @request.auth.id || @request.auth.role = "admin"',
-    manageRule: '@request.auth.role = "admin"',
-  };
+  // Shares the startup sync's definition, so this never reinstates older rules.
+  const payload = buildUsersCollectionUpdate(usersCollection.fields);
 
   if (!dryRun) {
     await pb.collections.update('users', payload);

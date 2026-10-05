@@ -39,6 +39,11 @@ import { CommunityReportDialog } from './CommunityReportDialog';
 import { CommunityRightRail } from './CommunityRightRail';
 import { CommunitySearchScreen } from './CommunitySearchScreen';
 import { CommunityThreadScreen } from './CommunityThreadScreen';
+import {
+  createComposeRequest,
+  releaseComposeRequest,
+  type ComposeRequest,
+} from './compose-request';
 import type { CommunityPost, CommunitySearchType } from '@/types/community';
 
 // The single owner of community state. Everything below it reads the route out
@@ -74,8 +79,10 @@ export function CommunityPage({
   const { t } = useLocale();
   const { session, profile, isLoading, setUnreadNotifications } = useCommunitySession(isAuthenticated);
   const [composer, setComposer] = useState<ComposerState | null>(null);
-  const [composeSignal, setComposeSignal] = useState(0);
-  const [composeFiles, setComposeFiles] = useState<File[] | undefined>();
+  // Held until the feed says it opened the composer with it. The feed can mount
+  // long after the request is made - a navigation away from another screen, or
+  // the session still loading - so the request waits rather than expires.
+  const [composeRequest, setComposeRequest] = useState<ComposeRequest | null>(null);
   const [reportTarget, setReportTarget] = useState<{ postId?: string; handle?: string } | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
@@ -95,12 +102,17 @@ export function CommunityPage({
       onRequireAuth();
       return;
     }
-    setComposeFiles(files);
     if (route.section !== 'feed') {
       onNavigate(communityFeedPath());
     }
-    setComposeSignal((value) => value + 1);
+    setComposeRequest(createComposeRequest(files));
   }, [isAuthenticated, onNavigate, onRequireAuth, route.section]);
+
+  // One request, one composer: once the feed reports it opened with it, the
+  // page lets go of the request and of the files it was carrying.
+  const handleComposeRequestHandled = useCallback((requestId: number) => {
+    setComposeRequest((current) => releaseComposeRequest(current, requestId));
+  }, []);
 
   // The home feed's quick-compose card carries selected attachments here.
   useEffect(() => {
@@ -269,8 +281,8 @@ export function CommunityPage({
       <CommunityFeedScreen
         key={route.feedTab}
         tab={route.feedTab}
-        openComposerSignal={composeSignal}
-        initialComposeFiles={composeFiles}
+        composeRequest={composeRequest}
+        onComposeRequestHandled={handleComposeRequestHandled}
       />
     );
   };

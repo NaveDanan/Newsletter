@@ -194,4 +194,4 @@ For a read-only check before applying changes:
 kubectl exec -n newsletter deploy/newsletter -- node /app/scripts/migrate-pocketbase-data.mjs --dry-run
 ```
 
-The migration syncs additive PocketBase schema changes, adds `users.locale` where missing, backfills missing user locales to `he`, preserves existing records, and creates the disabled newsletter digest schedule row if it does not already exist.
+The migration syncs additive PocketBase schema changes, applies the same users fields and access rules as the startup users-schema sync (including the admin-only `role` and `featuredWriter` locks), backfills missing user locales to `he`, preserves existing records, and creates the disabled newsletter digest schedule row if it does not already exist.

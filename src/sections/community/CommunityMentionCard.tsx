@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { fetchCommunityProfile } from '@/lib/pocketbase/community';
 import { CommunityAvatar } from './CommunityAvatar';
@@ -9,7 +10,8 @@ import { useCommunity } from './CommunityContext';
 import type { CommunityProfile } from '@/types/community';
 
 // One post can repeat the same handle many times, so resolved profiles are
-// shared process-wide rather than refetched per hover.
+// shared per viewer rather than refetched per hover. Relationship flags belong
+// to the requesting account, so another viewer must never reuse them.
 const cache = new Map<string, CommunityProfile>();
 
 interface CommunityMentionCardProps {
@@ -18,9 +20,18 @@ interface CommunityMentionCardProps {
 }
 
 export function CommunityMentionCard({ handle, children }: CommunityMentionCardProps) {
+  const { user } = useAuth();
+  const key = `${user?.id ?? 'anonymous'}:${handle.toLowerCase()}`;
+  return (
+    <CommunityMentionCardContent key={key} cacheKey={key} handle={handle}>
+      {children}
+    </CommunityMentionCardContent>
+  );
+}
+
+function CommunityMentionCardContent({ handle, children, cacheKey: key }: CommunityMentionCardProps & { cacheKey: string }) {
   const { t, formatNumber } = useLocale();
   const { openProfile } = useCommunity();
-  const key = handle.toLowerCase();
   const [profile, setProfile] = useState<CommunityProfile | null>(cache.get(key) ?? null);
   const [isOpen, setIsOpen] = useState(false);
   const [hasFailed, setHasFailed] = useState(false);

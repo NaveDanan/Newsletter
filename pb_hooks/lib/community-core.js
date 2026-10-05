@@ -34,6 +34,7 @@ var WORD_CLASS = '0-9A-Za-z_\\u00C0-\\u024F\\u0590-\\u05FF\\u0600-\\u06FF';
 var HASHTAG_PATTERN = new RegExp('(^|[^' + WORD_CLASS + '#])#([' + WORD_CLASS + ']{1,80})', 'g');
 var MENTION_PATTERN = new RegExp('(^|[^' + WORD_CLASS + '@])@([0-9A-Za-z_]{' + MIN_HANDLE_LENGTH + ',' + MAX_HANDLE_LENGTH + '})', 'g');
 var URL_PATTERN = /\bhttps?:\/\/[^\s<>"']{4,2000}/gi;
+var SENTENCE_PUNCTUATION = '.,;:!?';
 var HANDLE_PATTERN = /^[0-9A-Za-z_]+$/;
 var CONTROL_CHARACTERS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 
@@ -66,8 +67,17 @@ function truncate(value, length) {
   return text.slice(0, Math.max(0, length - 1)) + '\u2026';
 }
 
-function buildPreview(value) {
-  return truncate(trimBody(value).replace(/\s+/g, ' '), PREVIEW_LENGTH);
+function buildPreview(value, communityMarkup) {
+  var text = communityMarkup ? visibleCommunityBody(value) : value;
+  return truncate(trimBody(text).replace(/\s+/g, ' '), PREVIEW_LENGTH);
+}
+
+function escapeBodyLiteral(value) {
+  return asText(value).replace(/[\\*+~<>]/g, '\\$&');
+}
+
+function visibleCommunityBody(value) {
+  return projectFormatting(asText(value)).text;
 }
 
 function normalizeHandle(value) {
@@ -233,6 +243,128 @@ function normalizeHashtag(value) {
   return asText(value).replace(/^#+/, '').toLowerCase().slice(0, 80);
 }
 
+// Mirror of projectFormatting in src/lib/community-text.ts. Scan entities on
+// visible text, preserving their original offsets in the unchanged body.
+// Paired formatting can span entities or close within a URL. Asterisks wholly
+// inside an otherwise unformatted URL remain literal path characters.
+function projectFormatting(body) {
+  var urlRanges = [];
+  var urlPattern = new RegExp(URL_PATTERN.source, 'gi');
+  var match;
+  while ((match = urlPattern.exec(body)) !== null) {
+    urlRanges.push({ start: match.index, end: match.index + match[0].length });
+  }
+
+  var open = {};
+  var removed = {};
+  var index = 0;
+  var urlIndex = 0;
+  var pair;
+  var mark;
+  var width;
+  var opener;
+  var offset;
+  var insideUrl;
+  var explicit;
+  var tokenStart;
+  while (index < body.length) {
+    while (urlRanges[urlIndex] && index >= urlRanges[urlIndex].end) urlIndex += 1;
+    if (body.charAt(index) === '\n' && !(open.italic && open.italic.explicit)) delete open.italic;
+    if (body.charAt(index) === '\\' && body.charAt(index + 1) && '\\*+~<>'.indexOf(body.charAt(index + 1)) !== -1) {
+      removed[index] = true;
+      index += 2;
+      continue;
+    }
+    // Rich-editor openers inside URLs carry \!; unescaped legacy URL stars
+    // remain literal. Backslash escapes preserve literal marker characters.
+    explicit = body.slice(index, index + 2) === '\\!';
+    tokenStart = index + (explicit ? 2 : 0);
+    pair = body.slice(tokenStart, tokenStart + 2);
+    mark = null;
+    width = 2;
+    if (body.slice(tokenStart, tokenStart + 3) === '***' && !open.bold && !open.italic) {
+      mark = 'italic';
+      width = 1;
+    } else if (pair === '**') {
+      mark = 'bold';
+    } else if (pair === '~~') {
+      mark = 'strike';
+    } else if (pair === '++') {
+      mark = 'underline';
+    } else if (body.charAt(tokenStart) === '*') {
+      mark = 'italic';
+      width = 1;
+    }
+    if (!mark) {
+      index += 1;
+      continue;
+    }
+    if (explicit) width += 2;
+    opener = open[mark];
+    if (opener) {
+      if (index > opener.start + opener.width) {
+        for (offset = 0; offset < opener.width; offset += 1) removed[opener.start + offset] = true;
+        for (offset = 0; offset < width; offset += 1) removed[index + offset] = true;
+      }
+      delete open[mark];
+    } else {
+      insideUrl = urlRanges[urlIndex] && index >= urlRanges[urlIndex].start;
+      if (explicit || !insideUrl || Object.keys(open).length > 0) {
+        open[mark] = { start: index, width: width, mark: mark, explicit: explicit };
+      }
+    }
+    index += width;
+  }
+
+  var characters = [];
+  var offsets = [];
+  for (index = 0; index < body.length; index += 1) {
+    if (!removed[index]) {
+      characters.push(body.charAt(index));
+      offsets.push(index);
+    }
+  }
+  return { text: characters.join(''), offsets: offsets };
+}
+
+function countCharacter(value, character) {
+  var total = 0;
+  var index;
+  for (index = 0; index < value.length; index += 1) {
+    if (value.charAt(index) === character) {
+      total += 1;
+    }
+  }
+  return total;
+}
+
+// Sentence punctuation is never part of a URL, but a closing bracket is when
+// the URL itself opened it: `/wiki/Foo_(bar)` keeps its parenthesis while
+// `(https://example.com/a)` does not.
+function trimTrailingPunctuation(value) {
+  var result = value;
+  var last;
+
+  while (result.length > 0) {
+    last = result.charAt(result.length - 1);
+    if (SENTENCE_PUNCTUATION.indexOf(last) !== -1) {
+      result = result.slice(0, -1);
+      continue;
+    }
+    if (last === ')' && countCharacter(result, ')') > countCharacter(result, '(')) {
+      result = result.slice(0, -1);
+      continue;
+    }
+    if (last === ']' && countCharacter(result, ']') > countCharacter(result, '[')) {
+      result = result.slice(0, -1);
+      continue;
+    }
+    break;
+  }
+
+  return result;
+}
+
 function pushEntity(entities, entity) {
   var index;
   for (index = 0; index < entities.length; index += 1) {
@@ -248,7 +380,8 @@ function pushEntity(entities, entity) {
 // client renders each range as a React node because the shared HTML sanitizer
 // drops anchors and every attribute.
 function parseEntities(body) {
-  var text = asText(body);
+  var projection = projectFormatting(asText(body));
+  var text = projection.text;
   var entities = [];
   var hashtags = [];
   var handles = [];
@@ -257,13 +390,13 @@ function parseEntities(body) {
 
   URL_PATTERN.lastIndex = 0;
   while ((match = URL_PATTERN.exec(text)) !== null) {
-    var rawUrl = match[0].replace(/[.,;:!?)\]]+$/, '');
+    var rawUrl = trimTrailingPunctuation(match[0]);
     var normalizedUrl = normalizeUrl(rawUrl);
     if (normalizedUrl) {
       pushEntity(entities, {
         type: 'url',
-        start: match.index,
-        end: match.index + rawUrl.length,
+        start: projection.offsets[match.index],
+        end: projection.offsets[match.index + rawUrl.length - 1] + 1,
         value: normalizedUrl,
         display: rawUrl,
       });
@@ -283,8 +416,8 @@ function parseEntities(body) {
     if (tag) {
       pushEntity(entities, {
         type: 'hashtag',
-        start: tagStart,
-        end: tagStart + match[2].length + 1,
+        start: projection.offsets[tagStart],
+        end: projection.offsets[tagStart + match[2].length] + 1,
         value: tag,
         display: match[2],
       });
@@ -304,8 +437,8 @@ function parseEntities(body) {
     if (isValidHandle(handle)) {
       pushEntity(entities, {
         type: 'mention',
-        start: mentionStart,
-        end: mentionStart + match[2].length + 1,
+        start: projection.offsets[mentionStart],
+        end: projection.offsets[mentionStart + match[2].length] + 1,
         value: handle,
         display: match[2],
       });
@@ -777,6 +910,8 @@ module.exports = {
   trimBody: trimBody,
   truncate: truncate,
   buildPreview: buildPreview,
+  escapeBodyLiteral: escapeBodyLiteral,
+  visibleCommunityBody: visibleCommunityBody,
   normalizeHandle: normalizeHandle,
   isValidHandle: isValidHandle,
   suggestHandle: suggestHandle,

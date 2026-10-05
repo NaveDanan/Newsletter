@@ -587,13 +587,14 @@ function constrainEngagementToCaller(payload, existing, callerId) {
   });
 
   if (!Object.prototype.hasOwnProperty.call(payload, 'commentItems')) return;
-  var storedComments = {};
+  var storedComments = Object.create(null);
   readRecordJsonArray(existing, 'commentItems').forEach(function (comment) {
     if (comment && comment.id) storedComments[comment.id] = comment;
   });
   payload.commentItems = asArray(payload.commentItems).map(function (comment) {
     if (!comment || typeof comment !== 'object') return comment;
-    var stored = comment.id ? storedComments[comment.id] : null;
+    var stored = comment.id && Object.prototype.hasOwnProperty.call(storedComments, comment.id)
+      ? storedComments[comment.id] : null;
     var storedIds = stored ? asStringArray(stored.likedByUserIds) : [];
     var nextIds = applyOwnToggle(storedIds, comment.likedByUserIds, callerId);
     var next = Object.assign({}, comment, {
@@ -604,6 +605,27 @@ function constrainEngagementToCaller(payload, existing, callerId) {
     next.authorId = stored ? asString(stored.authorId) : callerId;
     return next;
   });
+}
+
+var ENGAGEMENT_FIELDS = ['likes', 'likedByUserIds', 'bookmarkedByUserIds', 'commentItems'];
+
+// The collection record API is a second write path into newsletters. Every
+// caller except a superuser gets the same caller-only engagement limits as
+// PATCH /api/newsletters/{id}, so like and comment alerts name the real actor.
+function handleNewsletterRecordUpdateRequest(e) {
+  if (!e.hasSuperuserAuth()) {
+    // The body only says which fields were sent: PocketBase hands JSON fields
+    // over as raw bytes there. The loaded record holds the readable values.
+    var sent = asObject(e.requestInfo().body);
+    var payload = {};
+    ENGAGEMENT_FIELDS.forEach(function (field) {
+      if (!Object.prototype.hasOwnProperty.call(sent, field)) return;
+      payload[field] = field === 'likes' ? e.record.get(field) : e.record.getString(field);
+    });
+    constrainEngagementToCaller(payload, e.record.original(), getAuthId(e.auth));
+    setRecordValues(e.record, payload);
+  }
+  return e.next();
 }
 
 function buildNewsletterPayload(body, auth, existing) {
@@ -1046,6 +1068,7 @@ module.exports = {
   canReadNewsletter: canReadNewsletter,
   canAccessProject: canAccessProject,
   buildNewsletterPayload: buildNewsletterPayload,
+  handleNewsletterRecordUpdateRequest: handleNewsletterRecordUpdateRequest,
   buildProjectPayload: buildProjectPayload,
   handleNewsletterList: handleNewsletterList,
   handleNewsletterCreate: handleNewsletterCreate,

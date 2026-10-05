@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { QuickComposeCard } from '@/components/QuickComposeCard';
 import { useCommunityEngagement } from '@/hooks/useCommunityEngagement';
@@ -9,6 +9,11 @@ import { cn } from '@/lib/utils';
 import { CommunityComposer } from './CommunityComposer';
 import { useCommunity } from './CommunityContext';
 import { CommunityFeedList } from './CommunityFeedList';
+import {
+  acknowledgeableComposeRequestId,
+  consumeComposeRequest,
+  type ComposeRequest,
+} from './compose-request';
 import { COMMUNITY_FEED_TABS, type CommunityFeedTab, type CommunityPost } from '@/types/community';
 
 // The three feed tabs are three different server queries over the same shape,
@@ -18,30 +23,44 @@ import { COMMUNITY_FEED_TABS, type CommunityFeedTab, type CommunityPost } from '
 interface CommunityFeedScreenProps {
   tab: CommunityFeedTab;
   onPostCreated?: (post: CommunityPost) => void;
-  /** Incremented by the page whenever something elsewhere asks to compose. */
-  openComposerSignal?: number;
-  initialComposeFiles?: File[];
+  /** Set by the page while something elsewhere is waiting for the composer. */
+  composeRequest?: ComposeRequest | null;
+  /** Told which request the composer opened with, so the page can release it. */
+  onComposeRequestHandled?: (requestId: number) => void;
 }
 
 export function CommunityFeedScreen({
   tab,
   onPostCreated,
-  openComposerSignal = 0,
-  initialComposeFiles,
+  composeRequest,
+  onComposeRequestHandled,
 }: CommunityFeedScreenProps) {
   const { t } = useLocale();
   const { isAuthenticated, navigate, profile, requireAuth, selectedTags } = useCommunity();
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[] | undefined>(undefined);
-  const [lastComposerSignal, setLastComposerSignal] = useState(openComposerSignal);
+  // Null until this feed instance opens the composer for a request. A fresh
+  // mount therefore still sees a request the page is holding from before it
+  // existed, instead of assuming anything older was already dealt with.
+  const [handledRequestId, setHandledRequestId] = useState<number | null>(null);
 
-  // A bumped signal means something elsewhere asked to compose; open on the
-  // render that observes the change rather than one commit later.
-  if (openComposerSignal !== lastComposerSignal) {
-    setLastComposerSignal(openComposerSignal);
-    setPendingFiles(initialComposeFiles);
+  // Open on the render that observes the request rather than one commit later.
+  const unhandled = consumeComposeRequest(composeRequest, handledRequestId);
+  if (unhandled) {
+    setHandledRequestId(unhandled.handledId);
+    setPendingFiles(unhandled.files);
     setIsComposeOpen(true);
   }
+
+  // Acknowledging after the commit is what makes a request one-shot: the page
+  // drops it (and its files), so coming back to the feed later starts clean.
+  const requestToAcknowledge = acknowledgeableComposeRequestId(composeRequest, handledRequestId);
+  useEffect(() => {
+    if (requestToAcknowledge === null) {
+      return;
+    }
+    onComposeRequestHandled?.(requestToAcknowledge);
+  }, [onComposeRequestHandled, requestToAcknowledge]);
 
   const source = useCallback(
     (cursor: string) => fetchCommunityFeed({ tab, cursor: cursor || undefined }),

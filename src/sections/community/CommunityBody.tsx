@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import type { ReactNode } from 'react';
-import { splitCommunityBody } from '@/lib/community-text';
+import { parseCommunityEntities, splitCommunityBody } from '@/lib/community-text';
+import type { CommunityBodyMark, CommunityBodySegment } from '@/lib/community-text';
 import { cn } from '@/lib/utils';
 import { CommunityMentionCard } from './CommunityMentionCard';
 import type { CommunityEntity } from '@/types/community';
@@ -15,48 +16,46 @@ interface CommunityBodyProps {
   onHashtagClick?: (tag: string) => void;
   onMentionClick?: (handle: string) => void;
   className?: string;
+  maxLength?: number;
 }
 
 const ENTITY_CLASS = 'text-[var(--primary-accent)] hover:underline focus-visible:underline focus-visible:outline-none';
 
-// Bodies are plain text, so the composer's formatting markers are turned into
-// elements here rather than through HTML.
-const MARKUP_PATTERN = /\*\*([\s\S]+?)\*\*|~~([\s\S]+?)~~|\+\+([\s\S]+?)\+\+|\*([^*\n]+)\*/g;
-
-function renderInlineMarkup(text: string, keyPrefix: string): ReactNode {
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  MARKUP_PATTERN.lastIndex = 0;
-  while ((match = MARKUP_PATTERN.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
+// Formatting is paired before entity splitting, so it can cross text and
+// interactive elements. React escapes the content instead of building HTML.
+function withMarks(text: string, marks: CommunityBodyMark[], keyPrefix: string): ReactNode {
+  return marks.reduceRight<ReactNode>((child, mark, position) => {
+    const key = `${keyPrefix}-${mark}-${position}`;
+    if (mark === 'bold') {
+      return <strong key={key} className="font-bold">{child}</strong>;
     }
-
-    const key = `${keyPrefix}-${match.index}`;
-    if (match[1] !== undefined) {
-      nodes.push(<strong key={key} className="font-bold">{match[1]}</strong>);
-    } else if (match[2] !== undefined) {
-      nodes.push(<s key={key}>{match[2]}</s>);
-    } else if (match[3] !== undefined) {
-      nodes.push(<u key={key}>{match[3]}</u>);
-    } else {
-      nodes.push(<em key={key} className="italic">{match[4]}</em>);
+    if (mark === 'italic') {
+      return <em key={key} className="italic">{child}</em>;
     }
+    if (mark === 'underline') {
+      return <u key={key}>{child}</u>;
+    }
+    return <s key={key}>{child}</s>;
+  }, text);
+}
 
-    lastIndex = match.index + match[0].length;
+function clipSegments(segments: CommunityBodySegment[], maxLength?: number): CommunityBodySegment[] {
+  if (maxLength === undefined) return segments;
+  const clipped: CommunityBodySegment[] = [];
+  let remaining = Math.max(0, Math.floor(maxLength));
+  for (const segment of segments) {
+    if (remaining <= 0) break;
+    const text = segment.text.slice(0, remaining);
+    clipped.push({ ...segment, text });
+    remaining -= text.length;
   }
-
-  if (nodes.length === 0) {
-    return text;
+  while (clipped.length > 0) {
+    const last = clipped[clipped.length - 1];
+    last.text = last.text.trimEnd();
+    if (last.text) break;
+    clipped.pop();
   }
-
-  if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
-  }
-
-  return nodes;
+  return clipped;
 }
 
 export function CommunityBody({
@@ -65,20 +64,44 @@ export function CommunityBody({
   onHashtagClick,
   onMentionClick,
   className,
+  maxLength,
 }: CommunityBodyProps) {
-  const segments = splitCommunityBody(body, entities);
+  // Records written by an older scanner can contain partial handles/tags or
+  // marker-corrupted URLs. Reconcile their derived ranges using today's mirror
+  // so the visible text and interactive destination agree without a backfill.
+  const parsed = parseCommunityEntities(body);
+  const hasDrift = parsed.length !== entities.length || parsed.some((entity, index) => {
+    const stored = entities[index];
+    return stored.type !== entity.type || stored.start !== entity.start || stored.end !== entity.end || stored.value !== entity.value;
+  });
+  // Clip only the visible label after parsing the complete source, so a URL
+  // cut by "See more" keeps its full destination and formatting still pairs.
+  const segments = clipSegments(splitCommunityBody(body, hasDrift ? parsed : entities), maxLength);
 
   if (segments.length === 0) {
     return null;
   }
 
+  const groups: Array<{ key: string; entity: CommunityEntity | null; parts: CommunityBodySegment[] }> = [];
+  for (const segment of segments) {
+    const previous = groups[groups.length - 1];
+    if (previous && previous.entity === segment.entity) {
+      previous.parts.push(segment);
+    } else {
+      groups.push({ key: segment.key, entity: segment.entity, parts: [segment] });
+    }
+  }
+
   return (
     <p className={cn('whitespace-pre-wrap break-words text-[15px] leading-relaxed text-[var(--text-primary)]', className)}>
-      {segments.map((segment) => {
-        const entity = segment.entity;
+      {groups.map((group) => {
+        const entity = group.entity;
+        const content = group.parts.map((part) => (
+          <Fragment key={part.key}>{withMarks(part.text, part.marks, part.key)}</Fragment>
+        ));
 
         if (!entity) {
-          return <Fragment key={segment.key}>{renderInlineMarkup(segment.text, segment.key)}</Fragment>;
+          return <Fragment key={group.key}>{content}</Fragment>;
         }
 
         if (entity.type === 'url') {
@@ -87,14 +110,14 @@ export function CommunityBody({
           // cross-origin guards.
           return (
             <a
-              key={segment.key}
+              key={group.key}
               href={entity.value}
               target="_blank"
               rel="noopener noreferrer nofollow ugc"
               className={ENTITY_CLASS}
               onClick={(event) => event.stopPropagation()}
             >
-              {segment.text}
+              {content}
             </a>
           );
         }
@@ -110,19 +133,19 @@ export function CommunityBody({
               handleClick?.(entity.value);
             }}
           >
-            {segment.text}
+            {content}
           </button>
         );
 
         if (entity.type === 'mention') {
           return (
-            <CommunityMentionCard key={segment.key} handle={entity.value}>
+            <CommunityMentionCard key={group.key} handle={entity.value}>
               {trigger}
             </CommunityMentionCard>
           );
         }
 
-        return <Fragment key={segment.key}>{trigger}</Fragment>;
+        return <Fragment key={group.key}>{trigger}</Fragment>;
       })}
     </p>
   );

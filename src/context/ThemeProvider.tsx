@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   currentAccountAppearance,
   saveAccountAppearance,
@@ -13,6 +13,20 @@ import {
   type DeviceMode,
   type Theme,
 } from '@/context/ThemeContext';
+import {
+  ACCENT_CUSTOM_STORAGE_KEY,
+  ACCENT_PRESET_STORAGE_KEY,
+  APPEARANCE_STORAGE_KEY,
+  DEFAULT_APPEARANCE,
+  HEX_COLOR,
+  THEME_STORAGE_KEY,
+  VISITOR_APPEARANCE_OWNER,
+  isAccentKey,
+  isTheme,
+  resolveAccountAppearance,
+  type AppearanceMirror,
+  type AppearanceState,
+} from '@/context/appearance';
 
 function hexToRgb(hex: string) {
   let cleanHex = hex.replace('#', '');
@@ -52,18 +66,6 @@ function hexToHsl(hex: string) {
   return `${h} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
 }
 
-function isTheme(value: string): value is Theme {
-  return value === 'light' || value === 'dark' || value === 'system';
-}
-
-function isAccentKey(value: string): value is AccentKey {
-  return value === 'custom' || Object.prototype.hasOwnProperty.call(ACCENT_PRESETS, value);
-}
-
-const THEME_STORAGE_KEY = 'artsocial-theme';
-const ACCENT_PRESET_STORAGE_KEY = 'artsocial-accent-preset';
-const ACCENT_CUSTOM_STORAGE_KEY = 'artsocial-accent-custom';
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const PERSIST_DELAY_MS = 600;
 const NARROW_VIEWPORT_QUERY = '(max-width: 767px)';
 
@@ -75,34 +77,61 @@ function remember(key: string, value: string) {
   }
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(THEME_STORAGE_KEY);
-      return saved && isTheme(saved) ? saved : 'system';
+function readStoredValue(key: string) {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function readAppearanceMirror(): AppearanceMirror {
+  const saved = readStoredValue(APPEARANCE_STORAGE_KEY);
+  if (saved) {
+    try {
+      const mirror = JSON.parse(saved) as Partial<AppearanceMirror> | null;
+      if (mirror && typeof mirror.owner === 'string'
+        && typeof mirror.theme === 'string' && isTheme(mirror.theme)
+        && typeof mirror.accentKey === 'string' && isAccentKey(mirror.accentKey)
+        && typeof mirror.customHex === 'string' && HEX_COLOR.test(mirror.customHex)) {
+        return { owner: mirror.owner, theme: mirror.theme, accentKey: mirror.accentKey, customHex: mirror.customHex };
+      }
+    } catch {
+      // Fall back to the old device preferences when upgrading a stored mirror.
     }
-    return 'system';
-  });
+  }
+  const theme = readStoredValue(THEME_STORAGE_KEY);
+  const accentKey = readStoredValue(ACCENT_PRESET_STORAGE_KEY);
+  const customHex = readStoredValue(ACCENT_CUSTOM_STORAGE_KEY);
+  return {
+    owner: null,
+    theme: theme && isTheme(theme) ? theme : DEFAULT_APPEARANCE.theme,
+    accentKey: accentKey && isAccentKey(accentKey) ? accentKey : DEFAULT_APPEARANCE.accentKey,
+    customHex: customHex && HEX_COLOR.test(customHex) ? customHex : DEFAULT_APPEARANCE.customHex,
+  };
+}
+
+function rememberAppearance(owner: string, appearance: AppearanceState) {
+  // One storage write keeps ownership and preferences together across tabs.
+  remember(APPEARANCE_STORAGE_KEY, JSON.stringify({ owner, ...appearance }));
+  remember(THEME_STORAGE_KEY, appearance.theme);
+  remember(ACCENT_PRESET_STORAGE_KEY, appearance.accentKey);
+  remember(ACCENT_CUSTOM_STORAGE_KEY, appearance.customHex);
+}
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [initialAppearance] = useState(readAppearanceMirror);
+  const [theme, setThemeState] = useState<Theme>(initialAppearance.theme);
 
   const [deviceMode, setDeviceMode] = useState<DeviceMode>(() => (
     typeof window !== 'undefined' && window.matchMedia(NARROW_VIEWPORT_QUERY).matches ? 'mobile' : 'web'
   ));
 
-  const [accentKey, setAccentKeyState] = useState<AccentKey>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(ACCENT_PRESET_STORAGE_KEY);
-      return saved && isAccentKey(saved) ? saved : 'red';
-    }
-    return 'red';
-  });
-
-  const [customHex, setCustomHexState] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(ACCENT_CUSTOM_STORAGE_KEY);
-      return saved && HEX_COLOR.test(saved) ? saved : '#ff3b53';
-    }
-    return '#ff3b53';
-  });
+  const [accentKey, setAccentKeyState] = useState<AccentKey>(initialAppearance.accentKey);
+  const [customHex, setCustomHexState] = useState<string>(initialAppearance.customHex);
 
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
 
@@ -204,57 +233,82 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // merge into `pending` and go out once it settles, so an older save can never
   // land after a newer one. Every guard is scoped to the signed-in account, so
   // a previous account's unfinished save never blocks or overwrites the next.
+  //
+  // An echo that arrives while an edit is pending is ignored rather than
+  // dropped: the account record is re-read once the last save settles, so a
+  // change another tab made in the meantime still reaches this one.
   const accountIdRef = useRef<string | null>(null);
+  // The account whose appearance is on screen. It outlives sign-out on purpose:
+  // a different account must not inherit it, while the same account signing
+  // back in keeps its own look. Restore the owner with the mirror on reload.
+  const appearanceOwnerRef = useRef<string | null>(initialAppearance.owner);
   const syncedAppearanceRef = useRef('');
   const pendingAppearanceRef = useRef<{ userId: string; patch: Partial<AppearancePreferences> } | null>(null);
   const persistTimerRef = useRef<number | null>(null);
   const saveInFlightForRef = useRef<string | null>(null);
+  // What is on screen, readable from callbacks that outlive a render.
+  const appearanceRef = useRef<AppearanceState>({ theme, accentKey, customHex });
 
   useEffect(() => {
-    const adopt = (account: AccountAppearance | null) => {
-      const userId = account ? account.userId : null;
-      if (userId !== accountIdRef.current) {
-        // A different account (or none): anything queued belonged to the last one.
-        accountIdRef.current = userId;
-        syncedAppearanceRef.current = '';
-        pendingAppearanceRef.current = null;
-        if (persistTimerRef.current !== null) {
-          window.clearTimeout(persistTimerRef.current);
-          persistTimerRef.current = null;
-        }
-      }
+    appearanceRef.current = { theme, accentKey, customHex };
+  }, [theme, accentKey, customHex]);
 
-      // Unsaved local edits win until they land; their echo must not undo them.
-      const hasLocalEdits = persistTimerRef.current !== null
-        || pendingAppearanceRef.current !== null
-        || saveInFlightForRef.current === userId;
-      if (!account || hasLocalEdits) {
-        return;
+  const adoptAccountAppearance = useCallback((account: AccountAppearance | null) => {
+    const userId = account ? account.userId : null;
+    if (userId !== accountIdRef.current) {
+      // A different account (or none): anything queued belonged to the last one.
+      accountIdRef.current = userId;
+      syncedAppearanceRef.current = '';
+      pendingAppearanceRef.current = null;
+      if (persistTimerRef.current !== null) {
+        window.clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
       }
-      const signature = JSON.stringify(account.preferences);
-      if (signature === syncedAppearanceRef.current) {
-        return;
-      }
-      syncedAppearanceRef.current = signature;
+    }
 
-      const { themePreference, accentPreset, accentCustomHex } = account.preferences;
-      if (isTheme(themePreference)) {
-        setThemeState(themePreference);
-        remember(THEME_STORAGE_KEY, themePreference);
-      }
-      if (HEX_COLOR.test(accentCustomHex)) {
-        setCustomHexState(accentCustomHex);
-        remember(ACCENT_CUSTOM_STORAGE_KEY, accentCustomHex);
-      }
-      if (isAccentKey(accentPreset)) {
-        setAccentKeyState(accentPreset);
-        remember(ACCENT_PRESET_STORAGE_KEY, accentPreset);
-      }
-    };
+    // Signing out changes nothing on screen: there is no account to follow and
+    // the mirror in localStorage is what a visitor sees.
+    if (!account) {
+      return;
+    }
 
-    adopt(currentAccountAppearance());
-    return subscribeToAccountAppearance(adopt);
+    // Unsaved local edits win until they land; their echo must not undo them.
+    const hasLocalEdits = persistTimerRef.current !== null
+      || pendingAppearanceRef.current !== null
+      || saveInFlightForRef.current === userId;
+    if (hasLocalEdits) {
+      return;
+    }
+
+    const signature = JSON.stringify(account.preferences);
+    if (signature === syncedAppearanceRef.current) {
+      return;
+    }
+    syncedAppearanceRef.current = signature;
+
+    const current = appearanceRef.current;
+    const next = resolveAccountAppearance(appearanceOwnerRef.current, account, current);
+    appearanceOwnerRef.current = account.userId;
+    appearanceRef.current = next;
+
+    // The mirror always matches the account that owns the screen, so a reload
+    // paints its look rather than the one before it.
+    if (next.theme !== current.theme) {
+      setThemeState(next.theme);
+    }
+    if (next.customHex !== current.customHex) {
+      setCustomHexState(next.customHex);
+    }
+    if (next.accentKey !== current.accentKey) {
+      setAccentKeyState(next.accentKey);
+    }
+    rememberAppearance(account.userId, next);
   }, []);
+
+  useEffect(() => {
+    adoptAccountAppearance(currentAccountAppearance());
+    return subscribeToAccountAppearance(adoptAccountAppearance);
+  }, [adoptAccountAppearance]);
 
   const flushAppearance = () => {
     const pending = pendingAppearanceRef.current;
@@ -265,21 +319,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     saveInFlightForRef.current = pending.userId;
 
     saveAccountAppearance(pending.userId, pending.patch)
-      .then((saved) => {
-        const stillCurrent = accountIdRef.current === pending.userId && !pendingAppearanceRef.current;
-        if (saved && stillCurrent) {
-          syncedAppearanceRef.current = JSON.stringify(saved.preferences);
-        }
-      })
       .catch((error: unknown) => {
         console.warn('Could not save appearance to the account:', error);
       })
       .finally(() => {
         saveInFlightForRef.current = null;
         // Edits made meanwhile wait for their debounce, if it is still running.
-        if (persistTimerRef.current === null) {
-          flushAppearance();
+        if (persistTimerRef.current !== null) {
+          return;
         }
+        if (pendingAppearanceRef.current !== null) {
+          flushAppearance();
+          return;
+        }
+        // Nothing local is left, so the account record decides again. The SDK
+        // merged the response into the auth store, so this reads our own write
+        // plus anything another tab stored while this one was saving — the
+        // change that had to be ignored is applied here instead of being
+        // stamped as synchronized and lost.
+        adoptAccountAppearance(currentAccountAppearance());
       });
   };
 
@@ -287,8 +345,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const persistAppearance = (patch: Partial<AppearancePreferences>) => {
     const account = currentAccountAppearance();
     if (!account) {
+      // Signed out: the choice lives in localStorage for this device only.
+      // Ownership stays with the account that last painted the screen, so a
+      // different account signing in still starts from the app defaults.
+      if (appearanceOwnerRef.current === null) {
+        appearanceOwnerRef.current = VISITOR_APPEARANCE_OWNER;
+      }
+      rememberAppearance(appearanceOwnerRef.current, appearanceRef.current);
       return;
     }
+    rememberAppearance(account.userId, appearanceRef.current);
     const queued = pendingAppearanceRef.current;
     pendingAppearanceRef.current = {
       userId: account.userId,
@@ -305,6 +371,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
+    appearanceRef.current = { ...appearanceRef.current, theme: newTheme };
     remember(THEME_STORAGE_KEY, newTheme);
     persistAppearance({ themePreference: newTheme });
   };
@@ -322,9 +389,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setAccentColor = (presetKey: AccentKey, hex?: string) => {
     setAccentKeyState(presetKey);
+    appearanceRef.current = { ...appearanceRef.current, accentKey: presetKey };
     remember(ACCENT_PRESET_STORAGE_KEY, presetKey);
     if (presetKey === 'custom' && hex && HEX_COLOR.test(hex)) {
       setCustomHexState(hex);
+      appearanceRef.current = { ...appearanceRef.current, customHex: hex };
       remember(ACCENT_CUSTOM_STORAGE_KEY, hex);
       persistAppearance({ accentPreset: presetKey, accentCustomHex: hex });
       return;

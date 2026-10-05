@@ -562,7 +562,7 @@ function toggleJoin(e, options) {
           kind: options.notificationKind,
           postId: postId,
           rootId: threadId,
-          preview: c.buildPreview(post.getString('body')),
+          preview: post.getString('body'),
           targetPath: '/community/post/' + threadId,
         });
       } else {
@@ -1445,8 +1445,9 @@ function search(e) {
     };
   }
 
-  var params = { status: 'published', term: '%' + term + '%' };
-  var filter = 'status = {:status} && body ~ {:term}';
+  var params = { status: 'published', term: '%' + term + '%', literalTerm: '%' + c.escapeBodyLiteral(term) + '%' };
+  // Match legacy body text and literal characters escaped by the rich editor.
+  var filter = 'status = {:status} && (body ~ {:term} || body ~ {:literalTerm})';
 
   if (term.charAt(0) === '#') {
     params.tag = '%"' + c.normalizeHashtag(term) + '"%';

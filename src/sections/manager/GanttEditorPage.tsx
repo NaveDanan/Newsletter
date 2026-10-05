@@ -22,7 +22,7 @@ import {
 import { faDollarSign, faEuroSign, faPoundSign, faShekelSign } from '@fortawesome/free-solid-svg-icons';
 import { addDays, compareAsc, format, parseISO, startOfDay, startOfMonth, startOfQuarter } from 'date-fns';
 import { enUS, he as heLocale } from 'date-fns/locale';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useProjects } from '@/hooks/useProjects';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -73,12 +73,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 interface GanttEditorPageProps {
   projectId: string;
   onBack: () => void;
+  /** The editor supplies its leave guard to navigation rendered around it. */
+  renderShell?: (content: ReactNode, onNavigate?: (action: () => void) => void) => ReactNode;
 }
 
 interface GanttEditorPageInternalProps {
   project: import('@/types/project').Project;
   updateProjectGantt: (id: string, gantt: ProjectGantt) => Promise<unknown>;
   onBack: () => void;
+  renderShell?: GanttEditorPageProps['renderShell'];
 }
 
 type DragMode = 'move' | 'resize-start' | 'resize-end';
@@ -480,13 +483,14 @@ function CurrencyIcon({ currency }: { currency: GanttCurrency }) {
   );
 }
 
-export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
+export function GanttEditorPage({ projectId, onBack, renderShell }: GanttEditorPageProps) {
   const { isRTL, t } = useLocale();
   const { projects, isLoading, updateProjectGantt } = useProjects();
   const backIcon = isRTL ? ArrowRight01Icon : ArrowLeft01Icon;
+  const wrap = (content: ReactNode) => renderShell ? renderShell(content) : content;
 
   if (isLoading) {
-    return (
+    return wrap(
       <div
         className="flex h-screen w-full items-center justify-center bg-[var(--bg-app)] text-sm font-semibold text-[var(--text-secondary)]"
         dir={isRTL ? 'rtl' : 'ltr'}
@@ -498,7 +502,7 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
 
   const project = projects.find((entry) => entry.id === projectId);
   if (!project) {
-    return (
+    return wrap(
       <div className="min-h-screen bg-[var(--bg-app)] px-4 py-10" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="mx-auto max-w-3xl rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-8 shadow-sm">
           <button
@@ -518,10 +522,10 @@ export function GanttEditorPage({ projectId, onBack }: GanttEditorPageProps) {
     );
   }
 
-  return <GanttEditorPageInternal project={project} updateProjectGantt={updateProjectGantt} onBack={onBack} />;
+  return <GanttEditorPageInternal project={project} updateProjectGantt={updateProjectGantt} onBack={onBack} renderShell={renderShell} />;
 }
 
-function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttEditorPageInternalProps) {
+function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderShell }: GanttEditorPageInternalProps) {
   const { formatDate, formatNumber, isRTL, locale, t } = useLocale();
   const calendarLocale = locale === 'he' ? heLocale : enUS;
   const backIcon = isRTL ? ArrowRight01Icon : ArrowLeft01Icon;
@@ -592,6 +596,17 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
   const [showResourcesDialog, setShowResourcesDialog] = useState(false);
   const [showRolesDialog, setShowRolesDialog] = useState(false);
   const [showUnsavedLeaveDialog, setShowUnsavedLeaveDialog] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveInFlightRef = useRef(false);
+  const pendingLeaveActionRef = useRef<(() => void) | null>(null);
+  const isMountedRef = useRef(false);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      pendingLeaveActionRef.current = null;
+    };
+  }, []);
   const [showEmptyTaskNameDialog, setShowEmptyTaskNameDialog] = useState(false);
   const [restDayReview, setRestDayReview] = useState<RestDayReviewState | null>(null);
   const [emptyTaskNameWarningCount, setEmptyTaskNameWarningCount] = useState(0);
@@ -1032,19 +1047,25 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     return true;
   }, [applyDraftGantt, maybeShowRestDayReview, t]);
 
-  const handleBack = () => {
+  const requestLeave = (action: () => void) => {
+    if (saveInFlightRef.current) return;
     if (isDirty) {
+      pendingLeaveActionRef.current = action;
       setShowUnsavedLeaveDialog(true);
       return;
     }
 
-    onBack();
+    action();
   };
 
+  const handleBack = () => requestLeave(onBack);
+
   const handleConfirmLeaveWithoutSaving = useCallback(() => {
+    const action = pendingLeaveActionRef.current;
+    pendingLeaveActionRef.current = null;
     setShowUnsavedLeaveDialog(false);
-    onBack();
-  }, [onBack]);
+    action?.();
+  }, []);
 
   const handleApproveRestDayReview = useCallback(() => {
     setRestDayReview(null);
@@ -1079,29 +1100,50 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     setRestDayReview(conflicts.length > 0 ? { previousGantt: restDayReview.previousGantt, conflicts } : null);
   }, [applyDraftGantt, restDayReview]);
 
-  const persistDraftGantt = useCallback(() => {
+  const persistDraftGantt = useCallback(async () => {
+    if (saveInFlightRef.current) return false;
+    saveInFlightRef.current = true;
+    setIsSaving(true);
+    const draftSnapshot = JSON.stringify(draftGanttRef.current);
+    const leaveAction = pendingLeaveActionRef.current;
     const nextGantt = {
       ...draftGanttRef.current,
       lastEditedAt: new Date().toISOString(),
     };
 
-    void updateProjectGantt(project.id, nextGantt);
-    setSavedSnapshot(JSON.stringify(nextGantt));
-    applyDraftGantt(nextGantt);
-    setShowEmptyTaskNameDialog(false);
-    setEmptyTaskNameWarningCount(0);
-    toast.success(t('ganttEditor.scheduleSaved'));
+    try {
+      const saved = await updateProjectGantt(project.id, nextGantt);
+      if (!saved || !isMountedRef.current) return false;
+      setSavedSnapshot(JSON.stringify(nextGantt));
+      const unchanged = JSON.stringify(draftGanttRef.current) === draftSnapshot;
+      applyDraftGantt(unchanged ? nextGantt : { ...draftGanttRef.current, lastEditedAt: nextGantt.lastEditedAt });
+      setShowEmptyTaskNameDialog(false);
+      setEmptyTaskNameWarningCount(0);
+      toast.success(t('ganttEditor.scheduleSaved'));
+      if (leaveAction && unchanged && pendingLeaveActionRef.current === leaveAction) {
+        pendingLeaveActionRef.current = null;
+        setShowUnsavedLeaveDialog(false);
+        leaveAction();
+      }
+      return unchanged;
+    } catch {
+      return false;
+    } finally {
+      saveInFlightRef.current = false;
+      if (isMountedRef.current) setIsSaving(false);
+    }
   }, [applyDraftGantt, project.id, t, updateProjectGantt]);
 
   const handleSave = () => {
     const blankTaskNameCount = getBlankTaskNameCount(draftGanttRef.current.tasks);
     if (blankTaskNameCount > 0) {
       setEmptyTaskNameWarningCount(blankTaskNameCount);
+      setShowUnsavedLeaveDialog(false);
       setShowEmptyTaskNameDialog(true);
-      return;
+      return Promise.resolve(false);
     }
 
-    persistDraftGantt();
+    return persistDraftGantt();
   };
 
   const createAppendedTask = useCallback((tasks: GanttTask[]) => {
@@ -1823,7 +1865,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
     setTimelineCalendarMonth,
   ]);
 
-  return (
+  const editor = (
     <div
       className="flex h-screen min-h-0 flex-col overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)]"
       onClick={() => setTimelineSelectedTaskId(null)}
@@ -1913,7 +1955,11 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showUnsavedLeaveDialog} onOpenChange={setShowUnsavedLeaveDialog}>
+      <Dialog open={showUnsavedLeaveDialog} onOpenChange={(open) => {
+        if (saveInFlightRef.current && !open) return;
+        setShowUnsavedLeaveDialog(open);
+        if (!open) pendingLeaveActionRef.current = null;
+      }}>
         <DialogContent
           showCloseButton={false}
           className="overflow-hidden border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] p-0 shadow-2xl sm:max-w-md"
@@ -1940,7 +1986,11 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
             <DialogFooter className="mt-5 sm:justify-end">
               <button
                 type="button"
-                onClick={() => setShowUnsavedLeaveDialog(false)}
+                disabled={isSaving}
+                onClick={() => {
+                  pendingLeaveActionRef.current = null;
+                  setShowUnsavedLeaveDialog(false);
+                }}
                 className="btn-secondary text-xs sm:text-sm py-2 px-5"
               >
                 {t('manager.keepEditing')}
@@ -1948,10 +1998,14 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
               <button
                 type="button"
                 onClick={handleConfirmLeaveWithoutSaving}
+                disabled={isSaving}
                 className="btn-hire-me inline-flex items-center gap-2 text-xs sm:text-sm py-2 px-5"
               >
                 <HugeiconsIcon icon={backIcon} className="h-4 w-4" />
                 {t('ganttEditor.leaveWithoutSaving')}
+              </button>
+              <button type="button" onClick={handleSave} disabled={isSaving} className="btn-primary text-xs sm:text-sm py-2 px-5">
+                {t('manager.saveChanges')}
               </button>
             </DialogFooter>
           </div>
@@ -1961,9 +2015,11 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
       <Dialog
         open={showEmptyTaskNameDialog}
         onOpenChange={(open) => {
+          if (saveInFlightRef.current && !open) return;
           setShowEmptyTaskNameDialog(open);
           if (!open) {
             setEmptyTaskNameWarningCount(0);
+            pendingLeaveActionRef.current = null;
           }
         }}
       >
@@ -1994,9 +2050,11 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
               <button
                 type="button"
                 onClick={() => {
+                  pendingLeaveActionRef.current = null;
                   setShowEmptyTaskNameDialog(false);
                   setEmptyTaskNameWarningCount(0);
                 }}
+                disabled={isSaving}
                 className="btn-secondary text-xs sm:text-sm py-2 px-5"
               >
                 {t('common.cancel')}
@@ -2004,6 +2062,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
               <button
                 type="button"
                 onClick={persistDraftGantt}
+                disabled={isSaving}
                 className="btn-hire-me inline-flex items-center gap-2 text-xs sm:text-sm py-2 px-5"
               >
                 <HugeiconsIcon icon={Tick01Icon} className="h-4 w-4" />
@@ -2269,6 +2328,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
             <button
               type="button"
               onClick={handleSave}
+              disabled={isSaving}
               className="btn-hire-me inline-flex items-center gap-2 text-xs sm:text-sm py-2 px-5"
             >
               <HugeiconsIcon icon={Tick01Icon} className="h-4 w-4" />
@@ -3154,4 +3214,5 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack }: GanttE
       </div>
     </div>
   );
+  return renderShell ? renderShell(editor, requestLeave) : editor;
 }

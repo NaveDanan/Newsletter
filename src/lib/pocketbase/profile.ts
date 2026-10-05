@@ -41,6 +41,15 @@ export interface AccountAppearance {
   preferences: AppearancePreferences;
 }
 
+/**
+ * Reads the three appearance fields off a user record.
+ *
+ * A field PocketBase never stored comes back as "" — and the app only ever
+ * writes concrete values (including the explicit "system" theme) — so an empty
+ * string means "this account never chose", not "reset to the default".
+ * `resolveAccountAppearance` in src/context/appearance.ts decides what such a
+ * field falls back to.
+ */
 function readAccountAppearance(record: RecordModel | null): AccountAppearance | null {
   if (!record) {
     return null;

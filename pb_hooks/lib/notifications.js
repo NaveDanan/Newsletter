@@ -49,7 +49,8 @@ function create(app, options) {
   var params = Object.assign({ user: options.userId, kind: options.kind }, post.params, actor.params);
   if (c.findOneOrNull(tx, 'community_notifications', 'userId = {:user} && kind = {:kind} && ' + post.filter + ' && ' + actor.filter, params)) return;
   var row = c.newRecord(tx, 'community_notifications');
-  c.setValues(row, Object.assign({}, options, { preview: c.buildPreview(options.preview || '').slice(0, 300), isRead: false }));
+  var communityMarkup = String(options.targetPath || '').indexOf('/community/') === 0;
+  c.setValues(row, Object.assign({}, options, { preview: c.buildPreview(options.preview || '', communityMarkup).slice(0, 300), isRead: false }));
   tx.save(row);
   require(__hooks + '/lib/notification-push.js').enqueue(tx, row);
   });
@@ -111,8 +112,10 @@ function newsletterChanged(app, row, before) {
     if (!comment.id || previous.some(function (old) { return old.id === comment.id; })) return;
     var recipients = {};
     previous.forEach(function (old) { if (old.authorId) recipients[old.authorId] = true; });
+    // The stored authorName is client text; name the actor from their account.
+    var actor = comment.authorId ? c.findByIdOrNull(app, 'users', comment.authorId) : null;
     var deliveries = Object.keys(recipients).map(function (userId) {
-      return { userId: userId, actorId: comment.authorId, actorName: comment.authorName, kind: 'comment', postId: id + ':' + comment.id, preview: comment.body, targetPath: path };
+      return { userId: userId, actorId: comment.authorId, actorName: actor ? actor.getString('name') : '', kind: 'comment', postId: id + ':' + comment.id, preview: comment.body, targetPath: path };
     });
     enqueue(app, 'comment:' + id + ':' + comment.id, { deliveries: deliveries, source: 'newsletters', sourceId: id });
   });

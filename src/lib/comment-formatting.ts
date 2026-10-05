@@ -1,9 +1,7 @@
+import { escapeCommunityBodyLiteral, splitCommunityBody } from './community-text';
+
 export const COMMENT_EMOJIS = ['😀', '😂', '😍', '🔥', '👏', '🎉', '👍', '❤️', '🚀', '🙌'] as const;
 
-const BOLD_PATTERN = /\*\*([\s\S]+?)\*\*/g;
-const ITALIC_PATTERN = /(^|[^*])\*([^*\n]+)\*(?!\*)/g;
-const UNDERLINE_PATTERN = /\+\+([\s\S]+?)\+\+/g;
-const STRIKE_PATTERN = /~~([\s\S]+?)~~/g;
 const HTML_TAG_PATTERN = /<[^>]+>/g;
 const HTML_ENTITY_PATTERN = /&nbsp;/g;
 const ALLOWED_TAGS = new Set(['br', 'p', 'strong', 'em', 'u', 's']);
@@ -18,16 +16,30 @@ function escapeHtml(value: string): string {
 }
 
 function legacyMarkupToHtml(value: string): string {
-  return escapeHtml(value)
-    .replace(BOLD_PATTERN, '<strong>$1</strong>')
-    .replace(ITALIC_PATTERN, '$1<em>$2</em>')
-    .replace(UNDERLINE_PATTERN, '<u>$1</u>')
-    .replace(STRIKE_PATTERN, '<s>$1</s>')
-    .replace(/\n/g, '<br />');
+  const tags = { bold: 'strong', italic: 'em', underline: 'u', strike: 's' };
+  let active: Array<keyof typeof tags> = [];
+  let html = '';
+  for (const segment of splitCommunityBody(value, [])) {
+    let shared = 0;
+    while (shared < active.length && active[shared] === segment.marks[shared]) shared += 1;
+    for (let index = active.length - 1; index >= shared; index -= 1) html += `</${tags[active[index]]}>`;
+    for (let index = shared; index < segment.marks.length; index += 1) html += `<${tags[segment.marks[index]]}>`;
+    html += escapeHtml(segment.text).replace(/\n/g, '<br />');
+    active = segment.marks;
+  }
+  for (let index = active.length - 1; index >= 0; index -= 1) html += `</${tags[active[index]]}>`;
+  return html;
 }
 
 function hasHtmlMarkup(value: string): boolean {
-  return /<\/?[a-z][\s\S]*>/i.test(value);
+  const tags = /<\/?[a-z][\s\S]*?>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = tags.exec(value)) !== null) {
+    let escapes = 0;
+    for (let index = match.index - 1; index >= 0 && value[index] === '\\'; index -= 1) escapes += 1;
+    if (escapes % 2 === 0) return true;
+  }
+  return false;
 }
 
 function sanitizeHtmlNode(node: ChildNode): string {
@@ -66,11 +78,8 @@ function sanitizeHtml(value: string): string {
 }
 
 export function stripCommentFormatting(value: string): string {
-  const withLegacyMarkersRemoved = value
-    .replace(BOLD_PATTERN, '$1')
-    .replace(ITALIC_PATTERN, '$1$2')
-    .replace(UNDERLINE_PATTERN, '$1')
-    .replace(STRIKE_PATTERN, '$1');
+  const withLegacyMarkersRemoved = splitCommunityBody(value, []).map((segment) => segment.text).join('');
+  if (!hasHtmlMarkup(value)) return withLegacyMarkersRemoved.trim();
 
   return withLegacyMarkersRemoved
     .replace(/<br\s*\/?>/gi, '\n')
@@ -92,6 +101,12 @@ export function formatCommentBodyToHtml(value: string): string {
   return legacyMarkupToHtml(value);
 }
 
+// Community posts always store plain markup, even when their literal text
+// resembles an HTML tag. The editor must rehydrate it without HTML detection.
+export function formatCommunityBodyToHtml(value: string): string {
+  return legacyMarkupToHtml(value);
+}
+
 const MARKUP_TAGS: Record<string, string> = {
   strong: '**',
   b: '**',
@@ -103,30 +118,41 @@ const MARKUP_TAGS: Record<string, string> = {
   del: '~~',
 };
 
-function nodeToMarkup(node: ChildNode): string {
+function nodeToMarkup(node: ChildNode, output: { markup: string; visible: string }): void {
   if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent ?? '';
+    const text = node.textContent ?? '';
+    output.markup += escapeCommunityBodyLiteral(text);
+    output.visible += text;
+    return;
   }
 
   if (node.nodeType !== Node.ELEMENT_NODE) {
-    return '';
+    return;
   }
 
   const element = node as HTMLElement;
   const tagName = element.tagName.toLowerCase();
 
   if (tagName === 'br') {
-    return '\n';
+    output.markup += '\n';
+    output.visible += '\n';
+    return;
   }
 
-  const children = Array.from(element.childNodes).map(nodeToMarkup).join('');
-  const marker = MARKUP_TAGS[tagName];
-
-  if (marker && children.trim()) {
-    return marker + children + marker;
+  const marker = (element.textContent ?? '').trim() ? MARKUP_TAGS[tagName] : undefined;
+  if (marker) {
+    // A raw URL can legally contain paired stars. Distinguish an editor mark
+    // starting inside that URL, while literal stars are backslash-escaped.
+    const insideUrl = /\bhttps?:\/\/[^\s<>"']*$/i.test(output.visible);
+    const multilineItalic = marker === '*' && (element.getElementsByTagName('br').length > 0 || /[\r\n]/.test(element.textContent ?? ''));
+    output.markup += (insideUrl || multilineItalic ? '\\!' : '') + marker;
   }
-
-  return tagName === 'p' || tagName === 'div' ? children + '\n' : children;
+  Array.from(element.childNodes).forEach((child) => nodeToMarkup(child, output));
+  if (marker) output.markup += marker;
+  if (tagName === 'p' || tagName === 'div') {
+    output.markup += '\n';
+    output.visible += '\n';
+  }
 }
 
 // The inverse of legacyMarkupToHtml: a rich-text editor can drive a field that
@@ -137,10 +163,9 @@ export function htmlToCommentMarkup(value: string): string {
   }
 
   const document = new DOMParser().parseFromString(value, 'text/html');
-
-  return Array.from(document.body.childNodes)
-    .map(nodeToMarkup)
-    .join('')
+  const output = { markup: '', visible: '' };
+  Array.from(document.body.childNodes).forEach((node) => nodeToMarkup(node, output));
+  return output.markup
     .replace(/\n{3,}/g, '\n\n')
     .replace(/\s+$/, '');
 }

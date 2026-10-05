@@ -26,44 +26,42 @@ var REFRESH_CLAIM_MS = 5 * 1000;
 // the database at once. The claim is best-effort (the store has no
 // compare-and-set), which at worst lets a few requests rebuild together.
 //
-// Each invalidation bumps a generation. A rebuild that started before one may
-// have read pre-change rows, so its result is returned but never stored:
-// otherwise it could overwrite the invalidation and serve, say, a just
-// suspended writer for a full TTL.
+// Entries and refresh claims carry the generation they were built from. A
+// rebuild racing an invalidation may still write old rows, but the next read
+// rejects them instead of serving a just-suspended writer for a full TTL.
 function generationKey(key) {
   return key + ':generation';
 }
 
 function cached(app, key, ttlMs, compute) {
   var store = app.store();
+  var generation = store.get(generationKey(key)) || 0;
   var entry = store.get(key);
+  if (entry && entry.generation !== generation) {
+    entry = null;
+  }
   var now = Date.now();
   if (entry && (entry.expiresAt > now || entry.refreshingUntil > now)) {
     return entry.value;
   }
 
   if (entry) {
-    store.set(key, { expiresAt: entry.expiresAt, refreshingUntil: now + REFRESH_CLAIM_MS, value: entry.value });
+    store.set(key, { generation: generation, expiresAt: entry.expiresAt, refreshingUntil: now + REFRESH_CLAIM_MS, value: entry.value });
   }
-  // Read after claiming, so an invalidation racing the claim is still seen.
-  var generation = store.get(generationKey(key)) || 0;
 
   var value = compute();
   if ((store.get(generationKey(key)) || 0) === generation) {
-    store.set(key, { expiresAt: Date.now() + ttlMs, refreshingUntil: 0, value: value });
+    store.set(key, { generation: generation, expiresAt: Date.now() + ttlMs, refreshingUntil: 0, value: value });
   }
   return value;
 }
 
-// Marks the list stale rather than deleting it, so the next request rebuilds
-// it while concurrent ones are still answered.
+// A fresh token avoids lost increments when updates invalidate concurrently.
+// Leave the old entry untouched. Its generation no longer matches, so neither
+// its rows nor an in-flight refresh claim can be used by the next request.
 function invalidateWriters(app) {
   var store = app.store();
-  store.set(generationKey(WRITERS_CACHE_KEY), (store.get(generationKey(WRITERS_CACHE_KEY)) || 0) + 1);
-  var entry = store.get(WRITERS_CACHE_KEY);
-  if (entry) {
-    store.set(WRITERS_CACHE_KEY, { expiresAt: 0, refreshingUntil: 0, value: entry.value });
-  }
+  store.set(generationKey(WRITERS_CACHE_KEY), $security.randomString(24));
 }
 
 // Fields the writers row renders or filters on; other edits (theme saves and
@@ -182,7 +180,7 @@ function joinedActivity(app, limit) {
 function postedActivity(app, limit) {
   var c = core();
   return safeFind(app, 'community_posts', 'status = "published" && kind != "reply"', '-created', limit).map(function (post) {
-    var excerpt = post.getBool('sensitive') ? '' : c.truncate(c.trimBody(post.getString('body')).replace(/\s+/g, ' '), EXCERPT_LENGTH);
+    var excerpt = post.getBool('sensitive') ? '' : c.truncate(c.trimBody(c.visibleCommunityBody(post.getString('body'))).replace(/\s+/g, ' '), EXCERPT_LENGTH);
     return { kind: 'posted', id: 'posted-' + post.id, actorId: post.getString('authorId'), subjectId: String(post.id), subjectTitle: excerpt, createdAt: post.getString('created') };
   });
 }

@@ -11,6 +11,8 @@ interface AppStageShellProps {
   /** The mobile "+" action; the caller decides between composer and dashboard. */
   onCreateClick?: () => void;
   onProfileClick?: () => void;
+  /** Defers the complete route action while an editor asks to save or discard. */
+  onNavigate?: (action: () => void) => void;
   user?: { name?: string; email?: string; avatar?: string } | null;
 }
 
@@ -21,10 +23,15 @@ export function AppStageShell({
   onCommunityClick,
   onCreateClick,
   onProfileClick,
+  onNavigate,
   user,
 }: AppStageShellProps) {
   const { deviceMode } = useTheme();
   const [currentTime, setCurrentTime] = useState('9:41');
+  const navigate = (action: () => void) => {
+    if (onNavigate) onNavigate(action);
+    else action();
+  };
 
   useEffect(() => {
     const updateTime = () => {
@@ -67,9 +74,9 @@ export function AppStageShell({
               type="button"
               className={`mobile-nav-btn ${activeTab === 'home' ? 'active' : ''}`}
               title="Feed"
-              onClick={() => {
+              onClick={() => navigate(() => {
                 onHomeClick?.();
-              }}
+              })}
             >
               <Home className="size-5" />
               {activeTab === 'home' && <span className="mobile-nav-dot" />}
@@ -79,12 +86,12 @@ export function AppStageShell({
               type="button"
               className={`mobile-nav-btn ${activeTab === 'topics' ? 'active' : ''}`}
               title="Explore Topics"
-              onClick={() => {
+              onClick={() => navigate(() => {
                 if (window.location.pathname !== '/') {
                   onHomeClick?.();
                 }
                 window.location.hash = '#topics';
-              }}
+              })}
             >
               <Compass className="size-5" />
               {activeTab === 'topics' && <span className="mobile-nav-dot" />}
@@ -96,9 +103,9 @@ export function AppStageShell({
               className="mobile-create-circle shadow-lg hover:scale-105 active:scale-95 transition-transform"
               title="Create Post or Manage"
               aria-label="Create Post or Manage"
-              onClick={() => {
+              onClick={() => navigate(() => {
                 onCreateClick?.();
-              }}
+              })}
             >
               <Plus className="size-5 stroke-[2.5]" />
             </button>
@@ -107,9 +114,9 @@ export function AppStageShell({
               type="button"
               className={`mobile-nav-btn ${activeTab === 'community' ? 'active' : ''}`}
               title="Community"
-              onClick={() => {
+              onClick={() => navigate(() => {
                 onCommunityClick?.();
-              }}
+              })}
             >
               <Bell className="size-5" />
               {activeTab === 'community' && <span className="mobile-nav-dot" />}
@@ -119,9 +126,9 @@ export function AppStageShell({
               type="button"
               className={`mobile-nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
               title="Profile"
-              onClick={() => {
+              onClick={() => navigate(() => {
                 onProfileClick?.();
-              }}
+              })}
             >
               {user ? (
                 <UserAvatarCircle name={user.name} email={user.email} src={user.avatar} size={24} />

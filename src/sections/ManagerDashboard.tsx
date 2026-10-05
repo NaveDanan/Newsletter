@@ -1,7 +1,8 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Menu01Icon, Shield01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AccountMenu } from '@/components/AccountMenu';
+import { AppStageShell } from '@/components/AppStageShell';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSubscriberCount } from '@/hooks/useSubscriberCount';
@@ -45,6 +46,8 @@ interface ManagerDashboardProps {
   onProfileClick: () => void;
   onLogout: () => void;
   onHomeClick: () => void;
+  onCommunityClick: () => void;
+  onCreateClick: () => void;
   currentUser: PocketBaseUser | null;
   currentUserRole: UserRole | null;
   newsletters: Newsletter[];
@@ -68,6 +71,8 @@ export function ManagerDashboard({
   onProfileClick,
   onLogout,
   onHomeClick,
+  onCommunityClick,
+  onCreateClick,
   currentUser,
   currentUserRole,
   newsletters,
@@ -90,8 +95,17 @@ export function ManagerDashboard({
   const [viewingNewsletter, setViewingNewsletter] = useState<Newsletter | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [isSavingBeforeLeave, setIsSavingBeforeLeave] = useState(false);
   const editorRef = useRef<NewsletterEditorHandle | null>(null);
   const pendingLeaveActionRef = useRef<(() => void) | null>(null);
+  const isMountedRef = useRef(false);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      pendingLeaveActionRef.current = null;
+    };
+  }, []);
   const activeViewingNewsletter = viewingNewsletter
     ? newsletters.find((newsletter) => newsletter.id === viewingNewsletter.id) ?? null
     : null;
@@ -127,26 +141,16 @@ export function ManagerDashboard({
     setViewMode('viewer');
   };
 
-  const handleSaveNewsletter = (data: NewsletterFormData) => {
-    const result = addNewsletter(data);
-    if (result instanceof Promise) {
-      result.then((created) => {
-        if (created) handleBackToList();
-      });
-    } else if (result) {
-      handleBackToList();
-    }
+  const handleSaveNewsletter = async (data: NewsletterFormData) => {
+    const created = await addNewsletter(data);
+    if (created && isMountedRef.current) handleBackToList();
+    return created;
   };
 
-  const handleUpdateNewsletter = (id: string, data: Partial<NewsletterFormData>) => {
-    const result = updateNewsletter(id, data);
-    if (result instanceof Promise) {
-      result.then((updated) => {
-        if (updated) handleBackToList();
-      });
-    } else if (result) {
-      handleBackToList();
-    }
+  const handleUpdateNewsletter = async (id: string, data: Partial<NewsletterFormData>) => {
+    const updated = await updateNewsletter(id, data);
+    if (updated && isMountedRef.current) handleBackToList();
+    return updated;
   };
 
   const handleAutoSaveNewsletter = (id: string | null, data: Partial<NewsletterFormData>) => {
@@ -194,6 +198,7 @@ export function ManagerDashboard({
   };
 
   const requestLeaveEditor = (action: () => void) => {
+    if (isSavingBeforeLeave) return;
     if (viewMode !== 'editor') {
       action();
       return;
@@ -209,16 +214,19 @@ export function ManagerDashboard({
     action();
   };
 
-  const handleConfirmSaveAndLeave = () => {
-    const wasSaved = editorRef.current?.savePublishedChanges() ?? true;
-    if (!wasSaved) {
-      return;
-    }
-
+  const handleConfirmSaveAndLeave = async () => {
     const pendingAction = pendingLeaveActionRef.current;
-    pendingLeaveActionRef.current = null;
-    setShowUnsavedDialog(false);
-    pendingAction?.();
+    if (!pendingAction || isSavingBeforeLeave) return;
+    setIsSavingBeforeLeave(true);
+    try {
+      const wasSaved = await editorRef.current?.savePublishedChanges();
+      if (!wasSaved || !isMountedRef.current || pendingLeaveActionRef.current !== pendingAction) return;
+      pendingLeaveActionRef.current = null;
+      setShowUnsavedDialog(false);
+      pendingAction();
+    } finally {
+      if (isMountedRef.current) setIsSavingBeforeLeave(false);
+    }
   };
 
   const handleDiscardAndLeave = () => {
@@ -315,11 +323,12 @@ export function ManagerDashboard({
     }
   };
 
-  return (
+  const dashboard = (
     <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
       <AlertDialog
         open={showUnsavedDialog}
         onOpenChange={(open) => {
+          if (isSavingBeforeLeave && !open) return;
           setShowUnsavedDialog(open);
           if (!open) {
             pendingLeaveActionRef.current = null;
@@ -336,6 +345,7 @@ export function ManagerDashboard({
           <AlertDialogFooter>
             <AlertDialogCancel
               className="bg-[var(--bg-pill)] text-[var(--text-primary)] border-[var(--border-subtle)] hover:bg-[var(--bg-pill-hover)]"
+              disabled={isSavingBeforeLeave}
               onClick={() => {
                 pendingLeaveActionRef.current = null;
               }}
@@ -345,12 +355,17 @@ export function ManagerDashboard({
             <AlertDialogAction
               className="bg-[var(--bg-pill)] text-[var(--text-secondary)] hover:bg-[var(--bg-pill-hover)] hover:text-[var(--text-primary)]"
               onClick={handleDiscardAndLeave}
+              disabled={isSavingBeforeLeave}
             >
               {t('manager.discardChanges')}
             </AlertDialogAction>
             <AlertDialogAction
               className="btn-hire-me"
-              onClick={handleConfirmSaveAndLeave}
+              disabled={isSavingBeforeLeave}
+              onClick={(event) => {
+                event.preventDefault();
+                return handleConfirmSaveAndLeave();
+              }}
             >
               {t('manager.saveChanges')}
             </AlertDialogAction>
@@ -469,5 +484,19 @@ export function ManagerDashboard({
         </main>
       </div>
     </div>
+  );
+
+  return (
+    <AppStageShell
+      activeTab="manager"
+      onHomeClick={onHomeClick}
+      onCommunityClick={onCommunityClick}
+      onCreateClick={onCreateClick}
+      onProfileClick={onProfileClick}
+      onNavigate={requestLeaveEditor}
+      user={currentUser}
+    >
+      {dashboard}
+    </AppStageShell>
   );
 }

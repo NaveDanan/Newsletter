@@ -8,6 +8,9 @@ import {
   ViewOffIcon,
 } from '@hugeicons/core-free-icons';
 import { toast } from 'sonner';
+import Placeholder from '@tiptap/extension-placeholder';
+import StarterKit from '@tiptap/starter-kit';
+import { EditorContent, useEditor } from '@tiptap/react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,7 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { useLocale } from '@/contexts/LocaleContext';
 import {
   communityMediaKindOf,
@@ -25,6 +27,7 @@ import {
   probeCommunityMedia,
 } from '@/lib/community-media';
 import { normalizeCommunityBody } from '@/lib/community-text';
+import { formatCommunityBodyToHtml, htmlToCommentMarkup } from '@/lib/comment-formatting';
 import {
   getPocketBaseErrorMessage,
   resolveCommunityFileUrl,
@@ -86,6 +89,43 @@ export function CommunityEditPostDialog({
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const itemsRef = useRef<PendingMedia[]>(items);
   const openRef = useRef(open);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        bulletList: false,
+        orderedList: false,
+        codeBlock: false,
+        blockquote: false,
+        heading: false,
+        horizontalRule: false,
+      }),
+      Placeholder.configure({ placeholder: t('community.composer.placeholder') }),
+    ],
+    content: formatCommunityBodyToHtml(post.body),
+    editable: !isSubmitting,
+    onUpdate: ({ editor: current }) => setBody(htmlToCommentMarkup(current.getHTML())),
+    editorProps: {
+      attributes: {
+        class: 'composer-textarea min-h-[100px] p-0 text-[16px] leading-relaxed focus:outline-none',
+        dir: 'auto',
+        role: 'textbox',
+        'aria-label': t('community.composer.placeholder'),
+        'aria-multiline': 'true',
+      },
+    },
+  });
+
+  useEffect(() => {
+    if (open && editor) {
+      editor.commands.setContent(formatCommunityBodyToHtml(post.body), { emitUpdate: false });
+      editor.commands.focus('end');
+    }
+  }, [editor, open, post]);
+
+  useEffect(() => {
+    editor?.setEditable(!isSubmitting);
+  }, [editor, isSubmitting]);
 
   // Mirrors the latest items so the close/unmount cleanups can revoke blob URLs
   // without re-running on every media change.
@@ -279,14 +319,7 @@ export function CommunityEditPostDialog({
               />
             ) : null}
             <div className="min-w-0 flex-1">
-              <Textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder={t('community.composer.placeholder')}
-                className="min-h-[100px] resize-none border-none p-0 text-[16px] leading-relaxed shadow-none focus-visible:ring-0"
-                autoFocus
-                disabled={isSubmitting}
-              />
+              <EditorContent editor={editor} className="min-h-[100px]" />
 
               {items.length > 0 ? (
                 <div className={cn('mt-3 grid gap-2', items.length === 1 ? 'grid-cols-1' : 'grid-cols-2')}>

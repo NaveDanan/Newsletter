@@ -701,61 +701,58 @@ function App() {
 
     if (currentRoute.view === 'gantt-editor' && currentRoute.projectId) {
       return (
-        <AppStageShell
-          activeTab="manager"
-          onHomeClick={handleHomeClick}
-          onCommunityClick={handleCommunityClick}
-          onCreateClick={handleCreateClick}
-          onProfileClick={handleProfileClick}
-          user={user}
-        >
-          <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
-            <Toaster position={toasterPosition} richColors />
-            <GanttEditorPage
-              key={currentRoute.projectId}
-              projectId={currentRoute.projectId}
-              onBack={() => navigateTo('/manager/gantt')}
-            />
-          </div>
-        </AppStageShell>
+        <>
+          <Toaster position={toasterPosition} richColors />
+          <GanttEditorPage
+            key={currentRoute.projectId}
+            projectId={currentRoute.projectId}
+            onBack={() => navigateTo('/manager/gantt')}
+            renderShell={(content, onNavigate) => (
+              <AppStageShell
+                activeTab="manager"
+                onHomeClick={handleHomeClick}
+                onCommunityClick={handleCommunityClick}
+                onCreateClick={handleCreateClick}
+                onProfileClick={handleProfileClick}
+                onNavigate={onNavigate}
+                user={user}
+              >
+                {content}
+              </AppStageShell>
+            )}
+          />
+        </>
       );
     }
 
     return (
-      <AppStageShell
-        activeTab="manager"
-        onHomeClick={handleHomeClick}
-        onCommunityClick={handleCommunityClick}
-        onCreateClick={handleCreateClick}
-        onProfileClick={handleProfileClick}
-        user={user}
-      >
-        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
-          <Toaster position={toasterPosition} richColors />
-          <ManagerDashboard
-            activeTab={currentRoute.managerSection ?? 'newsletters'}
-            onTabChange={handleManagerTabChange}
-            onOpenGanttEditor={handleOpenGanttEditor}
-            onLogout={handleSignOut}
-            onProfileClick={handleProfileClick}
-            onHomeClick={handleHomeClick}
-            currentUser={user}
-            currentUserRole={userRole}
-            newsletters={newsletters}
-            addNewsletter={addNewsletter}
-            upsertDraftNewsletter={upsertDraftNewsletter}
-            updateNewsletter={updateNewsletter}
-            uploadPresentation={uploadPresentation}
-            deleteNewsletter={deleteNewsletter}
-            sendNewsletterUpdate={sendNewsletterUpdate}
-            onToggleNewsletterLike={handleArticleLike}
-            onAddNewsletterComment={handleArticleComment}
-            onToggleCommentLike={handleCommentLike}
-            onVoteNewsletterPoll={handleVotePoll}
-            onRsvpNewsletterEvent={handleRsvpEvent}
-          />
-        </div>
-      </AppStageShell>
+      <>
+        <Toaster position={toasterPosition} richColors />
+        <ManagerDashboard
+          activeTab={currentRoute.managerSection ?? 'newsletters'}
+          onTabChange={handleManagerTabChange}
+          onOpenGanttEditor={handleOpenGanttEditor}
+          onLogout={handleSignOut}
+          onProfileClick={handleProfileClick}
+          onHomeClick={handleHomeClick}
+          onCommunityClick={handleCommunityClick}
+          onCreateClick={handleCreateClick}
+          currentUser={user}
+          currentUserRole={userRole}
+          newsletters={newsletters}
+          addNewsletter={addNewsletter}
+          upsertDraftNewsletter={upsertDraftNewsletter}
+          updateNewsletter={updateNewsletter}
+          uploadPresentation={uploadPresentation}
+          deleteNewsletter={deleteNewsletter}
+          sendNewsletterUpdate={sendNewsletterUpdate}
+          onToggleNewsletterLike={handleArticleLike}
+          onAddNewsletterComment={handleArticleComment}
+          onToggleCommentLike={handleCommentLike}
+          onVoteNewsletterPoll={handleVotePoll}
+          onRsvpNewsletterEvent={handleRsvpEvent}
+        />
+      </>
     );
   }
 

@@ -438,6 +438,8 @@ export function Navigation({
               type="button"
               onClick={toggleMobileMenu}
               aria-label={isMobileMenuOpen ? t('nav.closeMenu') : t('nav.openMenu')}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-navigation-menu"
               className="lg:hidden p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] transition-colors"
             >
               {isMobileMenuOpen ? <HugeiconsIcon icon={Cancel01Icon} className="w-5 h-5" /> : <HugeiconsIcon icon={Menu01Icon} className="w-5 h-5" />}
@@ -475,7 +477,7 @@ export function Navigation({
 
       {/* Mobile dropdown menu */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden rounded-b-[inherit] border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-4 space-y-3 shadow-2xl animate-in slide-in-from-top-2 duration-200">
+        <div id="mobile-navigation-menu" className="lg:hidden max-h-[calc(100dvh-8rem)] overflow-y-auto rounded-b-[inherit] border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-4 space-y-3 shadow-2xl animate-in slide-in-from-top-2 duration-200">
           <div className="space-y-1">
             {navLinks.map((link) => (
               <a
@@ -503,15 +505,50 @@ export function Navigation({
                 {link.label}
               </a>
             ))}
-            {dropdownNavItems.map((link) => (
-              <a
-                key={link.id}
-                href={link.link}
-                className="block py-2.5 px-3 rounded-xl text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                {link.label}
-              </a>
+            {dropdownNavItems.map((dropdown) => (
+              <details key={dropdown.id} className="rounded-xl text-[var(--text-secondary)]">
+                <summary className="cursor-pointer py-2.5 px-3 rounded-xl text-sm font-semibold hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]">
+                  {dropdown.label}
+                </summary>
+                <div className="space-y-3 px-3 pb-3">
+                  {dropdown.subMenus?.map((group) => (
+                    <section key={group.title}>
+                      <h3 className="py-2 text-xs font-semibold text-[var(--text-muted)]">{group.title}</h3>
+                      <ul className="space-y-1">
+                        {group.items.map((item) => {
+                          const className = 'block w-full text-start rounded-xl px-3 py-2 text-sm hover:bg-[var(--bg-pill-hover)]';
+                          const select = (event: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
+                            if (item.onSelect) {
+                              event.preventDefault();
+                              item.onSelect();
+                            } else if (item.href?.startsWith('#') && activeTab !== 'home') {
+                              event.preventDefault();
+                              onHomeClick();
+                              window.location.hash = item.href;
+                            }
+                            setIsMobileMenuOpen(false);
+                          };
+                          const content = (
+                            <>
+                              <span className="block font-medium text-[var(--text-primary)]">{item.label}</span>
+                              <span className="block text-xs text-[var(--text-muted)]">{item.description}</span>
+                            </>
+                          );
+                          return (
+                            <li key={item.label}>
+                              {item.href ? (
+                                <a href={item.href} className={className} onClick={select}>{content}</a>
+                              ) : (
+                                <button type="button" className={className} onClick={select}>{content}</button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  ))}
+                </div>
+              </details>
             ))}
           </div>
         </div>

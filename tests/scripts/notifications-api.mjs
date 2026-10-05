@@ -107,6 +107,55 @@ try {
   await root.collection('newsletters').update(newsletter.id, { commentItems: [{ ...commentB, likes: 1 }, commentA] });
   assert.equal((await notes(a.client, 'comment')).items.length, 2);
 
+  // The collection record API is a second write path; it must not let a caller
+  // put likes or comments in someone else's name.
+  const deniedWrite = (error) => [400, 403, 404].includes(error.status);
+  await assert.rejects(a.client.collection('newsletters').create({ title: 'Viewer issue', status: 'published' }), deniedWrite, 'viewers cannot create newsletters through the collection API');
+  await assert.rejects(a.client.collection('newsletters').update(newsletter.id, { likedByUserIds: [d.id] }), deniedWrite, 'viewers cannot edit newsletters through the collection API');
+  await assert.rejects(a.client.collection('newsletters').delete(newsletter.id), deniedWrite, 'viewers cannot delete newsletters through the collection API');
+  await root.collection('users').update(b.id, { role: 'author' });
+  const owned = await root.collection('newsletters').create({ title: 'Owned issue', status: 'published', createdById: b.id, likedByUserIds: [], commentItems: [{ ...commentA, likedByUserIds: [] }] });
+  await b.client.collection('newsletters').update(owned.id, {
+    likedByUserIds: [d.id, b.id],
+    commentItems: [{ ...commentA, likedByUserIds: [d.id, b.id] }, { id: 'forged', authorId: d.id, authorName: 'dave', body: 'Not dave', createdAt: new Date().toISOString() }],
+  });
+  const ownedAfter = await root.collection('newsletters').getOne(owned.id);
+  assert.deepEqual(ownedAfter.likedByUserIds, [b.id], 'only the caller can add their own newsletter like');
+  assert.deepEqual(ownedAfter.commentItems[0].likedByUserIds, [b.id], 'only the caller can add their own comment like');
+  assert.equal(ownedAfter.commentItems[1].authorId, b.id, 'a new comment belongs to the caller');
+  assert.equal((await root.collection('community_notifications').getFullList({ filter: `actorId = "${d.id}"` })).length, 0, 'no alert names a user who did not act');
+  const ownedComment = await root.collection('community_notifications').getFirstListItem(`userId = "${a.id}" && kind = "comment" && postId = "${owned.id}:forged"`);
+  assert.equal(ownedComment.actorId, b.id, 'comment alerts name the caller');
+  assert.equal(ownedComment.actorName, 'bob', "comment alerts take the actor's account name, not the comment text");
+  const ownedLike = await root.collection('community_notifications').getFirstListItem(`userId = "${a.id}" && kind = "like" && postId = "${owned.id}:one"`);
+  assert.equal(ownedLike.actorId, b.id, "the caller's own like still notifies");
+
+  for (const mode of ['record', 'custom']) {
+    const attackIssue = await root.collection('newsletters').create({ title: `Prototype regression ${mode}`, status: 'published', createdById: b.id, commentItems: [commentA] });
+    const update = (commentItems) => mode === 'record'
+      ? b.client.collection('newsletters').update(attackIssue.id, { commentItems })
+      : send(b.client, `/api/newsletters/${attackIssue.id}`, { commentItems }, 'PATCH');
+    const seed = { id: '__proto__', constructor: { authorId: d.id }, authorId: d.id, body: 'Prototype seed', createdAt: new Date().toISOString() };
+    await update([commentA, seed]);
+    const seeded = await root.collection('newsletters').getOne(attackIssue.id);
+    assert.equal(seeded.commentItems[1].authorId, b.id, `${mode} special IDs belong to the caller`);
+    await update([...seeded.commentItems, { id: 'constructor', authorId: d.id, body: 'Forged actor', createdAt: new Date().toISOString() }]);
+    const after = await root.collection('newsletters').getOne(attackIssue.id);
+    assert.equal(after.commentItems[2].authorId, b.id, `${mode} prior __proto__ comment cannot spoof another actor`);
+    const alert = await root.collection('community_notifications').getFirstListItem(`userId = "${a.id}" && kind = "comment" && postId = "${attackIssue.id}:constructor"`);
+    assert.equal(alert.actorId, b.id, `${mode} alerts name the caller after a prototype attack`);
+    const block = await root.collection('community_blocks').create({ userId: a.id, targetId: b.id });
+    try {
+      await update([...after.commentItems, { id: 'toString', authorId: d.id, body: 'Blocked actor', createdAt: new Date().toISOString() }]);
+      const blocked = await root.collection('community_notifications').getFullList({ filter: `userId = "${a.id}" && postId = "${attackIssue.id}:toString"` });
+      assert.equal(blocked.length, 0, `${mode} special comment IDs cannot bypass recipient blocks`);
+    } finally {
+      await root.collection('community_blocks').delete(block.id);
+    }
+  }
+  assert.equal((await root.collection('community_notifications').getFullList({ filter: `actorId = "${d.id}"` })).length, 0, 'prototype IDs cannot create a victim-attributed notification');
+  await root.collection('users').update(b.id, { role: 'viewer' });
+
   const start = Date.now() + 60 * 60000;
   const event = { id: 'event-one', title: 'Planning meeting', startDate: new Date(start).toISOString(), attendees: [{ userId: a.id }, { userId: b.id }, { userId: d.id }] };
   await prefs(b.client, { events: false });

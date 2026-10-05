@@ -164,4 +164,82 @@ const unlikePatch = api.buildNewsletterPayload({ likes: 0, likedByUserIds: [] },
 assert.deepEqual(Array.from(unlikePatch.likedByUserIds), ['reader-2']);
 assert.equal(unlikePatch.likes, 1);
 
+// Mirrors a PocketBase record update request: the body carries JSON fields as
+// raw bytes, while the loaded record exposes the sent values by field type.
+function recordUpdateEvent(body, caller, { superuser = false } = {}) {
+  const written = {};
+  const rawBody = {};
+  let nextCalls = 0;
+  Object.keys(body).forEach((field) => {
+    const value = body[field];
+    rawBody[field] = value && typeof value === 'object' ? Array.from(Buffer.from(JSON.stringify(value))) : value;
+  });
+  return {
+    written,
+    get nextCalls() { return nextCalls; },
+    auth: caller,
+    hasSuperuserAuth: () => superuser,
+    requestInfo: () => ({ body: rawBody }),
+    record: {
+      original: () => engaged,
+      get: (field) => body[field],
+      getString: (field) => (body[field] && typeof body[field] === 'object' ? JSON.stringify(body[field]) : String(body[field] ?? '')),
+      set(field, value) { written[field] = value; },
+    },
+    next() { nextCalls += 1; return 'next-result'; },
+  };
+}
+
+const forgedBody = {
+  title: 'Retitled',
+  likes: 9,
+  likedByUserIds: ['victim-1', 'owner-1'],
+  bookmarkedByUserIds: ['victim-1'],
+  commentItems: [
+    { id: 'c1', authorId: 'victim-1', likes: 5, likedByUserIds: ['victim-1'] },
+    { id: 'c2', authorId: 'victim-2', authorName: 'Victim', likedByUserIds: [] },
+  ],
+};
+const ownerRequest = recordUpdateEvent(forgedBody, auth('owner-1', 'author'));
+assert.equal(api.handleNewsletterRecordUpdateRequest(ownerRequest), 'next-result');
+assert.equal(ownerRequest.nextCalls, 1);
+assert.equal('title' in ownerRequest.written, false, 'non-engagement fields keep the loaded request value');
+assert.deepEqual(JSON.parse(ownerRequest.written.likedByUserIds), ['reader-1', 'reader-2', 'owner-1']);
+assert.equal(ownerRequest.written.likes, 3);
+assert.deepEqual(JSON.parse(ownerRequest.written.bookmarkedByUserIds), ['reader-1']);
+const [recordStoredComment, recordNewComment] = JSON.parse(ownerRequest.written.commentItems);
+assert.equal(recordStoredComment.authorId, 'reader-1');
+assert.deepEqual(recordStoredComment.likedByUserIds, ['reader-2']);
+assert.equal(recordStoredComment.likes, 1);
+assert.equal(recordNewComment.authorId, 'owner-1');
+
+// User-controlled comment IDs must not resolve inherited properties or mutate
+// the lookup's prototype across writes. Both newsletter write paths use this.
+for (const id of ['constructor', 'toString', '__proto__']) {
+  const body = { commentItems: [{ id, authorId: 'victim', constructor: { authorId: 'victim' }, body: 'Forged' }] };
+  const custom = api.buildNewsletterPayload(body, auth('owner-1', 'author'), engaged);
+  assert.equal(custom.commentItems[0].authorId, 'owner-1', `new ${id} comment uses caller identity`);
+  const raw = recordUpdateEvent(body, auth('owner-1', 'author'));
+  api.handleNewsletterRecordUpdateRequest(raw);
+  assert.equal(JSON.parse(raw.written.commentItems)[0].authorId, 'owner-1', `record API ${id} comment uses caller identity`);
+}
+const prototypeSeed = record({
+  status: 'published',
+  commentItems: JSON.stringify([{ id: '__proto__', authorId: 'owner-1', constructor: { authorId: 'victim' } }]),
+});
+const followup = api.buildNewsletterPayload({
+  commentItems: [{ id: '__proto__', authorId: 'owner-1', constructor: { authorId: 'victim' } }, { id: 'constructor', authorId: 'victim' }],
+}, auth('owner-1', 'author'), prototypeSeed);
+assert.equal(followup.commentItems[1].authorId, 'owner-1', 'a prior __proto__ comment cannot seed forged author identity');
+
+const titleOnlyRequest = recordUpdateEvent({ title: 'Only the title' }, auth('owner-1', 'author'));
+api.handleNewsletterRecordUpdateRequest(titleOnlyRequest);
+assert.deepEqual(titleOnlyRequest.written, {}, 'requests without engagement fields are untouched');
+assert.equal(titleOnlyRequest.nextCalls, 1);
+
+const superuserRequest = recordUpdateEvent(forgedBody, null, { superuser: true });
+api.handleNewsletterRecordUpdateRequest(superuserRequest);
+assert.deepEqual(superuserRequest.written, {}, 'superusers keep full write access');
+assert.equal(superuserRequest.nextCalls, 1);
+
 console.log('api-manager helper tests passed');

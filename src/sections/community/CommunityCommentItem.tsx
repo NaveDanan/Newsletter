@@ -28,6 +28,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { NewsletterPollCard } from '@/components/newsletter/NewsletterPollCard';
+import { NewsletterEventCard } from '@/components/newsletter/NewsletterEventCard';
 import { createCommunityPost, getPocketBaseErrorMessage, moderateCommunityPost } from '@/lib/pocketbase/community';
 import { cn } from '@/lib/utils';
 import { CommunityAvatar } from './CommunityAvatar';
@@ -35,8 +37,11 @@ import { CommunityBody } from './CommunityBody';
 import { useCommunity } from './CommunityContext';
 import { CommunityEditPostDialog } from './CommunityEditPostDialog';
 import { CommunityMediaGrid } from './CommunityMediaGrid';
+import { CommunityLinkPreviewCard } from './CommunityLinkPreviewCard';
+import { CommunityQuotedPost } from './CommunityQuotedPost';
 import { CommunityReplyInput } from './CommunityReplyInput';
 import { formatCompactTime, type CommentTreeNode } from '@/lib/community-comments';
+import { visibleCommunityBody } from '@/lib/community-text';
 import type { UseCommunityEngagementResult } from '@/hooks/useCommunityEngagement';
 import type { CommunityPost } from '@/types/community';
 
@@ -80,13 +85,8 @@ export function CommunityCommentItem({
   const isNested = depth > 0;
 
   // Text truncation for long comments (like "... See more" in reference image)
-  const isLong = comment.body.length > 220;
-  const displayBody = useMemo(() => {
-    if (!isLong || isExpanded) {
-      return comment.body;
-    }
-    return comment.body.slice(0, 200).trim();
-  }, [comment.body, isExpanded, isLong]);
+  const visibleLength = useMemo(() => visibleCommunityBody(comment.body).length, [comment.body]);
+  const isLong = visibleLength > 220;
 
   // Nested children with connecting branch lines.
   const renderReplies = (childReplyTargetId: string | undefined) => {
@@ -268,8 +268,9 @@ export function CommunityCommentItem({
               {/* Body Text */}
               <div className="mt-1 text-[14px] sm:text-[15px] leading-relaxed text-[var(--text-primary)]" dir="auto">
                 <CommunityBody
-                  body={displayBody}
+                  body={comment.body}
                   entities={comment.entities}
+                  maxLength={isLong && !isExpanded ? 200 : undefined}
                   onHashtagClick={openHashtag}
                   onMentionClick={openProfile}
                   className="inline"
@@ -305,6 +306,35 @@ export function CommunityCommentItem({
               {comment.media && comment.media.length > 0 ? (
                 <div className="mt-2.5 max-w-sm overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
                   <CommunityMediaGrid media={comment.media} sensitive={comment.sensitive} />
+                </div>
+              ) : null}
+
+              {comment.linkPreview && comment.media.length === 0 ? (
+                <CommunityLinkPreviewCard preview={comment.linkPreview} />
+              ) : null}
+              {comment.quotedPost ? <CommunityQuotedPost post={comment.quotedPost} /> : null}
+
+              {comment.poll?.question ? (
+                <div className="mt-3" onClick={(event) => event.stopPropagation()}>
+                  <NewsletterPollCard
+                    poll={comment.poll}
+                    newsletterId={comment.id}
+                    currentUser={isAuthenticated ? user : null}
+                    onVote={(_, optionId) => actions.votePoll(comment, optionId)}
+                    onRequireAuth={requireAuth}
+                  />
+                </div>
+              ) : null}
+
+              {comment.event?.title ? (
+                <div className="mt-3" onClick={(event) => event.stopPropagation()}>
+                  <NewsletterEventCard
+                    event={comment.event}
+                    newsletterId={comment.id}
+                    currentUser={isAuthenticated ? user : null}
+                    onRsvp={() => actions.rsvpEvent(comment)}
+                    onRequireAuth={requireAuth}
+                  />
                 </div>
               ) : null}
             </div>

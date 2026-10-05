@@ -4,6 +4,7 @@ import { SentIcon } from '@hugeicons/core-free-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { searchCommunityPeople } from '@/lib/pocketbase/community';
+import { escapeCommunityBodyLiteral } from '@/lib/community-text';
 import { cn } from '@/lib/utils';
 import { CommunityAvatar } from './CommunityAvatar';
 import type { CommunityProfile } from '@/types/community';
@@ -133,11 +134,15 @@ export function CommunityReplyInput({
     event.preventDefault();
     const trimmed = value.trim();
     if (trimmed && !isSubmitting) {
-      onSubmit(trimmed);
+      onSubmit(escapeCommunityBodyLiteral(trimmed));
     }
   };
 
-  const isOpen = suggestions.length > 0;
+  const isOpen = query !== null && suggestions.length > 0;
+  // Results can narrow after arrow navigation while the debounced search is
+  // pending. Derive a valid index during rendering so keyboard and ARIA state
+  // agree even before any subsequent state update.
+  const selectedIndex = Math.min(highlighted, Math.max(0, suggestions.length - 1));
 
   return (
     <form onSubmit={submit} className="flex items-start gap-2">
@@ -173,13 +178,16 @@ export function CommunityReplyInput({
               }
               if (event.key === 'ArrowDown') {
                 event.preventDefault();
-                setHighlighted((index) => (index + 1) % suggestions.length);
+                setHighlighted((index) => (Math.min(index, suggestions.length - 1) + 1) % suggestions.length);
               } else if (event.key === 'ArrowUp') {
                 event.preventDefault();
-                setHighlighted((index) => (index - 1 + suggestions.length) % suggestions.length);
+                setHighlighted((index) => (Math.min(index, suggestions.length - 1) - 1 + suggestions.length) % suggestions.length);
               } else if (event.key === 'Enter' || event.key === 'Tab') {
-                event.preventDefault();
-                applySuggestion(suggestions[highlighted]);
+                const suggestion = suggestions[selectedIndex];
+                if (suggestion) {
+                  event.preventDefault();
+                  applySuggestion(suggestion);
+                }
               } else if (event.key === 'Escape') {
                 event.preventDefault();
                 setQuery(null);
@@ -211,12 +219,12 @@ export function CommunityReplyInput({
                 <button
                   type="button"
                   role="option"
-                  aria-selected={index === highlighted}
+                  aria-selected={index === selectedIndex}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => applySuggestion(suggestion)}
                   className={cn(
                     'flex w-full items-center gap-2 px-3 py-1.5 text-start transition-colors',
-                    index === highlighted ? 'bg-[var(--bg-pill-hover)]' : 'hover:bg-[var(--bg-pill-hover)]',
+                    index === selectedIndex ? 'bg-[var(--bg-pill-hover)]' : 'hover:bg-[var(--bg-pill-hover)]',
                   )}
                 >
                   <CommunityAvatar

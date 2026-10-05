@@ -23,7 +23,6 @@ export function useNavigationLinks() {
   useEffect(() => {
     let cancelled = false;
 
-    setIsLoading(true);
     fetchPocketBaseNavigationLinks()
       .then((data) => {
         if (cancelled) {

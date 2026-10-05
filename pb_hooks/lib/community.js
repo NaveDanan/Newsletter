@@ -1057,21 +1057,35 @@ function updateProfile(e) {
   var avatars = c.readUploadedFiles(e, 'avatar');
   if (avatars.length) {
     profile.set('avatar', avatars[0]);
+  } else if (body.removeAvatar === true || c.asText(body.removeAvatar) === 'true') {
+    // Profiles from before the unified editor may carry a community-only
+    // avatar; clearing it falls back to the account avatar, if any.
+    profile.set('avatar', '');
+    profile.set('avatarUrl', '');
   }
   var banners = c.readUploadedFiles(e, 'banner');
   if (banners.length) {
     profile.set('banner', banners[0]);
+  } else if (body.removeBanner === true || c.asText(body.removeBanner) === 'true') {
+    profile.set('banner', '');
   }
 
   app.save(profile);
+  refreshAuthorSnapshots(app, profile);
 
+  return { profile: c.serializeProfile(app, profile, { isSelf: true }) };
+}
+
+// Author identity is denormalized onto posts, so a profile edit has to rewrite
+// the copies. Bounded to the most recent 500 posts per edit; older posts keep
+// the name they were published under.
+function refreshAuthorSnapshots(app, profile) {
+  var c = core();
+  var userId = profile.getString('userId');
   var handleValue = profile.getString('handle');
   var nameValue = profile.getString('displayName');
   var avatarValue = c.profileAvatarUrl(app, profile);
 
-  // Author identity is denormalized onto posts, so a profile edit has to
-  // rewrite the copies. Bounded to the most recent 500 posts per edit; older
-  // posts keep the name they were published under.
   try {
     var posts = app.findRecordsByFilter('community_posts', 'authorId = {:authorId}', '-created', 500, 0, { authorId: userId });
     app.runInTransaction(function (tx) {
@@ -1087,8 +1101,23 @@ function updateProfile(e) {
       });
     });
   } catch (_) {}
+}
 
-  return { profile: c.serializeProfile(app, profile, { isSelf: true }) };
+// The account avatar is the one avatar the unified profile editor manages, so
+// changing it replaces any older community-only upload and refreshes every
+// copy derived from it.
+function syncAccountAvatar(app, user) {
+  var c = core();
+  var profile = c.findProfileByUserId(app, String(user.id));
+  if (!profile) {
+    return;
+  }
+
+  var avatar = user.getString('avatar');
+  profile.set('avatar', '');
+  profile.set('avatarUrl', avatar ? c.fileUrl(app, user, avatar) : '');
+  app.save(profile);
+  refreshAuthorSnapshots(app, profile);
 }
 
 function listProfilePosts(e, handle) {
@@ -1762,6 +1791,7 @@ module.exports = {
   getMe: getMe,
   getProfile: getProfile,
   updateProfile: updateProfile,
+  syncAccountAvatar: syncAccountAvatar,
   listProfilePosts: listProfilePosts,
   listProfileConnections: listProfileConnections,
   listNotifications: listNotifications,

@@ -46,7 +46,7 @@ function invokeWorker(settings) {
   var payloadPath = $os.tempDir() + '/newsletter-import-' + $security.randomString(24) + '.json';
   try {
     $os.writeFile(payloadPath, JSON.stringify(settings), 384);
-    var script = String($os.getenv('APP_ROOT') || '/app') + '/scripts/pocketbase/artifactory-import.mjs';
+    var script = String($os.getenv('APP_ROOT') || __hooks + '/..') + '/scripts/pocketbase/artifactory-import.mjs';
     var cmd = $os.cmd(String($os.getenv('NODE_BINARY') || 'node'), script, payloadPath);
     var result = JSON.parse(toString(cmd.output()));
     if (!result.ok) throw new Error(result.message || 'Newsletter import failed.');

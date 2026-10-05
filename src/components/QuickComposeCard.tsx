@@ -16,11 +16,24 @@ export function QuickComposeCard({ user, onCompose }: QuickComposeCardProps) {
   const videoInputRef = useRef<HTMLInputElement | null>(null);
 
   const actions = [
-    { key: 'image', icon: Image, color: 'text-emerald-500', label: t('quickCompose.image'), onClick: () => imageInputRef.current?.click() },
-    { key: 'video', icon: Video, color: 'text-blue-500', label: t('quickCompose.video'), onClick: () => videoInputRef.current?.click() },
-    { key: 'poll', icon: BarChart2, color: 'text-rose-500', label: t('quickCompose.poll'), onClick: () => onCompose() },
-    { key: 'schedule', icon: Calendar, color: 'text-amber-500', label: t('quickCompose.schedule'), onClick: () => onCompose() },
+    { key: 'image', icon: Image, color: 'text-emerald-500', label: t('quickCompose.image') },
+    { key: 'video', icon: Video, color: 'text-blue-500', label: t('quickCompose.video') },
+    { key: 'poll', icon: BarChart2, color: 'text-rose-500', label: t('quickCompose.poll') },
+    { key: 'schedule', icon: Calendar, color: 'text-amber-500', label: t('quickCompose.schedule') },
   ];
+
+  // Resolved when the button is pressed so the hidden inputs are only read outside render.
+  const handleAction = (key: string) => {
+    if (key === 'image') {
+      imageInputRef.current?.click();
+      return;
+    }
+    if (key === 'video') {
+      videoInputRef.current?.click();
+      return;
+    }
+    onCompose();
+  };
 
   const handlePicked = (pickEvent: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(pickEvent.target.files ?? []);
@@ -56,12 +69,12 @@ export function QuickComposeCard({ user, onCompose }: QuickComposeCardProps) {
       </div>
 
       <div className="create-post-actions-row flex items-center gap-3 pt-1">
-        {actions.map(({ key, icon: Icon, color, label, onClick }) => (
+        {actions.map(({ key, icon: Icon, color, label }) => (
           <button
             key={key}
             type="button"
             className="create-action-btn flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            onClick={onClick}
+            onClick={() => handleAction(key)}
           >
             <Icon className={`size-[18px] ${color}`} />
             <span>{label}</span>

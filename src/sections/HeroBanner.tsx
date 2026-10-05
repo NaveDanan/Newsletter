@@ -88,11 +88,11 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
           </div>
 
           <div ref={imageRef} className="lg:col-span-6 relative">
-            <div className="post-media-frame relative rounded-2xl overflow-hidden shadow-2xl border border-[var(--border-subtle)] group cursor-pointer" onClick={() => featuredNewsletter && onArticleClick?.(featuredNewsletter)}>
+            <div className="post-media-frame relative md:aspect-video rounded-2xl overflow-hidden shadow-2xl border border-[var(--border-subtle)] group cursor-pointer" onClick={() => featuredNewsletter && onArticleClick?.(featuredNewsletter)}>
               <img
                 src={heroImage}
                 alt={featuredNewsletter?.title ?? t('hero.imageAlt')}
-                className="w-full h-[300px] sm:h-[360px] lg:h-[420px] object-cover group-hover:scale-105 transition-transform duration-500"
+                className="w-full h-[300px] md:h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
 

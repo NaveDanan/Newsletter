@@ -60,6 +60,16 @@ function nextEditMediaKey(): string {
   return 'em-' + editMediaKeyCounter;
 }
 
+function initialItemsFor(post: CommunityPost): PendingMedia[] {
+  return (post.media || []).map((m) => ({
+    key: 'existing-' + m.id,
+    media: m,
+    previewUrl: resolveCommunityFileUrl(m.url),
+    kind: m.kind,
+    isUploading: false,
+  }));
+}
+
 export function CommunityEditPostDialog({
   open,
   post,
@@ -68,40 +78,58 @@ export function CommunityEditPostDialog({
 }: CommunityEditPostDialogProps) {
   const { t } = useLocale();
   const [body, setBody] = useState(post.body);
-  const [items, setItems] = useState<PendingMedia[]>([]);
+  const [items, setItems] = useState<PendingMedia[]>(() => (open ? initialItemsFor(post) : []));
   const [sensitive, setSensitive] = useState(Boolean(post.sensitive));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const itemsRef = useRef<PendingMedia[]>(items);
-  itemsRef.current = items;
+  const openRef = useRef(open);
+
+  // Mirrors the latest items so the close/unmount cleanups can revoke blob URLs
+  // without re-running on every media change.
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+
+  // Opening (or swapping the post) reseeds the editor from the post; closing
+  // discards the draft. Both are prop-driven resets, applied while rendering
+  // the change instead of one commit later.
+  const [lastSource, setLastSource] = useState<{ open: boolean; post: CommunityPost }>({ open, post });
+  if (lastSource.open !== open || lastSource.post !== post) {
+    setLastSource({ open, post });
     if (open) {
       setBody(post.body);
       setSensitive(Boolean(post.sensitive));
       setIsSubmitting(false);
-
-      const initialItems: PendingMedia[] = (post.media || []).map((m) => ({
-        key: 'existing-' + m.id,
-        media: m,
-        previewUrl: resolveCommunityFileUrl(m.url),
-        kind: m.kind,
-        isUploading: false,
-      }));
-      setItems(initialItems);
+      setItems(initialItemsFor(post));
     } else {
-      // Revoke any created blob URLs
+      setItems([]);
+    }
+  }
+
+  // Blob URLs created for freshly picked files are released when the dialog
+  // closes or unmounts, reading the items held just before the reset.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    return () => {
       itemsRef.current.forEach((item) => {
         if (item.previewUrl.startsWith('blob:')) {
           URL.revokeObjectURL(item.previewUrl);
         }
       });
-      setItems([]);
-    }
-  }, [open, post]);
+    };
+  }, [open]);
 
+  // Unmounting while closed still releases anything added after the close.
   useEffect(() => () => {
     itemsRef.current.forEach((item) => {
       if (item.previewUrl.startsWith('blob:')) {
@@ -157,6 +185,13 @@ export function CommunityEditPostDialog({
 
       const key = nextEditMediaKey();
       const probe = await probeCommunityMedia(file, kind);
+      if (!openRef.current) {
+        // Closed while the file was being read: the draft it belonged to is gone.
+        if (probe.previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(probe.previewUrl);
+        }
+        return;
+      }
       setItems((current) => current.concat({
         key,
         media: null,

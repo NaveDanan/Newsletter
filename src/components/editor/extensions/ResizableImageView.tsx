@@ -43,27 +43,51 @@ function normalizeRotation(value: number) {
   return normalized < 0 ? normalized + 360 : normalized;
 }
 
+interface ResizableImageGeometry {
+  width: string;
+  height: string;
+  rotation: number;
+  textWrap: ResizableImageTextWrap;
+  offsetX: number;
+  offsetY: number;
+}
+
+function readGeometry(attrs: Record<string, unknown>): ResizableImageGeometry {
+  return {
+    width: normalizeDimension(attrs.width, '100%'),
+    height: normalizeDimension(attrs.height, 'auto'),
+    // Finite, so geometry comparisons settle even for malformed imported HTML.
+    rotation: normalizeOffset(attrs.rotation),
+    textWrap: (attrs.textWrap || 'break') as ResizableImageTextWrap,
+    offsetX: normalizeOffset(attrs.offsetX),
+    offsetY: normalizeOffset(attrs.offsetY),
+  };
+}
+
+function isSameGeometry(a: ResizableImageGeometry, b: ResizableImageGeometry) {
+  return (
+    a.width === b.width &&
+    a.height === b.height &&
+    a.rotation === b.rotation &&
+    a.textWrap === b.textWrap &&
+    a.offsetX === b.offsetX &&
+    a.offsetY === b.offsetY
+  );
+}
+
 export function ResizableImageView({ node, updateAttributes, deleteNode, selected }: NodeViewProps) {
-  const {
-    src,
-    alt,
-    title,
-    width: initialWidth,
-    height: initialHeight,
-    rotation: initialRotation,
-    textWrap: initialTextWrap,
-    offsetX: initialOffsetX,
-    offsetY: initialOffsetY,
-  } = node.attrs;
-  
-  const [width, setWidth] = useState(normalizeDimension(initialWidth, '100%'));
-  const [, setHeight] = useState(normalizeDimension(initialHeight, 'auto'));
-  const [rotation, setRotation] = useState(initialRotation || 0);
-  const [textWrap, setTextWrap] = useState<ResizableImageTextWrap>(initialTextWrap || 'break');
+  const { src, alt, title } = node.attrs;
+  const geometry = readGeometry(node.attrs);
+
+  const [width, setWidth] = useState(geometry.width);
+  const [, setHeight] = useState(geometry.height);
+  const [rotation, setRotation] = useState(geometry.rotation);
+  const [textWrap, setTextWrap] = useState<ResizableImageTextWrap>(geometry.textWrap);
   const [offset, setOffset] = useState({
-    x: normalizeOffset(initialOffsetX),
-    y: normalizeOffset(initialOffsetY),
+    x: geometry.offsetX,
+    y: geometry.offsetY,
   });
+  const [syncedGeometry, setSyncedGeometry] = useState(geometry);
   const [isResizing, setIsResizing] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const [showControls, setShowControls] = useState(false);
@@ -75,37 +99,35 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
   const dragStartRef = useRef({ x: 0, y: 0 });
   const rotateStartRef = useRef({ centerX: 0, centerY: 0, angleOffset: 0 });
   const aspectRatioRef = useRef(1);
-  const widthRef = useRef(normalizeDimension(initialWidth, '100%'));
-  const heightRef = useRef(normalizeDimension(initialHeight, 'auto'));
-  const rotationRef = useRef(initialRotation || 0);
-  const textWrapRef = useRef<ResizableImageTextWrap>(initialTextWrap || 'break');
+  const widthRef = useRef(geometry.width);
+  const heightRef = useRef(geometry.height);
+  const rotationRef = useRef(geometry.rotation);
+  const textWrapRef = useRef<ResizableImageTextWrap>(geometry.textWrap);
   const offsetRef = useRef({
-    x: normalizeOffset(initialOffsetX),
-    y: normalizeOffset(initialOffsetY),
+    x: geometry.offsetX,
+    y: geometry.offsetY,
   });
 
+  // The node attributes own the geometry; local state only runs ahead of them
+  // while a gesture is in flight. When the attributes change from anywhere else
+  // (undo/redo, remote edits) the local copy is adjusted during render instead
+  // of in an effect, so no extra render pass is needed.
+  if (!isSameGeometry(syncedGeometry, geometry)) {
+    setSyncedGeometry(geometry);
+    setWidth(geometry.width);
+    setHeight(geometry.height);
+    setRotation(geometry.rotation);
+    setTextWrap(geometry.textWrap);
+    setOffset({ x: geometry.offsetX, y: geometry.offsetY });
+  }
+
   useEffect(() => {
-    const nextWidth = normalizeDimension(node.attrs.width, '100%');
-    const nextHeight = normalizeDimension(node.attrs.height, 'auto');
-    const nextRotation = Number(node.attrs.rotation || 0);
-    const nextTextWrap = (node.attrs.textWrap || 'break') as ResizableImageTextWrap;
-    const nextOffset = {
-      x: normalizeOffset(node.attrs.offsetX),
-      y: normalizeOffset(node.attrs.offsetY),
-    };
-
-    widthRef.current = nextWidth;
-    heightRef.current = nextHeight;
-    rotationRef.current = nextRotation;
-    textWrapRef.current = nextTextWrap;
-    offsetRef.current = nextOffset;
-
-    setWidth(nextWidth);
-    setHeight(nextHeight);
-    setRotation(nextRotation);
-    setTextWrap(nextTextWrap);
-    setOffset(nextOffset);
-  }, [node.attrs.height, node.attrs.offsetX, node.attrs.offsetY, node.attrs.rotation, node.attrs.textWrap, node.attrs.width]);
+    widthRef.current = syncedGeometry.width;
+    heightRef.current = syncedGeometry.height;
+    rotationRef.current = syncedGeometry.rotation;
+    textWrapRef.current = syncedGeometry.textWrap;
+    offsetRef.current = { x: syncedGeometry.offsetX, y: syncedGeometry.offsetY };
+  }, [syncedGeometry]);
 
   const commitAttributes = useCallback((overrides: Partial<{
     width: string;
@@ -122,20 +144,15 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
     const nextOffsetX = normalizeOffset(overrides.offsetX ?? offsetRef.current.x);
     const nextOffsetY = normalizeOffset(overrides.offsetY ?? offsetRef.current.y);
 
-    const currentWidth = normalizeDimension(node.attrs.width, '100%');
-    const currentHeight = normalizeDimension(node.attrs.height, 'auto');
-    const currentRotation = Number(node.attrs.rotation || 0);
-    const currentTextWrap = (node.attrs.textWrap || 'break') as ResizableImageTextWrap;
-    const currentOffsetX = normalizeOffset(node.attrs.offsetX);
-    const currentOffsetY = normalizeOffset(node.attrs.offsetY);
-
     if (
-      currentWidth === nextWidth &&
-      currentHeight === nextHeight &&
-      currentRotation === nextRotation &&
-      currentTextWrap === nextTextWrap &&
-      currentOffsetX === nextOffsetX &&
-      currentOffsetY === nextOffsetY
+      isSameGeometry(syncedGeometry, {
+        width: nextWidth,
+        height: nextHeight,
+        rotation: nextRotation,
+        textWrap: nextTextWrap,
+        offsetX: nextOffsetX,
+        offsetY: nextOffsetY,
+      })
     ) {
       return;
     }
@@ -148,7 +165,7 @@ export function ResizableImageView({ node, updateAttributes, deleteNode, selecte
       offsetX: nextOffsetX,
       offsetY: nextOffsetY,
     });
-  }, [node.attrs.height, node.attrs.offsetX, node.attrs.offsetY, node.attrs.rotation, node.attrs.textWrap, node.attrs.width, updateAttributes]);
+  }, [syncedGeometry, updateAttributes]);
 
   // Handle resize start
   const handleResizeStart = useCallback((e: React.MouseEvent, corner: string) => {

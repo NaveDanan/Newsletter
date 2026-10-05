@@ -31,6 +31,20 @@ export interface PocketBaseUser {
 
 export type SSOProvider = 'oidc' | 'microsoft' | 'custom';
 
+type AuthRecordListener = (record: RecordModel | null) => void;
+
+// Signing out replaces the client (resetPocketBase), which strands any
+// listener attached to the old authStore. Listeners registered here are
+// notified by whichever client is current.
+const authRecordListeners = new Set<AuthRecordListener>();
+
+export function subscribeToAuthRecord(listener: AuthRecordListener): () => void {
+  authRecordListeners.add(listener);
+  return () => {
+    authRecordListeners.delete(listener);
+  };
+}
+
 export function getPocketBase(): PocketBase {
   const currentUrl = getPocketBaseUrl();
   if (!pb) {
@@ -58,6 +72,8 @@ export function getPocketBase(): PocketBase {
     }
 
     pb.authStore.onChange((token, model) => {
+      authRecordListeners.forEach((listener) => listener(token && model ? model : null));
+
       if (token && model) {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, model }));
         bootLogger.debug('pocketbase', 'Persisted PocketBase auth state change', {

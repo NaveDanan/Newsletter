@@ -101,11 +101,11 @@ export function CarouselSection() {
     const diff = index - activeIndex;
     const absDiff = Math.abs(diff);
     
-    let translateX = diff * 280;
-    let translateZ = absDiff === 0 ? 180 : absDiff === 1 ? -80 : -220;
-    let rotateY = diff * -25;
-    let opacity = absDiff > 2 ? 0.3 : 1;
-    let scale = absDiff === 0 ? 1 : absDiff === 1 ? 0.9 : 0.8;
+    const translateX = diff * 280;
+    const translateZ = absDiff === 0 ? 180 : absDiff === 1 ? -80 : -220;
+    const rotateY = diff * -25;
+    const opacity = absDiff > 2 ? 0.3 : 1;
+    const scale = absDiff === 0 ? 1 : absDiff === 1 ? 0.9 : 0.8;
 
     return {
       transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,

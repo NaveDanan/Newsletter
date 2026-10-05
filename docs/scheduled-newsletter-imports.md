@@ -34,7 +34,7 @@ Admins can expand **Tracked DOCX files** below import settings. The paginated li
 
 Startup also runs `scripts/repair-imported-newsletter-dates.mjs` on articles referenced by import checkpoints. It corrects leading publication-date metadata, fixes the old importer’s RTL/left-alignment pattern and moves a leading summary before byline/source metadata into an empty subtitle field. Existing subtitles, other prose and workflow state are preserved. Repairs are idempotent.
 
-The normal container startup schema sync creates `newsletter_import_jobs` and `newsletter_imports`. Existing deployments need the updated app image, including hooks, scripts and dependencies. For a standalone PocketBase deployment, run `pnpm pb:sync-app-schema`, install production dependencies and set `APP_ROOT` to the project directory so the hook can locate `scripts/pocketbase/artifactory-import.mjs`. Node must be available on PATH, or through `NODE_BINARY`.
+The normal container startup schema sync creates `newsletter_import_jobs` and `newsletter_imports`. Existing deployments need the updated app image, including hooks, scripts and dependencies. For a standalone PocketBase deployment, run `pnpm pb:sync-app-schema`, install production dependencies and set `APP_ROOT` to the project directory so the hook can locate `scripts/pocketbase/artifactory-import.mjs` (it defaults to the parent of the hooks directory). Node must be available on PATH, or through `NODE_BINARY`.
 
 Run the parser and Artifactory client tests with:
 

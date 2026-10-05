@@ -84,6 +84,7 @@ export async function fetchActiveSubscriberCount(): Promise<number> {
   const pb = getPocketBase();
   const result = await pb.send<NewsletterStatsResponse>('/api/newsletter/stats', {
     method: 'GET',
+    requestKey: null,
   });
 
   return typeof result?.activeSubscribers === 'number' ? result.activeSubscribers : 0;

@@ -114,7 +114,9 @@ export const ResizableImage = Node.create<ResizableImageOptions>({
   },
 
   renderHTML({ HTMLAttributes }) {
-    const { width, height, rotation, textWrap, offsetX, offsetY, style: _style, ...attrs } = HTMLAttributes;
+    const { width, height, rotation, textWrap, offsetX, offsetY, ...attrs } = HTMLAttributes;
+    // The stored style attribute is replaced by the computed one below.
+    delete attrs.style;
     
     const styleParts: string[] = [];
     if (width && width !== 'auto') styleParts.push(`width: ${width}`);

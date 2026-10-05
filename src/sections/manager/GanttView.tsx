@@ -6,7 +6,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
 import { useProjects } from '../../hooks/useProjects';
-import { applyDependencyScheduling, getStatusBadgeClass, getStatusBarClass, getStatusColor, getTaskCalendarSpanDays, getTaskEnd, getTaskOffsetDays, getTimelineDays, updateTaskDeadline } from '../../lib/gantt';
+import { applyDependencyScheduling, getStatusBarClass, getStatusColor, getTaskCalendarSpanDays, getTaskEnd, getTaskOffsetDays, getTimelineDays, updateTaskDeadline } from '../../lib/gantt';
 import type { GanttTask, GanttZoom } from '../../types/gantt';
 import type { Project } from '../../types/project';
 import {

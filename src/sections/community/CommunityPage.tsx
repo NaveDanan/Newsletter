@@ -28,12 +28,12 @@ import { cn } from '@/lib/utils';
 import { CommunityBookmarksScreen } from './CommunityBookmarksScreen';
 import { CommunityComposerDialog } from './CommunityComposerDialog';
 import { CommunityConnectionsScreen } from './CommunityConnectionsScreen';
-import { CommunityProvider, type CommunityContextValue } from './CommunityContext';
+import { type CommunityContextValue } from './CommunityContext';
+import { CommunityProvider } from './CommunityProvider';
 import { CommunityFeedScreen } from './CommunityFeedScreen';
 import { CommunityHashtagScreen } from './CommunityHashtagScreen';
 import { CommunityLeftRail } from './CommunityLeftRail';
 import { CommunityNotificationsScreen } from './CommunityNotificationsScreen';
-import { CommunityProfileEditor } from './CommunityProfileEditor';
 import { CommunityProfileScreen } from './CommunityProfileScreen';
 import { CommunityReportDialog } from './CommunityReportDialog';
 import { CommunityRightRail } from './CommunityRightRail';
@@ -45,9 +45,10 @@ import type { CommunityPost, CommunitySearchType } from '@/types/community';
 // of the context rather than out of window.location, so the eleven screens stay
 // unaware that App drives navigation with history.pushState.
 //
-// The composer, the report dialog and the profile editor live here instead of
-// inside the screens because any card anywhere can open them, and a modal that
-// unmounts with its screen would close itself on the navigation it triggered.
+// The composer and the report dialog live here instead of inside the screens
+// because any card anywhere can open them, and a modal that unmounts with its
+// screen would close itself on the navigation it triggered. Profile editing is
+// not a modal: it is the unified /profile page shared with the rest of the site.
 
 interface CommunityPageProps {
   pathname: string;
@@ -68,15 +69,13 @@ export function CommunityPage({
   isAuthenticated,
   onNavigate,
   onRequireAuth,
-  onLeave,
   onOpenModeration,
 }: CommunityPageProps) {
   const { t } = useLocale();
-  const { session, profile, isLoading, saveProfile, setUnreadNotifications } = useCommunitySession(isAuthenticated);
+  const { session, profile, isLoading, setUnreadNotifications } = useCommunitySession(isAuthenticated);
   const [composer, setComposer] = useState<ComposerState | null>(null);
   const [composeSignal, setComposeSignal] = useState(0);
   const [reportTarget, setReportTarget] = useState<{ postId?: string; handle?: string } | null>(null);
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const toggleTag = useCallback((tag: string) => {
@@ -229,7 +228,7 @@ export function CommunityPage({
           key={targetHandle + ':' + route.profileTab}
           handle={targetHandle}
           tab={route.profileTab}
-          onEditProfile={() => setIsEditorOpen(true)}
+          onEditProfile={() => onNavigate('/profile')}
         />
       );
     }
@@ -397,13 +396,6 @@ export function CommunityPage({
         />
 
         <CommunityReportDialog target={reportTarget} onClose={() => setReportTarget(null)} />
-
-        <CommunityProfileEditor
-          open={isEditorOpen}
-          profile={profile}
-          onSave={saveProfile}
-          onClose={() => setIsEditorOpen(false)}
-        />
       </div>
     </CommunityProvider>
   );

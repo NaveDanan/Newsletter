@@ -259,6 +259,10 @@ export interface CommunityProfilePatch {
   pinnedPostId?: string;
   avatar?: File | null;
   banner?: File | null;
+  /** Clears the stored banner; ignored when `banner` carries a new file. */
+  removeBanner?: boolean;
+  /** Clears a community-only avatar; ignored when `avatar` carries a new file. */
+  removeAvatar?: boolean;
 }
 
 export interface CommunityMediaUpload {

@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { ThumbsUp } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSubscriberCount } from '@/hooks/useSubscriberCount';
 import { subscribeToNewsletter } from '@/lib/pocketbase/subscribers';
+import { RecentActivity } from './RecentActivity';
 
 interface SidebarProps {
   publishedCount: number;
+  onNavigate: (pathname: string) => void;
 }
 
-export function Sidebar({ publishedCount }: SidebarProps) {
+export function Sidebar({ publishedCount, onNavigate }: SidebarProps) {
   const { formatNumber, locale, t } = useLocale();
   const { subscriberCount, refreshSubscriberCount } = useSubscriberCount();
   const [email, setEmail] = useState('');
@@ -138,82 +138,7 @@ export function Sidebar({ publishedCount }: SidebarProps) {
       </div>
 
       {/* 3. Recent Activity Widget */}
-      <div className="space-y-3">
-        <h3 className="section-header-title text-sm font-bold text-[var(--text-primary)] mb-3">
-          Recent Activity
-        </h3>
-
-        {/* Activity 1 */}
-        <div className="activity-card">
-          <div className="activity-top-row flex items-center gap-3">
-            <div className="activity-avatar">
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80"
-                alt="Community Member"
-                className="w-full h-full object-cover"
-              />
-              <div className="yellow-dot-badge" />
-            </div>
-            <div className="activity-info flex-1 min-w-0">
-              <h4 className="activity-user-name text-xs sm:text-sm font-bold text-[var(--text-primary)] truncate">
-                Maya Shapiro
-              </h4>
-              <span className="activity-action-text text-[11px] text-[var(--text-secondary)] flex items-center gap-1">
-                joined newsletter • <span className="font-semibold text-[var(--primary-accent)]">2m ago</span>
-              </span>
-            </div>
-          </div>
-          <div className="activity-bottom-row flex items-center justify-between pt-1">
-            <span className="text-xs font-bold text-[var(--text-primary)]">Free /reader</span>
-            <button
-              type="button"
-              className="btn-pill-action btn-thanks-yellow text-[11px] py-1 px-3"
-              onClick={(e) => {
-                const btn = e.currentTarget;
-                if (btn.innerText === 'Thanks') {
-                  btn.innerText = 'Thanked ✓';
-                  btn.className = 'btn-pill-action btn-thanked-dark text-[11px] py-1 px-3';
-                  toast.success('Thanked subscriber!');
-                }
-              }}
-            >
-              Thanks
-            </button>
-          </div>
-        </div>
-
-        {/* Activity 2 */}
-        <div className="activity-card">
-          <div className="activity-top-row flex items-center gap-3">
-            <div className="activity-avatar">
-              <img
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80"
-                alt="David Levi"
-                className="w-full h-full object-cover"
-              />
-              <div className="yellow-dot-badge" />
-            </div>
-            <div className="activity-info flex-1 min-w-0">
-              <h4 className="activity-user-name text-xs sm:text-sm font-bold text-[var(--text-primary)] truncate">
-                David Levi
-              </h4>
-              <span className="activity-action-text text-[11px] text-[var(--text-secondary)] flex items-center gap-1">
-                shared workflow • <span className="font-semibold text-[var(--primary-accent)]">15m ago</span>
-              </span>
-            </div>
-          </div>
-          <div className="activity-bottom-row flex items-center justify-between pt-1">
-            <span className="text-xs font-bold text-[var(--text-primary)]">Workflow /case</span>
-            <button
-              type="button"
-              className="btn-pill-action btn-thanks-yellow text-[11px] py-1 px-3"
-              onClick={() => toast.success('Bookmarked discussion')}
-            >
-              View
-            </button>
-          </div>
-        </div>
-      </div>
+      <RecentActivity onNavigate={onNavigate} />
 
       {/* 4. Skills & Topics Tags */}
       <div id="topics" className="feed-post-card p-5">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { QuickComposeCard } from '@/components/QuickComposeCard';
 import { useCommunityEngagement } from '@/hooks/useCommunityEngagement';
@@ -27,14 +27,14 @@ export function CommunityFeedScreen({ tab, onPostCreated, openComposerSignal = 0
   const { isAuthenticated, navigate, profile, requireAuth, selectedTags } = useCommunity();
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[] | undefined>(undefined);
-  const lastComposerSignal = useRef(openComposerSignal);
+  const [lastComposerSignal, setLastComposerSignal] = useState(openComposerSignal);
 
-  useEffect(() => {
-    if (openComposerSignal !== lastComposerSignal.current) {
-      lastComposerSignal.current = openComposerSignal;
-      setIsComposeOpen(true);
-    }
-  }, [openComposerSignal]);
+  // A bumped signal means something elsewhere asked to compose; open on the
+  // render that observes the change rather than one commit later.
+  if (openComposerSignal !== lastComposerSignal) {
+    setLastComposerSignal(openComposerSignal);
+    setIsComposeOpen(true);
+  }
 
   const source = useCallback(
     (cursor: string) => fetchCommunityFeed({ tab, cursor: cursor || undefined }),

@@ -214,7 +214,7 @@ export function ImageCropperDialog({ file, shape, onCancel, onApply }: ImageCrop
       <DialogContent className="max-w-[min(520px,94vw)] gap-0 border-[#E5E5E5] bg-white p-0 sm:max-w-[520px]">
         <DialogHeader className="space-y-1 border-b border-[#E5E5E5] px-5 py-3.5 text-start">
           <DialogTitle className="text-base font-semibold text-[#171717]">
-            {t('profile.crop.avatarTitle')}
+            {t(shape === 'cover' ? 'profile.crop.coverTitle' : 'profile.crop.avatarTitle')}
           </DialogTitle>
           <DialogDescription className="text-[11px] text-[#737373]">
             {t('profile.crop.hint')}

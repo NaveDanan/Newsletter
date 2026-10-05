@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface DropdownNavigationLinkItem {
@@ -31,9 +31,61 @@ export interface DropdownNavigationItem {
 interface DropdownNavigationProps {
   navItems: DropdownNavigationItem[];
   className?: string;
+  /** Which edge of its trigger a panel lines up with; `end` opens it toward inline-start. */
+  align?: 'start' | 'end';
 }
 
-export function DropdownNavigation({ navItems, className }: DropdownNavigationProps) {
+const PANEL_EDGE_GAP_PX = 8;
+
+/** The horizontal span a panel may use: its nearest sideways-clipping ancestor, else the viewport. */
+function horizontalBounds(element: HTMLElement): { left: number; right: number } {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    if (getComputedStyle(node).overflowX !== 'visible') {
+      const left = node.getBoundingClientRect().left + node.clientLeft;
+      return { left, right: left + node.clientWidth };
+    }
+  }
+  return { left: 0, right: document.documentElement.clientWidth };
+}
+
+/** The visible panel box. It narrows and shifts sideways so no ancestor clips it. */
+function DropdownPanel({ children }: { children: React.ReactNode }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) {
+      return undefined;
+    }
+
+    const fit = () => {
+      panel.style.translate = '';
+      const bounds = horizontalBounds(panel);
+      const start = bounds.left + PANEL_EDGE_GAP_PX;
+      const end = bounds.right - PANEL_EDGE_GAP_PX;
+      panel.style.maxWidth = `${Math.max(0, end - start)}px`;
+
+      const rect = panel.getBoundingClientRect();
+      const shift = rect.right > end ? end - rect.right : rect.left < start ? start - rect.left : 0;
+      panel.style.translate = shift ? `${shift}px 0` : '';
+    };
+
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
+
+  return (
+    <div
+      ref={panelRef}
+      className="w-max rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-card)] backdrop-blur-xl"
+    >
+      {children}
+    </div>
+  );
+}
+
+export function DropdownNavigation({ navItems, className, align = 'start' }: DropdownNavigationProps) {
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
 
@@ -152,9 +204,9 @@ export function DropdownNavigation({ navItems, className }: DropdownNavigationPr
                   exit={{ opacity: 0, y: 8 }}
                   transition={{ duration: 0.16, ease: 'easeOut' }}
                   className="absolute top-full z-50 pt-3"
-                  style={{ insetInlineStart: 0 }}
+                  style={align === 'end' ? { insetInlineEnd: 0 } : { insetInlineStart: 0 }}
                 >
-                  <div className="w-max rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-card)] backdrop-blur-xl">
+                  <DropdownPanel>
                     <div className="flex flex-wrap gap-8">
                       {navItem.subMenus.map((subMenu) => (
                         <div key={subMenu.title} className="min-w-64 max-w-72">
@@ -202,7 +254,7 @@ export function DropdownNavigation({ navItems, className }: DropdownNavigationPr
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </DropdownPanel>
                 </motion.div>
               ) : null}
             </AnimatePresence>

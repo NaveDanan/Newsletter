@@ -132,7 +132,7 @@ export function LatestArticles({ newsletters, currentUserId, onArticleClick }: L
               </div>
 
               {/* Media Frame with Shatter Effect Overlay */}
-              <div className="post-media-frame relative h-48 sm:h-64 rounded-2xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-app)]">
+              <div className="post-media-frame relative h-48 md:h-auto md:aspect-video rounded-2xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-app)]">
                 <img
                   src={article.coverImage}
                   alt={article.title}

@@ -1,8 +1,6 @@
 import { type ReactNode, useState, useEffect } from 'react';
 import { useTheme } from '@/context/ThemeContext';
-import { useLocale } from '@/contexts/LocaleContext';
-import { DeviceToggleBar } from './DeviceToggleBar';
-import { Home, Compass, Plus, Bell, User, Wifi, Battery, Signal, SlidersHorizontal, ChevronUp } from 'lucide-react';
+import { Home, Compass, Plus, Bell, User, Wifi, Battery, Signal } from 'lucide-react';
 import { UserAvatarCircle } from '@/components/UserAvatarCircle';
 
 interface AppStageShellProps {
@@ -24,10 +22,7 @@ export function AppStageShell({
   onProfileClick,
   user,
 }: AppStageShellProps) {
-  const { deviceMode, resolvedTheme } = useTheme();
-  const { t } = useLocale();
-  const [mobileTab, setMobileTab] = useState<'feed' | 'activity' | 'profile'>('feed');
-  const [showControls, setShowControls] = useState(false);
+  const { deviceMode } = useTheme();
   const [currentTime, setCurrentTime] = useState('9:41');
 
   useEffect(() => {
@@ -44,36 +39,10 @@ export function AppStageShell({
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start py-4 px-2 sm:px-4 md:py-6 transition-colors">
-      {/* Device & Theme Selector Bar — collapsed by default */}
-      <button
-        type="button"
-        onClick={() => setShowControls((open) => !open)}
-        aria-expanded={showControls}
-        aria-label={showControls ? 'Hide display controls' : 'Show display controls'}
-        title={showControls ? 'Hide display controls' : 'Show display controls'}
-        className="mb-2 flex size-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)]/80 text-[var(--text-secondary)] shadow-[var(--shadow-card)] backdrop-blur-xl transition-colors hover:text-[var(--primary-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)]"
-      >
-        {showControls ? <ChevronUp className="size-4" /> : <SlidersHorizontal className="size-4" />}
-      </button>
-      {showControls ? <DeviceToggleBar /> : null}
-
       {/* Main Stage */}
-      <div className={`device-stage mode-${deviceMode} w-full`} data-tab={mobileTab}>
+      <div className={`device-stage mode-${deviceMode} w-full`}>
         <div className="app-window" id="app-window">
-          {/* 1. Desktop Window Frame (macOS Titlebar) */}
-          <div className="desktop-titlebar">
-            <div className="window-controls">
-              <span className="win-btn win-close" title="Close" />
-              <span className="win-btn win-min" title="Minimize" />
-              <span className="win-btn win-max" title="Zoom" />
-            </div>
-            <div className="window-title">
-              AI-BREAK — {user?.name || 'Community & Newsletter'} (Desktop App)
-            </div>
-            <div className="window-badge">1200 × 860px</div>
-          </div>
-
-          {/* 2. Mobile Device Bezel & Dynamic Island (Shown in Mobile Mode) */}
+          {/* Mobile Device Bezel & Dynamic Island (Shown in Mobile Mode) */}
           <div className="mobile-top-bezel">
             <span className="mobile-status-time">{currentTime}</span>
             <div className="dynamic-island-notch">
@@ -86,40 +55,6 @@ export function AppStageShell({
             </div>
           </div>
 
-          {/* Mobile Segmented Navigation Tabs */}
-          <div className="mobile-tabs-bar">
-            <button
-              type="button"
-              className={`mobile-tab-btn ${mobileTab === 'feed' ? 'active' : ''}`}
-              onClick={() => {
-                setMobileTab('feed');
-                onHomeClick?.();
-              }}
-            >
-              Feed
-            </button>
-            <button
-              type="button"
-              className={`mobile-tab-btn ${mobileTab === 'activity' ? 'active' : ''}`}
-              onClick={() => {
-                setMobileTab('activity');
-                onCommunityClick?.();
-              }}
-            >
-              Community
-            </button>
-            <button
-              type="button"
-              className={`mobile-tab-btn ${mobileTab === 'profile' ? 'active' : ''}`}
-              onClick={() => {
-                setMobileTab('profile');
-                onProfileClick?.();
-              }}
-            >
-              Profile
-            </button>
-          </div>
-
           {/* Content Inner Scroll Container */}
           <div className="app-inner-scroll" id="app-inner-scroll">
             {children}
@@ -129,15 +64,14 @@ export function AppStageShell({
           <nav className="mobile-bottom-bar" aria-label="Mobile Navigation">
             <button
               type="button"
-              className={`mobile-nav-btn ${activeTab === 'home' || mobileTab === 'feed' ? 'active' : ''}`}
+              className={`mobile-nav-btn ${activeTab === 'home' ? 'active' : ''}`}
               title="Feed"
               onClick={() => {
-                setMobileTab('feed');
                 onHomeClick?.();
               }}
             >
               <Home className="size-5" />
-              {(activeTab === 'home' || mobileTab === 'feed') && <span className="mobile-nav-dot" />}
+              {activeTab === 'home' && <span className="mobile-nav-dot" />}
             </button>
 
             <button
@@ -169,23 +103,21 @@ export function AppStageShell({
 
             <button
               type="button"
-              className={`mobile-nav-btn ${activeTab === 'community' || mobileTab === 'activity' ? 'active' : ''}`}
+              className={`mobile-nav-btn ${activeTab === 'community' ? 'active' : ''}`}
               title="Community"
               onClick={() => {
-                setMobileTab('activity');
                 onCommunityClick?.();
               }}
             >
               <Bell className="size-5" />
-              {(activeTab === 'community' || mobileTab === 'activity') && <span className="mobile-nav-dot" />}
+              {activeTab === 'community' && <span className="mobile-nav-dot" />}
             </button>
 
             <button
               type="button"
-              className={`mobile-nav-btn ${activeTab === 'profile' || mobileTab === 'profile' ? 'active' : ''}`}
+              className={`mobile-nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
               title="Profile"
               onClick={() => {
-                setMobileTab('profile');
                 onProfileClick?.();
               }}
             >

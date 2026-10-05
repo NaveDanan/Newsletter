@@ -3,6 +3,7 @@ import { Navigation } from './components/Navigation';
 import { HeroBanner } from './sections/HeroBanner';
 import { PopularArticles } from './sections/PopularArticles';
 import { LatestArticles } from './sections/LatestArticles';
+import { OurWriters } from './sections/OurWriters';
 import { Sidebar } from './sections/Sidebar';
 import { ManagerDashboard, type Tab as ManagerTab } from './sections/ManagerDashboard';
 import { GanttEditorPage } from './sections/manager/GanttEditorPage';
@@ -22,7 +23,6 @@ import { canAccessManagerTab, hasManagerAccess } from './lib/auth/permissions';
 import { parseCommunityRoute } from './lib/community-routes';
 import { bootLogger } from './lib/bootLogger';
 import { AppStageShell } from './components/AppStageShell';
-import { UserAvatarCircle } from './components/UserAvatarCircle';
 import { QuickComposeCard } from './components/QuickComposeCard';
 import { Toaster } from 'sonner';
 import { toast } from 'sonner';
@@ -271,22 +271,6 @@ function App() {
       : null
   ), [currentRoute.articleId, currentRoute.view, newsletters]);
 
-  const storyAuthors = useMemo(() => {
-    const list = publishedNewsletters.map((n) => ({
-      name: n.author.split(' ')[0] || n.author,
-      avatar: n.coverImage,
-      article: n,
-    }));
-    if (list.length >= 4) return list.slice(0, 7);
-    return [
-      ...list,
-      { name: 'Amanda', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80', article: publishedNewsletters[0] },
-      { name: 'John', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=150&q=80', article: publishedNewsletters[0] },
-      { name: 'Andrew', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80', article: publishedNewsletters[0] },
-      { name: 'Rosaline', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&q=80', article: publishedNewsletters[0] },
-    ].filter(Boolean).slice(0, 7);
-  }, [publishedNewsletters]);
-
   const navigateTo = useCallback((pathname: string, { replace = false }: { replace?: boolean } = {}) => {
     const nextRoute = resolveRoute(pathname);
     const historyMethod = replace ? 'replaceState' : 'pushState';
@@ -297,7 +281,9 @@ function App() {
       replace,
     });
 
-    window.history[historyMethod]({}, '', nextRoute.pathname);
+    // Pushed entries are tagged so a page's Back button can tell whether
+    // history.back() would stay inside the app.
+    window.history[historyMethod](replace ? window.history.state : { appNavigation: true }, '', nextRoute.pathname);
     window.dispatchEvent(new Event('app:navigate'));
   }, []);
 
@@ -531,6 +517,17 @@ function App() {
       navigateTo('/community/profile');
     } else {
       navigateTo('/profile');
+    }
+  };
+
+  // The profile page is reached from both the site and the community, so Back
+  // returns to wherever the user came from when that was inside the app.
+  const handleProfileBack = () => {
+    const state: unknown = window.history.state;
+    if (state && typeof state === 'object' && 'appNavigation' in state) {
+      window.history.back();
+    } else {
+      handleHomeClick();
     }
   };
 
@@ -867,7 +864,7 @@ function App() {
       >
         <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
           <Toaster position={toasterPosition} richColors />
-          <ProfilePage onBack={handleHomeClick} />
+          <ProfilePage onBack={handleProfileBack} />
         </div>
       </AppStageShell>
     );
@@ -988,28 +985,11 @@ function App() {
               <div className="lg:col-span-8 space-y-8">
                 {!isSearchActive && (
                   <>
-                    {/* Reference: Stories Scroll Row */}
-                    <div className="stories-scroll-container">
-                      {storyAuthors.map((authorItem, idx) => (
-                        <div
-                          key={authorItem.name + idx}
-                          className={`story-item ${idx === 0 ? 'active-story' : ''}`}
-                          onClick={() => authorItem.article && handleArticleClick(authorItem.article)}
-                          title={`View ${authorItem.name}'s latest newsletter`}
-                        >
-                          <div className="story-avatar-squircle">
-                            <img
-                              src={authorItem.avatar}
-                              alt={authorItem.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <span className="story-name text-[11px] font-medium text-[var(--text-primary)] truncate max-w-[64px]">
-                            {authorItem.name}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    <OurWriters
+                      newsletters={publishedNewsletters}
+                      onArticleClick={handleArticleClick}
+                      onNavigate={navigateTo}
+                    />
 
                     {/* Reference: Create Post / Quick Compose Card */}
                     <QuickComposeCard user={user} onCompose={handleQuickCompose} />
@@ -1045,7 +1025,10 @@ function App() {
 
               {/* Right Sidebar Column */}
               <div className="lg:col-span-4 sticky top-20">
-                <Sidebar publishedCount={publishedNewsletters.length} />
+                <Sidebar
+                  publishedCount={publishedNewsletters.length}
+                  onNavigate={navigateTo}
+                />
               </div>
             </div>
           </div>

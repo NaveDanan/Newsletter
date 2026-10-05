@@ -46,17 +46,46 @@ function getWrapPresetWidth(currentWidth: string, container: HTMLDivElement | nu
   return `${nextWidth}px`;
 }
 
+interface MediaEmbedGeometry {
+  width: string;
+  height: string | null;
+  textWrap: MediaEmbedTextWrap;
+  offsetX: number;
+  offsetY: number;
+}
+
+function readGeometry(attrs: Record<string, unknown>, mediaType: MediaEmbedType): MediaEmbedGeometry {
+  return {
+    width: normalizeMediaDimension(attrs.width, '100%') ?? '100%',
+    height: normalizeMediaDimension(attrs.height, getDefaultMediaHeight(mediaType)),
+    textWrap: (attrs.textWrap || 'break') as MediaEmbedTextWrap,
+    offsetX: normalizeOffset(attrs.offsetX),
+    offsetY: normalizeOffset(attrs.offsetY),
+  };
+}
+
+function isSameGeometry(a: MediaEmbedGeometry, b: MediaEmbedGeometry) {
+  return (
+    a.width === b.width &&
+    a.height === b.height &&
+    a.textWrap === b.textWrap &&
+    a.offsetX === b.offsetX &&
+    a.offsetY === b.offsetY
+  );
+}
+
 export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }: NodeViewProps) {
   const { t } = useLocale();
   const src = node.attrs.src as string;
   const mediaType = node.attrs.mediaType as MediaEmbedType;
   const title = node.attrs.title as string | null;
-  const widthAttr = normalizeMediaDimension(node.attrs.width, '100%') ?? '100%';
-  const heightAttr = normalizeMediaDimension(node.attrs.height, getDefaultMediaHeight(mediaType));
-  const textWrapAttr = (node.attrs.textWrap || 'break') as MediaEmbedTextWrap;
   const previewUrls = normalizePreviewUrls(node.attrs.previewUrls);
   const previewStatus = node.attrs.previewStatus as 'ready' | 'failed' | null;
   const previewError = typeof node.attrs.previewError === 'string' ? node.attrs.previewError : null;
+  const geometry = readGeometry(node.attrs, mediaType);
+  // Identifies the presentation the inline viewer is currently responsible for.
+  // `null` means no viewer is mounted (non-pptx media, or rendered slide previews).
+  const pptxViewerKey = mediaType === 'pptx' && previewUrls.length === 0 ? src : null;
   const pptxHostRef = useRef<HTMLDivElement | null>(null);
   const pptxViewerRef = useRef<PptxViewerInstance | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -64,25 +93,27 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
   const mediaFrameRef = useRef<HTMLDivElement | null>(null);
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const dragStartRef = useRef({ x: 0, y: 0 });
-  const [pptxError, setPptxError] = useState<string | null>(null);
-  const [width, setWidth] = useState(widthAttr);
-  const [height, setHeight] = useState(heightAttr);
-  const [textWrap, setTextWrap] = useState<MediaEmbedTextWrap>(textWrapAttr);
+  const [pptxFailed, setPptxFailed] = useState(false);
+  const [pptxFailureKey, setPptxFailureKey] = useState(pptxViewerKey);
+  const [width, setWidth] = useState(geometry.width);
+  const [height, setHeight] = useState(geometry.height);
+  const [textWrap, setTextWrap] = useState<MediaEmbedTextWrap>(geometry.textWrap);
   const [offset, setOffset] = useState({
-    x: normalizeOffset(node.attrs.offsetX),
-    y: normalizeOffset(node.attrs.offsetY),
+    x: geometry.offsetX,
+    y: geometry.offsetY,
   });
+  const [syncedGeometry, setSyncedGeometry] = useState(geometry);
   const [isResizing, setIsResizing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPptxPreviewFullscreen, setIsPptxPreviewFullscreen] = useState(false);
-  const widthRef = useRef(widthAttr);
-  const heightRef = useRef(heightAttr);
-  const textWrapRef = useRef<MediaEmbedTextWrap>(textWrapAttr);
+  const widthRef = useRef(geometry.width);
+  const heightRef = useRef(geometry.height);
+  const textWrapRef = useRef<MediaEmbedTextWrap>(geometry.textWrap);
   const offsetRef = useRef({
-    x: normalizeOffset(node.attrs.offsetX),
-    y: normalizeOffset(node.attrs.offsetY),
+    x: geometry.offsetX,
+    y: geometry.offsetY,
   });
 
   const embedSrc = buildEmbedSrc(mediaType, src);
@@ -92,25 +123,31 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
   const interactiveMedia = isInteractiveMediaType(mediaType);
   const activeSlide = Math.min(currentSlide, Math.max(0, previewUrls.length - 1));
 
+  // The node attributes own the geometry; local state only runs ahead of them
+  // while a gesture is in flight. When the attributes change from anywhere else
+  // (undo/redo, remote edits) the local copy is adjusted during render instead
+  // of in an effect, so no extra render pass is needed.
+  if (!isSameGeometry(syncedGeometry, geometry)) {
+    setSyncedGeometry(geometry);
+    setWidth(geometry.width);
+    setHeight(geometry.height);
+    setTextWrap(geometry.textWrap);
+    setOffset({ x: geometry.offsetX, y: geometry.offsetY });
+  }
+
+  // A failure only describes the presentation it came from, so it is dropped as
+  // soon as the viewer switches to a different one.
+  if (pptxFailureKey !== pptxViewerKey) {
+    setPptxFailureKey(pptxViewerKey);
+    setPptxFailed(false);
+  }
+
   useEffect(() => {
-    const nextWidth = normalizeMediaDimension(node.attrs.width, '100%') ?? '100%';
-    const nextHeight = normalizeMediaDimension(node.attrs.height, getDefaultMediaHeight(mediaType));
-    const nextTextWrap = (node.attrs.textWrap || 'break') as MediaEmbedTextWrap;
-    const nextOffset = {
-      x: normalizeOffset(node.attrs.offsetX),
-      y: normalizeOffset(node.attrs.offsetY),
-    };
-
-    widthRef.current = nextWidth;
-    heightRef.current = nextHeight;
-    textWrapRef.current = nextTextWrap;
-    offsetRef.current = nextOffset;
-
-    setWidth(nextWidth);
-    setHeight(nextHeight);
-    setTextWrap(nextTextWrap);
-    setOffset(nextOffset);
-  }, [mediaType, node.attrs.height, node.attrs.offsetX, node.attrs.offsetY, node.attrs.textWrap, node.attrs.width]);
+    widthRef.current = syncedGeometry.width;
+    heightRef.current = syncedGeometry.height;
+    textWrapRef.current = syncedGeometry.textWrap;
+    offsetRef.current = { x: syncedGeometry.offsetX, y: syncedGeometry.offsetY };
+  }, [syncedGeometry]);
 
   const commitAttributes = useCallback((overrides: Partial<{
     width: string;
@@ -125,18 +162,14 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
     const nextOffsetX = normalizeOffset(overrides.offsetX ?? offsetRef.current.x);
     const nextOffsetY = normalizeOffset(overrides.offsetY ?? offsetRef.current.y);
 
-    const currentWidth = normalizeMediaDimension(node.attrs.width, '100%') ?? '100%';
-    const currentHeight = normalizeMediaDimension(node.attrs.height, getDefaultMediaHeight(mediaType));
-    const currentTextWrap = (node.attrs.textWrap || 'break') as MediaEmbedTextWrap;
-    const currentOffsetX = normalizeOffset(node.attrs.offsetX);
-    const currentOffsetY = normalizeOffset(node.attrs.offsetY);
-
     if (
-      currentWidth === nextWidth &&
-      currentHeight === nextHeight &&
-      currentTextWrap === nextTextWrap &&
-      currentOffsetX === nextOffsetX &&
-      currentOffsetY === nextOffsetY
+      isSameGeometry(syncedGeometry, {
+        width: nextWidth,
+        height: nextHeight,
+        textWrap: nextTextWrap,
+        offsetX: nextOffsetX,
+        offsetY: nextOffsetY,
+      })
     ) {
       return;
     }
@@ -148,7 +181,7 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
       offsetX: nextOffsetX,
       offsetY: nextOffsetY,
     });
-  }, [mediaType, node.attrs.height, node.attrs.offsetX, node.attrs.offsetY, node.attrs.textWrap, node.attrs.width, updateAttributes]);
+  }, [mediaType, syncedGeometry, updateAttributes]);
 
   useEffect(() => {
     if (mediaType !== 'pptx' || !pptxHostRef.current) {
@@ -159,7 +192,6 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
     }
 
     let cancelled = false;
-    setPptxError(null);
 
     void createPptxViewer(pptxHostRef.current, src).then((viewer) => {
       if (cancelled) {
@@ -170,7 +202,7 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
       pptxViewerRef.current = viewer;
     }).catch((error) => {
       console.error('Failed to render PowerPoint inside editor:', error);
-      setPptxError(t('editor.failedPresentation'));
+      setPptxFailed(true);
     });
 
     return () => {
@@ -178,7 +210,7 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
       pptxViewerRef.current?.destroy();
       pptxViewerRef.current = null;
     };
-  }, [mediaType, previewUrls.length, src, t]);
+  }, [mediaType, previewUrls.length, src]);
 
   useEffect(() => {
     if (mediaType !== 'pptx' || previewUrls.length === 0) {
@@ -491,8 +523,8 @@ export function MediaEmbedView({ node, selected, deleteNode, updateAttributes }:
                   </div>
                 ) : (
                   <div className="h-full w-full overflow-hidden bg-white">
-                    {pptxError ? (
-                      <p className="px-3 py-2 text-sm text-[#B91C1C]">{pptxError}</p>
+                    {pptxFailed ? (
+                      <p className="px-3 py-2 text-sm text-[#B91C1C]">{t('editor.failedPresentation')}</p>
                     ) : null}
                     <div ref={pptxHostRef} className="min-h-full w-full overflow-hidden" />
                   </div>

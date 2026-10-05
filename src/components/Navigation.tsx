@@ -8,14 +8,16 @@ import {
   LogIn,
   UserRound,
   Newspaper,
+  Search,
   Sparkles,
   Users,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { AccountMenu } from '@/components/AccountMenu';
 import { DropdownNavigation, type DropdownNavigationItem } from '@/components/ui/dropdown-navigation';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useNavigationData } from '@/contexts/NavigationDataContext';
+import { useCollapsingLabels } from '@/hooks/useCollapsingLabels';
 import { DEFAULT_DROPDOWN_IDS, SEED_DROPDOWNS } from '@/types/navigation-link';
 
 interface NavigationProps {
@@ -31,6 +33,9 @@ interface NavigationProps {
   authName?: string;
   activeTab?: 'home' | 'topics' | 'bookmarks' | 'community' | string;
 }
+
+// The order in which header labels fold away as the bar narrows.
+const FOLD = { search: 1, community: 2, account: 3, brand: 4 } as const;
 
 function normalizeDropdownLabel(value: string): string {
   return value.trim().toLowerCase();
@@ -61,8 +66,47 @@ export function Navigation({
 }: NavigationProps) {
   const { t } = useLocale();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // The side menu and the account menu share the header, so only one is open.
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const { dropdowns, links: navigationLinks } = useNavigationData();
   const isCommunityRoute = activeTab === 'community';
+  const barRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
+
+  useCollapsingLabels(barRef, FOLD.brand, (level) => {
+    // Once the inline field has room again the extra row is redundant.
+    if (level < FOLD.search) {
+      setIsSearchPanelOpen(false);
+    }
+  });
+
+  const updateSearch = (value: string) => {
+    setSearchQuery(value);
+    onSearchChange?.(value);
+  };
+
+  const toggleMobileMenu = () => {
+    setIsAccountMenuOpen(false);
+    setIsMobileMenuOpen((open) => !open);
+  };
+
+  const handleAccountMenuOpenChange = (open: boolean) => {
+    setIsAccountMenuOpen(open);
+    if (open) {
+      setIsMobileMenuOpen(false);
+    }
+  };
+
+  const handleSearchToggle = () => {
+    if (Number(barRef.current?.dataset.collapse ?? 0) >= FOLD.search) {
+      setIsSearchPanelOpen((open) => !open);
+      return;
+    }
+    searchInputRef.current?.focus();
+  };
 
   const resolvedDropdowns = useMemo(() => {
     const items = [...dropdowns];
@@ -256,35 +300,40 @@ export function Navigation({
 
   return (
     <header className="app-floating-header">
-      {/* Top bar */}
+      {/* Top bar: labels fold to icons as it narrows, see useCollapsingLabels */}
       <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
+        <div ref={barRef} className="nav-bar flex h-16 items-center gap-3 sm:gap-4">
           {/* Left: Brand Logo & Title */}
-          <div className="flex items-center gap-3 shrink-0">
-            <button 
+          <div className="flex shrink-0 items-center gap-3">
+            <button
+              type="button"
               onClick={onHomeClick}
-              className="flex items-center gap-3 group text-start"
+              className="flex items-center group text-start"
               aria-label="AI-BREAK Home"
             >
               <div className="brand-logo group-hover:scale-105 transition-transform">
-                <img 
-                  src="/logo.gif" 
-                  alt="AI-BREAK Logo" 
+                <img
+                  src="/logo.gif"
+                  alt="AI-BREAK Logo"
                   className="w-7 h-7 object-contain rounded-lg"
                 />
               </div>
-              <div className="flex flex-col">
-                <span className="font-extrabold text-lg text-[var(--text-primary)] tracking-tight leading-none group-hover:text-[var(--primary-accent)] transition-colors">
-                  AI-BREAK
+              <span className="nav-label" data-collapse-order={FOLD.brand}>
+                <span>
+                  <span className="flex flex-col ps-3">
+                    <span className="font-extrabold text-lg text-[var(--text-primary)] tracking-tight leading-none group-hover:text-[var(--primary-accent)] transition-colors">
+                      AI-BREAK
+                    </span>
+                    <span className="text-[10px] font-semibold text-[var(--text-muted)] tracking-wider uppercase mt-1">
+                      Newsletter & Community
+                    </span>
+                  </span>
                 </span>
-                <span className="text-[10px] font-semibold text-[var(--text-muted)] tracking-wider uppercase mt-1">
-                  Newsletter & Community
-                </span>
-              </div>
+              </span>
             </button>
 
             <div className="hidden xl:flex items-center gap-5 ms-2">
-              {navLinks.map((link) => (
+              {navLinks.filter((link) => link.id !== 'community').map((link) => (
                 <a
                   key={link.label}
                   href={link.href}
@@ -293,12 +342,6 @@ export function Navigation({
                     if (link.id === 'home') {
                       event.preventDefault();
                       onHomeClick();
-                      return;
-                    }
-
-                    if (link.id === 'community') {
-                      event.preventDefault();
-                      onCommunityClick();
                       return;
                     }
 
@@ -317,49 +360,83 @@ export function Navigation({
             </div>
           </div>
 
-          {/* Center: Search */}
-          <div className="hidden md:flex items-center justify-center flex-1 mx-4">
-            {!isCommunityRoute && (
-              <div className="relative w-full max-w-[260px]">
-                <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-bold text-sm pointer-events-none">
-                  #
+          <div data-collapse-slack className="min-w-0 flex-1" />
+
+          {/* Center: Search (folds first) */}
+          {!isCommunityRoute ? (
+            <div className="nav-search">
+              <button
+                ref={searchToggleRef}
+                type="button"
+                className="nav-search-toggle"
+                aria-label={t('nav.openSearch')}
+                aria-expanded={isSearchPanelOpen}
+                onClick={handleSearchToggle}
+              >
+                <Search className="size-4" aria-hidden="true" />
+              </button>
+              <span className="nav-label" data-collapse-order={FOLD.search}>
+                <span>
+                  <span className="block pe-4">
+                    <input
+                      ref={searchInputRef}
+                      type="search"
+                      value={searchQuery}
+                      placeholder={t('nav.searchPlaceholder')}
+                      aria-label={t('nav.searchPlaceholder')}
+                      onChange={(event) => updateSearch(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          onSearch?.(searchQuery);
+                        }
+                      }}
+                      className="h-9 w-40 bg-transparent text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
+                    />
+                  </span>
                 </span>
-                <input
-                  type="text"
-                  placeholder={t('nav.searchPlaceholder') || 'Search newsletters, topics...'}
-                  onChange={(e) => onSearchChange?.(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      onSearch?.(e.currentTarget.value);
-                    }
-                  }}
-                  className="w-full h-10 bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-full ps-8 pe-10 text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-accent)] focus:ring-2 focus:ring-[var(--primary-accent-glow)] transition-all"
-                />
-                <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[var(--text-muted)] bg-[var(--bg-pill)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)] pointer-events-none">
-                  /
-                </span>
-              </div>
-            )}
-          </div>
+              </span>
+            </div>
+          ) : null}
+
+          <div data-collapse-slack className="min-w-0 flex-1" />
 
           {/* Right side controls */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <div className="hidden lg:flex shrink-0 items-center">
-              <DropdownNavigation navItems={dropdownNavItems} />
+              {/* Opens toward the bar's centre so panels never pass its outer edge. */}
+              <DropdownNavigation navItems={dropdownNavItems} align="end" />
             </div>
 
-            {/* Account / User Menu */}
+            <button
+              type="button"
+              onClick={onCommunityClick}
+              aria-label={t('nav.community')}
+              title={t('nav.community')}
+              aria-current={isCommunityRoute ? 'page' : undefined}
+              className="nav-pill"
+            >
+              <Users className="size-4 shrink-0" aria-hidden="true" />
+              <span className="nav-label" data-collapse-order={FOLD.community}>
+                <span>
+                  <span className="block ps-2 pe-0.5">{t('nav.community')}</span>
+                </span>
+              </span>
+            </button>
+
             <AccountMenu
               onProfileClick={onProfileClick}
               onManagerClick={onManagerClick}
               onSignInClick={onSignInClick}
               onSignOut={onSignOut}
-              className="hidden sm:flex"
+              foldOrder={FOLD.account}
+              open={isAccountMenuOpen}
+              onOpenChange={handleAccountMenuOpenChange}
             />
 
             {/* Mobile Hamburger Menu button */}
-            <button 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            <button
+              type="button"
+              onClick={toggleMobileMenu}
               aria-label={isMobileMenuOpen ? t('nav.closeMenu') : t('nav.openMenu')}
               className="lg:hidden p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] transition-colors"
             >
@@ -369,9 +446,36 @@ export function Navigation({
         </div>
       </div>
 
+      {/* Folded search opens as a row under the bar */}
+      {isSearchPanelOpen && !isCommunityRoute ? (
+        <div className="border-t border-[var(--border-subtle)] px-4 py-3 animate-in slide-in-from-top-2 duration-200">
+          <div className="nav-search w-full">
+            <Search className="ms-3 size-4 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
+            <input
+              autoFocus
+              type="search"
+              value={searchQuery}
+              placeholder={t('nav.searchPlaceholder')}
+              aria-label={t('nav.searchPlaceholder')}
+              onChange={(event) => updateSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  onSearch?.(searchQuery);
+                  setIsSearchPanelOpen(false);
+                } else if (event.key === 'Escape') {
+                  setIsSearchPanelOpen(false);
+                  searchToggleRef.current?.focus();
+                }
+              }}
+              className="h-9 min-w-0 flex-1 bg-transparent px-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
+            />
+          </div>
+        </div>
+      ) : null}
+
       {/* Mobile dropdown menu */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-4 space-y-3 shadow-2xl animate-in slide-in-from-top-2 duration-200">
+        <div className="lg:hidden rounded-b-[inherit] border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-4 space-y-3 shadow-2xl animate-in slide-in-from-top-2 duration-200">
           <div className="space-y-1">
             {navLinks.map((link) => (
               <a
@@ -409,28 +513,6 @@ export function Navigation({
                 {link.label}
               </a>
             ))}
-          </div>
-
-          <div className="pt-3 border-t border-[var(--border-subtle)]">
-            <AccountMenu
-              variant="mobile"
-              onProfileClick={() => {
-                onProfileClick();
-                setIsMobileMenuOpen(false);
-              }}
-              onManagerClick={() => {
-                onManagerClick();
-                setIsMobileMenuOpen(false);
-              }}
-              onSignInClick={() => {
-                onSignInClick();
-                setIsMobileMenuOpen(false);
-              }}
-              onSignOut={() => {
-                onSignOut();
-                setIsMobileMenuOpen(false);
-              }}
-            />
           </div>
         </div>
       )}

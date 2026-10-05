@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext } from 'react';
 import type { CommunityPost, CommunityProfile, CommunitySearchType, CommunitySession } from '@/types/community';
 
 // Nearly every card in the community screens needs the same four things: who is
@@ -26,11 +26,7 @@ export interface CommunityContextValue {
   toggleTag: (tag: string) => void;
 }
 
-const CommunityContext = createContext<CommunityContextValue | null>(null);
-
-export function CommunityProvider({ value, children }: { value: CommunityContextValue; children: ReactNode }) {
-  return <CommunityContext.Provider value={value}>{children}</CommunityContext.Provider>;
-}
+export const CommunityContext = createContext<CommunityContextValue | null>(null);
 
 export function useCommunity(): CommunityContextValue {
   const context = useContext(CommunityContext);

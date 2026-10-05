@@ -362,6 +362,12 @@ export async function updateCommunityProfile(patch: CommunityProfilePatch): Prom
         body[key] = patch[key];
       }
     });
+    if (patch.removeBanner) {
+      body.removeBanner = true;
+    }
+    if (patch.removeAvatar) {
+      body.removeAvatar = true;
+    }
     const value = record(await sendJson('/api/community/me', 'PATCH', body));
     return mapCommunityProfile(value.profile);
   }

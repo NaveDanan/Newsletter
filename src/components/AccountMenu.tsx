@@ -6,6 +6,7 @@ import {
   Logout01Icon,
   Notification01Icon,
 } from '@hugeicons/core-free-icons';
+import { LogIn } from 'lucide-react';
 import { UserAvatarCircle } from '@/components/UserAvatarCircle';
 import {
   DropdownMenu,
@@ -33,7 +34,18 @@ interface AccountMenuProps {
   showManagerItem?: boolean;
   /** Manager dashboard passes `requestLeaveEditor` so unsaved work raises a prompt. */
   onNavigate?: (action: () => void) => void;
-  variant?: 'header' | 'mobile';
+  /**
+   * Site header only: the label (name, or "Sign in") folds away at this
+   * useCollapsingLabels level, leaving just the avatar or icon.
+   */
+  foldOrder?: number;
+  /**
+   * Controls the menu, for headers that keep it exclusive with another menu.
+   * A controlled menu is non-modal, so one click on the other menu's trigger
+   * both closes this one and opens that one.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   className?: string;
 }
 
@@ -44,7 +56,9 @@ export function AccountMenu({
   onSignOut,
   showManagerItem = true,
   onNavigate,
-  variant = 'header',
+  foldOrder,
+  open,
+  onOpenChange,
   className,
 }: AccountMenuProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -56,13 +70,33 @@ export function AccountMenu({
   }
 
   if (!isAuthenticated || !user) {
+    if (foldOrder !== undefined) {
+      return (
+        <button
+          type="button"
+          onClick={onSignInClick}
+          aria-label={t('nav.signIn')}
+          className={cn(
+            'btn-pill-action btn-thanks-yellow inline-flex h-[38px] min-w-[38px] shrink-0 items-center justify-center px-2.5 text-xs font-bold',
+            className,
+          )}
+        >
+          <LogIn className="size-4 shrink-0" aria-hidden="true" />
+          <span className="nav-label" data-collapse-order={foldOrder}>
+            <span>
+              <span className="block ps-2 pe-1">{t('nav.signIn')}</span>
+            </span>
+          </span>
+        </button>
+      );
+    }
+
     return (
       <button
         type="button"
         onClick={onSignInClick}
         className={cn(
-          'btn-pill-action btn-thanks-yellow text-xs font-bold px-4 py-2',
-          variant === 'header' ? 'hidden sm:inline-flex' : 'block py-2 font-medium',
+          'btn-pill-action btn-thanks-yellow hidden text-xs font-bold px-4 py-2 sm:inline-flex',
           className,
         )}
       >
@@ -84,13 +118,14 @@ export function AccountMenu({
 
   return (
     <div className="flex items-center gap-2 sm:gap-3">
-      <DropdownMenu dir={dir}>
+      <DropdownMenu dir={dir} open={open} onOpenChange={onOpenChange} modal={onOpenChange === undefined}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             aria-label={t('account.menuLabel')}
             className={cn(
               'user-top-chip outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)]',
+              foldOrder !== undefined && 'user-top-chip--folding shrink-0',
               className,
             )}
           >
@@ -108,16 +143,30 @@ export function AccountMenu({
                 />
               ) : null}
             </span>
-            <span className="user-top-name max-w-[110px] truncate hidden sm:inline">
-              {user.name}
-            </span>
-            <span className="user-top-chevron text-xs opacity-70">▾</span>
+            {foldOrder !== undefined ? (
+              <span className="nav-label" data-collapse-order={foldOrder}>
+                <span>
+                  <span className="flex items-center gap-2.5 ps-2.5 pe-2">
+                    <span className="user-top-name max-w-[110px] truncate">{user.name}</span>
+                    <span className="user-top-chevron text-xs opacity-70">▾</span>
+                  </span>
+                </span>
+              </span>
+            ) : (
+              <>
+                <span className="user-top-name max-w-[110px] truncate hidden sm:inline">
+                  {user.name}
+                </span>
+                <span className="user-top-chevron text-xs opacity-70">▾</span>
+              </>
+            )}
           </button>
         </DropdownMenuTrigger>
+        {/* Portalled to <body>, so it must outrank the sticky header (z-index 200). */}
         <DropdownMenuContent
           align={isRTL ? 'start' : 'end'}
           sideOffset={8}
-          className="w-64 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2 shadow-[var(--shadow-card)] backdrop-blur-xl"
+          className="z-[210] w-64 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2 shadow-[var(--shadow-card)] backdrop-blur-xl"
         >
           <DropdownMenuItem
             className={cn(ITEM_CLASS, 'items-center gap-3 py-2.5')}

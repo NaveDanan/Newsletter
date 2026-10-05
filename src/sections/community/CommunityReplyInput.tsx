@@ -34,6 +34,14 @@ function toSuggestion(profile: CommunityProfile): MentionSuggestion {
   };
 }
 
+// The replied-to author is offered first whenever the typed token still prefixes their handle.
+function seededFor(query: string | null, mentionSeed: MentionSuggestion | null): MentionSuggestion[] {
+  if (query === null || !mentionSeed) {
+    return [];
+  }
+  return mentionSeed.handle.toLowerCase().startsWith(query.toLowerCase()) ? [mentionSeed] : [];
+}
+
 export function CommunityReplyInput({
   placeholder,
   mentionSeed = null,
@@ -56,20 +64,25 @@ export function CommunityReplyInput({
   }, []);
 
   // A bare "@" offers the replied-to author first; anything longer is searched.
+  // The local narrowing is synchronous, so it is applied while rendering the
+  // token change; only the debounced remote search needs an effect.
+  const [lastToken, setLastToken] = useState<{ query: string | null; seed: MentionSuggestion | null }>({
+    query,
+    seed: mentionSeed,
+  });
+  if (lastToken.query !== query || lastToken.seed !== mentionSeed) {
+    setLastToken({ query, seed: mentionSeed });
+    if (query === null || query.length < 2) {
+      setSuggestions(seededFor(query, mentionSeed));
+    }
+  }
+
   useEffect(() => {
-    if (query === null) {
-      setSuggestions([]);
+    if (query === null || query.length < 2) {
       return;
     }
 
-    const seeded = mentionSeed && mentionSeed.handle.toLowerCase().startsWith(query.toLowerCase())
-      ? [mentionSeed]
-      : [];
-
-    if (query.length < 2) {
-      setSuggestions(seeded);
-      return;
-    }
+    const seeded = seededFor(query, mentionSeed);
 
     let cancelled = false;
     const timer = window.setTimeout(() => {

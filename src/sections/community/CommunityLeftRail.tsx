@@ -1,11 +1,7 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Bookmark01Icon,
-  DashboardSquare01Icon,
-  GlobeIcon,
   Home01Icon,
-  Logout01Icon,
-  MoreHorizontalIcon,
   Notification01Icon,
   PencilEdit01Icon,
   Search01Icon,
@@ -13,16 +9,8 @@ import {
   UserIcon,
 } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
-import { hasManagerAccess } from '@/lib/auth/permissions';
 import {
   communityBookmarksPath,
   communityFeedPath,
@@ -32,7 +20,6 @@ import {
   type CommunitySection,
 } from '@/lib/community-routes';
 import { cn } from '@/lib/utils';
-import { CommunityAvatar } from './CommunityAvatar';
 import { useCommunity } from './CommunityContext';
 
 // The left rail is the primary navigation for the community, inspired by X (Twitter).
@@ -61,16 +48,13 @@ export function CommunityLeftRail({
   onCompose,
   onOpenModeration,
 }: CommunityLeftRailProps) {
-  const { t, formatNumber, dir, isRTL, toggleLocale } = useLocale();
+  const { t, formatNumber } = useLocale();
   const { isAuthenticated, profile, canModerate, navigate, requireAuth } = useCommunity();
-  const { user, isAuthenticated: isAuthAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated: isAuthAuthenticated } = useAuth();
 
   const isLoggedIn = isAuthenticated || isAuthAuthenticated || Boolean(user) || Boolean(profile);
-  const userAvatarUrl = profile?.avatarUrl || user?.avatar || '';
-  const userDisplayName = profile?.displayName || user?.name || user?.email?.split('@')[0] || t('account.profile');
   const userHandle = profile?.handle || (user?.name ? user.name.toLowerCase().replace(/\s+/g, '') : (user?.email ? user.email.split('@')[0] : 'user'));
   const profilePath = profile?.handle ? communityProfilePath(profile.handle) : (userHandle ? communityProfilePath(userHandle) : '/community/profile');
-  const showManage = Boolean(user && hasManagerAccess(user.role));
 
   const items: RailItem[] = [
     { key: 'feed', label: t('community.nav.feed'), icon: Home01Icon, path: communityFeedPath() },

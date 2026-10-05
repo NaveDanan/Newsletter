@@ -61,9 +61,12 @@ export function NewsletterViewer({
     window.scrollTo(0, 0);
   }, [newsletter]);
 
-  useEffect(() => {
+  // Reset the draft when a different newsletter is shown, without an effect round-trip.
+  const [draftNewsletterId, setDraftNewsletterId] = useState(newsletter.id);
+  if (draftNewsletterId !== newsletter.id) {
+    setDraftNewsletterId(newsletter.id);
     setCommentDraft('');
-  }, [newsletter.id]);
+  }
 
   const handleShare = (platform: string) => {
     const url = window.location.href;
@@ -162,7 +165,7 @@ export function NewsletterViewer({
 
       <article ref={articleRef} className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
         {newsletter.coverImage && (
-          <div className="post-media-frame relative mb-8 h-64 overflow-hidden rounded-3xl sm:h-80 lg:h-96 border border-[var(--border-subtle)] shadow-[var(--shadow-card)]">
+          <div className="post-media-frame relative mb-8 h-64 md:h-auto md:aspect-video overflow-hidden rounded-3xl border border-[var(--border-subtle)] shadow-[var(--shadow-card)]">
             <img
               src={newsletter.coverImage}
               alt={newsletter.title}

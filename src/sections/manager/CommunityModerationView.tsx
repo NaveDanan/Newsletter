@@ -21,6 +21,7 @@ import {
   type CommunityReport,
   type CommunityReportStatus,
 } from '@/types/community';
+import { FeaturedWritersManager } from './FeaturedWritersManager';
 
 // The moderation queue lives in the manager dashboard rather than inside the
 // community itself, because the roles that can act on a report are the same
@@ -44,6 +45,9 @@ export function CommunityModerationView({ currentUserRole }: CommunityModeration
   const [busyId, setBusyId] = useState('');
   const requestRef = useRef(0);
   const isAllowed = canModerateCommunity(currentUserRole);
+  // Curating the homepage writers row is an admin-only power, narrower than the
+  // moderation queue that managers also reach.
+  const canCurateWriters = currentUserRole === 'admin';
 
   const load = useCallback(async (nextCursor: string, nextStatus: CommunityReportStatus) => {
     const requestId = requestRef.current + 1;
@@ -142,6 +146,8 @@ export function CommunityModerationView({ currentUserRole }: CommunityModeration
           ))}
         </div>
       </header>
+
+      {canCurateWriters ? <FeaturedWritersManager /> : null}
 
       {error ? (
         <div className="dashboard-card space-y-3">

@@ -332,7 +332,7 @@ export function CommunityPage({
         </div>
 
         {!isAuthenticated ? (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-3 text-[var(--text-primary)] lg:px-8 shadow-2xl">
+          <div className="fixed inset-x-0 bottom-0 max-md:bottom-[var(--mobile-shell-bar-height)] z-30 border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-3 text-[var(--text-primary)] lg:px-8 shadow-2xl">
             <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-bold">{t('community.signIn.title')}</p>
@@ -352,7 +352,7 @@ export function CommunityPage({
             <button
               type="button"
               aria-label={t('community.composer.post')}
-              className="fixed bottom-20 end-4 z-30 rounded-full bg-[var(--primary-accent)] p-4 text-[var(--accent-contrast)] shadow-xl hover:scale-105 active:scale-95 transition-all lg:hidden"
+              className="fixed bottom-20 max-md:bottom-[calc(var(--mobile-shell-bar-height)+5rem)] end-4 z-30 rounded-full bg-[var(--primary-accent)] p-4 text-[var(--accent-contrast)] shadow-xl hover:scale-105 active:scale-95 transition-all lg:hidden"
               onClick={() => requestCompose()}
             >
               <HugeiconsIcon icon={PencilEdit01Icon} className="size-6" />
@@ -360,7 +360,7 @@ export function CommunityPage({
 
             <nav
               aria-label={t('community.nav.menu')}
-              className="fixed inset-x-0 bottom-0 z-30 flex border-t border-[var(--border-subtle)] bg-[var(--bg-card)]/95 backdrop-blur-md lg:hidden"
+              className="fixed inset-x-0 bottom-0 max-md:bottom-[var(--mobile-shell-bar-height)] z-30 flex border-t border-[var(--border-subtle)] bg-[var(--bg-card)]/95 backdrop-blur-md lg:hidden"
             >
               {mobileItems.map((item) => {
                 const isActive = item.key === route.section

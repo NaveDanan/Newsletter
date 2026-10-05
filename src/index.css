@@ -401,9 +401,16 @@
   color: var(--text-primary);
 }
 
-/* Mobile Bottom Nav Bar */
+/* Mobile Bottom Nav Bar. Its height is shared so page-level fixed bars
+   (community nav, sign-in prompt) can sit directly above it. */
+:root {
+  --mobile-shell-bar-height: 56px;
+}
+
 .mobile-bottom-bar {
   width: 100%;
+  height: var(--mobile-shell-bar-height);
+  box-sizing: border-box;
   display: none;
   align-items: center;
   justify-content: space-around;

@@ -506,6 +506,20 @@ function App() {
     navigateTo('/sign-in');
   };
 
+  // The mobile "+" opens the dashboard for managers and the community
+  // composer for everyone else, who would otherwise bounce off the manager guard.
+  const handleCreateClick = () => {
+    if (!isUserAuthenticated) {
+      handleSignInClick();
+      return;
+    }
+    if (hasManagerAccess(userRole)) {
+      handleManagerClick();
+      return;
+    }
+    handleQuickCompose();
+  };
+
   const handleAuthSuccess = () => {
     navigateTo('/', { replace: true });
   };
@@ -599,7 +613,7 @@ function App() {
         activeTab="home"
         onHomeClick={handleHomeClick}
         onCommunityClick={handleCommunityClick}
-        onManagerClick={handleManagerClick}
+        onCreateClick={handleCreateClick}
         onProfileClick={handleProfileClick}
         user={user}
       >
@@ -629,7 +643,7 @@ function App() {
         activeTab="home"
         onHomeClick={handleHomeClick}
         onCommunityClick={handleCommunityClick}
-        onManagerClick={handleManagerClick}
+        onCreateClick={handleCreateClick}
         onProfileClick={handleProfileClick}
         user={user}
       >
@@ -651,7 +665,7 @@ function App() {
           activeTab="manager"
           onHomeClick={handleHomeClick}
           onCommunityClick={handleCommunityClick}
-          onManagerClick={handleManagerClick}
+          onCreateClick={handleCreateClick}
           onProfileClick={handleProfileClick}
           user={user}
         >
@@ -671,7 +685,7 @@ function App() {
           activeTab="manager"
           onHomeClick={handleHomeClick}
           onCommunityClick={handleCommunityClick}
-          onManagerClick={handleManagerClick}
+          onCreateClick={handleCreateClick}
           onProfileClick={handleProfileClick}
           user={user}
         >
@@ -691,7 +705,7 @@ function App() {
           activeTab="manager"
           onHomeClick={handleHomeClick}
           onCommunityClick={handleCommunityClick}
-          onManagerClick={handleManagerClick}
+          onCreateClick={handleCreateClick}
           onProfileClick={handleProfileClick}
           user={user}
         >
@@ -712,7 +726,7 @@ function App() {
         activeTab="manager"
         onHomeClick={handleHomeClick}
         onCommunityClick={handleCommunityClick}
-        onManagerClick={handleManagerClick}
+        onCreateClick={handleCreateClick}
         onProfileClick={handleProfileClick}
         user={user}
       >
@@ -751,7 +765,7 @@ function App() {
         activeTab="home"
         onHomeClick={handleHomeClick}
         onCommunityClick={handleCommunityClick}
-        onManagerClick={handleManagerClick}
+        onCreateClick={handleCreateClick}
         onProfileClick={handleProfileClick}
         user={user}
       >
@@ -769,7 +783,7 @@ function App() {
         activeTab="home"
         onHomeClick={handleHomeClick}
         onCommunityClick={handleCommunityClick}
-        onManagerClick={handleManagerClick}
+        onCreateClick={handleCreateClick}
         onProfileClick={handleProfileClick}
         user={user}
       >
@@ -787,7 +801,7 @@ function App() {
         activeTab="home"
         onHomeClick={handleHomeClick}
         onCommunityClick={handleCommunityClick}
-        onManagerClick={handleManagerClick}
+        onCreateClick={handleCreateClick}
         onProfileClick={handleProfileClick}
         user={user}
       >
@@ -809,7 +823,7 @@ function App() {
         activeTab="home"
         onHomeClick={handleHomeClick}
         onCommunityClick={handleCommunityClick}
-        onManagerClick={handleManagerClick}
+        onCreateClick={handleCreateClick}
         onProfileClick={handleProfileClick}
         user={user}
       >
@@ -831,7 +845,7 @@ function App() {
         activeTab="home"
         onHomeClick={handleHomeClick}
         onCommunityClick={handleCommunityClick}
-        onManagerClick={handleManagerClick}
+        onCreateClick={handleCreateClick}
         onProfileClick={handleProfileClick}
         user={user}
       >
@@ -860,7 +874,7 @@ function App() {
         activeTab="profile"
         onHomeClick={handleHomeClick}
         onCommunityClick={handleCommunityClick}
-        onManagerClick={handleManagerClick}
+        onCreateClick={handleCreateClick}
         onProfileClick={handleProfileClick}
         user={user}
       >
@@ -878,7 +892,7 @@ function App() {
         activeTab="home"
         onHomeClick={handleHomeClick}
         onCommunityClick={handleCommunityClick}
-        onManagerClick={handleManagerClick}
+        onCreateClick={handleCreateClick}
         onProfileClick={handleProfileClick}
         user={user}
       >
@@ -896,7 +910,7 @@ function App() {
         activeTab="community"
         onHomeClick={handleHomeClick}
         onCommunityClick={handleCommunityClick}
-        onManagerClick={handleManagerClick}
+        onCreateClick={handleCreateClick}
         onProfileClick={handleProfileClick}
         user={user}
       >
@@ -937,7 +951,7 @@ function App() {
       activeTab="home"
       onHomeClick={handleHomeClick}
       onCommunityClick={handleCommunityClick}
-      onManagerClick={handleManagerClick}
+      onCreateClick={handleCreateClick}
       onProfileClick={handleProfileClick}
       user={user}
     >

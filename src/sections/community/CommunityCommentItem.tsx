@@ -88,10 +88,87 @@ export function CommunityCommentItem({
     return comment.body.slice(0, 200).trim();
   }, [comment.body, isExpanded, isLong]);
 
-  if (comment.status !== 'published' || !author) {
+  // Nested children with connecting branch lines.
+  const renderReplies = (childReplyTargetId: string | undefined) => {
+    if (!hasChildren) {
+      return null;
+    }
+
+    if (!areRepliesOpen) {
+      return (
+        <button
+          type="button"
+          onClick={() => setAreRepliesOpen(true)}
+          aria-expanded={false}
+          className="relative mt-2 inline-flex items-center gap-1.5 ps-7 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--primary-accent)] sm:ps-8"
+        >
+          <span
+            className="absolute start-0 top-0 h-[10px] w-5 rounded-bl-[10px] border-b-2 border-s-2 border-[var(--text-muted)]/30 rtl:rounded-bl-none rtl:rounded-br-[10px] sm:w-6"
+            aria-hidden="true"
+          />
+          <HugeiconsIcon icon={ArrowDown01Icon} className="size-3.5" />
+          {node.children.length === 1
+            ? t('community.comments.viewReply')
+            : t('community.comments.viewReplies', { count: node.children.length })}
+        </button>
+      );
+    }
+
     return (
-      <div className="py-2 text-xs italic text-[var(--text-muted)] ps-10">
-        {comment.status === 'removed' ? t('community.post.removed') : t('community.post.unavailable')}
+      <div className="relative mt-2 space-y-3 ps-7 sm:ps-8">
+        {node.children.map((child, index) => {
+          const isLast = index === node.children.length - 1;
+          return (
+            <div key={child.comment.id} className="relative">
+              {/* Elbow: drops from the parent bubble, then curves into the child avatar. */}
+              <span
+                className="absolute start-0 top-0 h-[18px] w-5 sm:w-6 rounded-bl-[12px] border-b-2 border-s-2 border-[var(--text-muted)]/30 rtl:rounded-bl-none rtl:rounded-br-[12px]"
+                aria-hidden="true"
+              />
+
+              {/* Trunk continuing down to the next sibling, bridging the row gap. */}
+              {!isLast ? (
+                <span
+                  className="absolute start-0 top-[18px] -bottom-3 w-[2px] bg-[var(--text-muted)]/30"
+                  aria-hidden="true"
+                />
+              ) : null}
+
+              <CommunityCommentItem
+                node={child}
+                postAuthorId={postAuthorId}
+                actions={actions}
+                onModerated={onModerated}
+                onReplyAdded={onReplyAdded}
+                depth={depth + 1}
+                replyTargetId={childReplyTargetId}
+              />
+            </div>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => setAreRepliesOpen(false)}
+          aria-expanded
+          className="text-xs font-semibold text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+        >
+          {t('community.comments.hideReplies')}
+        </button>
+      </div>
+    );
+  };
+
+  if (comment.status !== 'published' || !author) {
+    // Tombstones keep their place so published replies beneath them stay
+    // visible. The server rejects replies to an unpublished parent, so those
+    // children take replies themselves instead of attaching here.
+    return (
+      <div className="relative">
+        <div className="py-2 text-xs italic text-[var(--text-muted)] ps-10">
+          {comment.status === 'removed' ? t('community.post.removed') : t('community.post.unavailable')}
+        </div>
+        {renderReplies(undefined)}
       </div>
     );
   }
@@ -359,68 +436,7 @@ export function CommunityCommentItem({
             </div>
           ) : null}
 
-          {/* Nested Children Replies with connecting branch lines */}
-          {hasChildren && !areRepliesOpen ? (
-            <button
-              type="button"
-              onClick={() => setAreRepliesOpen(true)}
-              aria-expanded={false}
-              className="relative mt-2 inline-flex items-center gap-1.5 ps-7 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--primary-accent)] sm:ps-8"
-            >
-              <span
-                className="absolute start-0 top-0 h-[10px] w-5 rounded-bl-[10px] border-b-2 border-s-2 border-[var(--text-muted)]/30 rtl:rounded-bl-none rtl:rounded-br-[10px] sm:w-6"
-                aria-hidden="true"
-              />
-              <HugeiconsIcon icon={ArrowDown01Icon} className="size-3.5" />
-              {node.children.length === 1
-                ? t('community.comments.viewReply')
-                : t('community.comments.viewReplies', { count: node.children.length })}
-            </button>
-          ) : null}
-
-          {hasChildren && areRepliesOpen ? (
-            <div className="relative mt-2 space-y-3 ps-7 sm:ps-8">
-              {node.children.map((child, index) => {
-                const isLast = index === node.children.length - 1;
-                return (
-                  <div key={child.comment.id} className="relative">
-                    {/* Elbow: drops from the parent bubble, then curves into the child avatar. */}
-                    <span
-                      className="absolute start-0 top-0 h-[18px] w-5 sm:w-6 rounded-bl-[12px] border-b-2 border-s-2 border-[var(--text-muted)]/30 rtl:rounded-bl-none rtl:rounded-br-[12px]"
-                      aria-hidden="true"
-                    />
-
-                    {/* Trunk continuing down to the next sibling, bridging the row gap. */}
-                    {!isLast ? (
-                      <span
-                        className="absolute start-0 top-[18px] -bottom-3 w-[2px] bg-[var(--text-muted)]/30"
-                        aria-hidden="true"
-                      />
-                    ) : null}
-
-                    <CommunityCommentItem
-                      node={child}
-                      postAuthorId={postAuthorId}
-                      actions={actions}
-                      onModerated={onModerated}
-                      onReplyAdded={onReplyAdded}
-                      depth={depth + 1}
-                      replyTargetId={comment.id}
-                    />
-                  </div>
-                );
-              })}
-
-              <button
-                type="button"
-                onClick={() => setAreRepliesOpen(false)}
-                aria-expanded
-                className="text-xs font-semibold text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
-              >
-                {t('community.comments.hideReplies')}
-              </button>
-            </div>
-          ) : null}
+          {renderReplies(comment.id)}
         </div>
       </div>
 

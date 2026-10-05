@@ -8,7 +8,8 @@ interface AppStageShellProps {
   activeTab?: string;
   onHomeClick?: () => void;
   onCommunityClick?: () => void;
-  onManagerClick?: () => void;
+  /** The mobile "+" action; the caller decides between composer and dashboard. */
+  onCreateClick?: () => void;
   onProfileClick?: () => void;
   user?: { name?: string; email?: string; avatar?: string } | null;
 }
@@ -18,7 +19,7 @@ export function AppStageShell({
   activeTab = 'home',
   onHomeClick,
   onCommunityClick,
-  onManagerClick,
+  onCreateClick,
   onProfileClick,
   user,
 }: AppStageShellProps) {
@@ -94,8 +95,9 @@ export function AppStageShell({
               type="button"
               className="mobile-create-circle shadow-lg hover:scale-105 active:scale-95 transition-transform"
               title="Create Post or Manage"
+              aria-label="Create Post or Manage"
               onClick={() => {
-                if (onManagerClick) onManagerClick();
+                onCreateClick?.();
               }}
             >
               <Plus className="size-5 stroke-[2.5]" />

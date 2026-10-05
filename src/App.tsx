@@ -494,9 +494,11 @@ function App() {
   };
 
   // Posts are only ever created in the community, so the home card routes there.
-  const handleQuickCompose = () => {
+  const handleQuickCompose = (files?: File[]) => {
     navigateTo('/community');
-    window.setTimeout(() => { window.dispatchEvent(new Event('community:compose')); }, 0);
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('community:compose', { detail: { files } }));
+    }, 0);
   };
 
   const handleRequireAuth = () => {

@@ -75,6 +75,7 @@ export function CommunityPage({
   const { session, profile, isLoading, setUnreadNotifications } = useCommunitySession(isAuthenticated);
   const [composer, setComposer] = useState<ComposerState | null>(null);
   const [composeSignal, setComposeSignal] = useState(0);
+  const [composeFiles, setComposeFiles] = useState<File[] | undefined>();
   const [reportTarget, setReportTarget] = useState<{ postId?: string; handle?: string } | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
@@ -89,21 +90,26 @@ export function CommunityPage({
 
   // Composing always happens inline in the feed, so a request from anywhere
   // else lands on the feed first and then nudges the card open.
-  const requestCompose = useCallback(() => {
+  const requestCompose = useCallback((files?: File[]) => {
     if (!isAuthenticated) {
       onRequireAuth();
       return;
     }
+    setComposeFiles(files);
     if (route.section !== 'feed') {
       onNavigate(communityFeedPath());
     }
     setComposeSignal((value) => value + 1);
   }, [isAuthenticated, onNavigate, onRequireAuth, route.section]);
 
-  // The home feed's quick-compose card navigates here and then asks for it.
+  // The home feed's quick-compose card carries selected attachments here.
   useEffect(() => {
-    window.addEventListener('community:compose', requestCompose);
-    return () => { window.removeEventListener('community:compose', requestCompose); };
+    const handleCompose = (event: Event) => {
+      const detail = (event as CustomEvent<{ files?: File[] }>).detail;
+      requestCompose(detail?.files);
+    };
+    window.addEventListener('community:compose', handleCompose);
+    return () => { window.removeEventListener('community:compose', handleCompose); };
   }, [requestCompose]);
 
   const navigate = useCallback((next: string) => {
@@ -259,7 +265,14 @@ export function CommunityPage({
       return <CommunityHashtagScreen key={route.tag} tag={route.tag} />;
     }
 
-    return <CommunityFeedScreen key={route.feedTab} tab={route.feedTab} openComposerSignal={composeSignal} />;
+    return (
+      <CommunityFeedScreen
+        key={route.feedTab}
+        tab={route.feedTab}
+        openComposerSignal={composeSignal}
+        initialComposeFiles={composeFiles}
+      />
+    );
   };
 
   const mobileItems = [
@@ -340,7 +353,7 @@ export function CommunityPage({
               type="button"
               aria-label={t('community.composer.post')}
               className="fixed bottom-20 end-4 z-30 rounded-full bg-[var(--primary-accent)] p-4 text-[var(--accent-contrast)] shadow-xl hover:scale-105 active:scale-95 transition-all lg:hidden"
-              onClick={requestCompose}
+              onClick={() => requestCompose()}
             >
               <HugeiconsIcon icon={PencilEdit01Icon} className="size-6" />
             </button>

@@ -20,9 +20,15 @@ interface CommunityFeedScreenProps {
   onPostCreated?: (post: CommunityPost) => void;
   /** Incremented by the page whenever something elsewhere asks to compose. */
   openComposerSignal?: number;
+  initialComposeFiles?: File[];
 }
 
-export function CommunityFeedScreen({ tab, onPostCreated, openComposerSignal = 0 }: CommunityFeedScreenProps) {
+export function CommunityFeedScreen({
+  tab,
+  onPostCreated,
+  openComposerSignal = 0,
+  initialComposeFiles,
+}: CommunityFeedScreenProps) {
   const { t } = useLocale();
   const { isAuthenticated, navigate, profile, requireAuth, selectedTags } = useCommunity();
   const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -33,6 +39,7 @@ export function CommunityFeedScreen({ tab, onPostCreated, openComposerSignal = 0
   // render that observes the change rather than one commit later.
   if (openComposerSignal !== lastComposerSignal) {
     setLastComposerSignal(openComposerSignal);
+    setPendingFiles(initialComposeFiles);
     setIsComposeOpen(true);
   }
 

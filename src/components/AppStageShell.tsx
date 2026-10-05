@@ -38,7 +38,7 @@ export function AppStageShell({
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start py-4 px-2 sm:px-4 md:py-6 transition-colors">
+    <div className="min-h-screen flex flex-col items-center justify-start py-4 px-2 sm:px-4 md:py-6 max-md:!p-0 transition-colors">
       {/* Main Stage */}
       <div className={`device-stage mode-${deviceMode} w-full`}>
         <div className="app-window" id="app-window">

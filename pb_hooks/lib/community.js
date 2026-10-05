@@ -892,7 +892,8 @@ function getThread(e, postId) {
   var baseCondition = includeTree
     ? '(parentId = {:parentId} || rootId = {:rootId}) && id != {:selfId}'
     : 'parentId = {:parentId}';
-  var filter = appendBlockExclusion(baseCondition, params, blockedUserIds(app, viewer.id));
+  var blocked = blockedUserIds(app, viewer.id);
+  var filter = appendBlockExclusion(baseCondition, params, blocked);
   var replyRecords = app.findRecordsByFilter(
     'community_posts',
     applyCursor(filter, params, cursor),
@@ -902,9 +903,57 @@ function getThread(e, postId) {
     params
   );
 
-  var replies = pageResult(replyRecords, limit, function (page) {
-    return content().serializePosts(app, page, viewer.id, viewer.role);
-  });
+  var hasMore = replyRecords.length > limit;
+  var page = hasMore ? replyRecords.slice(0, limit) : replyRecords;
+  var last = page.length ? page[page.length - 1] : null;
+  var pageRecords = page.slice();
+  var includedIds = {};
+  var requestedIds = {};
+  pageRecords.forEach(function (record) { includedIds[String(record.id)] = true; });
+
+  // A newest-first page can contain a reply without its older parent. Include
+  // the missing ancestors so client-side tree construction stays stable across
+  // pages; the cursor still advances only over the paginated reply records.
+  for (var depth = 0; depth < c.MAX_REPLY_DEPTH; depth += 1) {
+    var ancestorIds = [];
+    pageRecords.forEach(function (record) {
+      var parentId = record.getString('parentId');
+      if (parentId && parentId !== String(postId) && !includedIds[parentId] && !requestedIds[parentId]) {
+        requestedIds[parentId] = true;
+        ancestorIds.push(parentId);
+      }
+    });
+    if (!ancestorIds.length) {
+      break;
+    }
+
+    var ancestorParams = {};
+    var ancestorClauses = ancestorIds.map(function (id, index) {
+      var key = 'ancestor' + index;
+      ancestorParams[key] = id;
+      return 'id = {:' + key + '}';
+    });
+    var ancestorFilter = appendBlockExclusion(
+      '(' + ancestorClauses.join(' || ') + ')',
+      ancestorParams,
+      blocked
+    );
+    var ancestorsPage = app.findRecordsByFilter('community_posts', ancestorFilter, '-created,-id', ancestorIds.length, 0, ancestorParams);
+    ancestorsPage = ancestorsPage.filter(function (record) { return record.getString('rootId') === String(postId); });
+    ancestorsPage.forEach(function (record) {
+      var id = String(record.id);
+      if (!includedIds[id]) {
+        includedIds[id] = true;
+        pageRecords.push(record);
+      }
+    });
+  }
+
+  var replies = {
+    items: content().serializePosts(app, pageRecords, viewer.id, viewer.role),
+    hasMore: hasMore,
+    cursor: last ? c.encodeCursor(last.getString('created'), String(last.id)) : '',
+  };
 
   return {
     post: content().serializePosts(app, [post], viewer.id, viewer.role)[0],

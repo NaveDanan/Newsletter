@@ -27,10 +27,11 @@ export function OurWriters({ newsletters, onArticleClick, onNavigate }: OurWrite
   const entries = useMemo(() => writers.map((writer) => {
     const normalizedName = writer.name.toLowerCase();
     // Matching on the author name covers newsletters imported before
-    // createdById was recorded.
+    // createdById was recorded; an owned newsletter only matches its owner.
     const latestArticle = newsletters
-      .filter((newsletter) => newsletter.createdById === writer.id
-        || (normalizedName !== '' && newsletter.author.trim().toLowerCase() === normalizedName))
+      .filter((newsletter) => (newsletter.createdById
+        ? newsletter.createdById === writer.id
+        : normalizedName !== '' && newsletter.author.trim().toLowerCase() === normalizedName))
       .reduce<Newsletter | null>((latest, newsletter) => (
         !latest || publishedTime(newsletter) > publishedTime(latest) ? newsletter : latest
       ), null);

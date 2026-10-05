@@ -130,4 +130,38 @@ assert.throws(() => api.buildProjectPayload({
   gantt: { tasks: [{ id: 'b', status: 'pending' }, { id: 'b', status: 'pending' }] },
 }, auth('creator-1', 'manager')), BadRequestError);
 
+const engaged = record({
+  status: 'published',
+  createdById: 'owner-1',
+  likes: 2,
+  likedByUserIds: ['reader-1', 'reader-2'],
+  bookmarkedByUserIds: ['reader-1'],
+  commentItems: JSON.stringify([
+    { id: 'c1', authorId: 'reader-1', likes: 1, likedByUserIds: ['reader-2'] },
+  ]),
+});
+const engagementPatch = api.buildNewsletterPayload({
+  likes: 9,
+  likedByUserIds: ['owner-1', 'victim-1', 'victim-2'],
+  bookmarkedByUserIds: ['victim-1'],
+  commentItems: [
+    { id: 'c1', authorId: 'victim-1', likes: 5, likedByUserIds: ['victim-1', 'owner-1'] },
+    { id: 'c2', authorId: 'victim-2', likes: 3, likedByUserIds: ['victim-2'] },
+  ],
+}, auth('owner-1', 'author'), engaged);
+assert.deepEqual(Array.from(engagementPatch.likedByUserIds), ['reader-1', 'reader-2', 'owner-1']);
+assert.equal(engagementPatch.likes, 3);
+assert.deepEqual(Array.from(engagementPatch.bookmarkedByUserIds), ['reader-1']);
+const [storedComment, newComment] = engagementPatch.commentItems;
+assert.equal(storedComment.authorId, 'reader-1');
+assert.deepEqual(Array.from(storedComment.likedByUserIds), ['reader-2', 'owner-1']);
+assert.equal(storedComment.likes, 2);
+assert.equal(newComment.authorId, 'owner-1');
+assert.deepEqual(Array.from(newComment.likedByUserIds), []);
+assert.equal(newComment.likes, 0);
+
+const unlikePatch = api.buildNewsletterPayload({ likes: 0, likedByUserIds: [] }, auth('reader-1', 'admin'), engaged);
+assert.deepEqual(Array.from(unlikePatch.likedByUserIds), ['reader-2']);
+assert.equal(unlikePatch.likes, 1);
+
 console.log('api-manager helper tests passed');

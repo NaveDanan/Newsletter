@@ -26,25 +26,32 @@ function createClientId(): string {
 
 export function useNewsletters({ currentUser, currentUserRole, enabled = true }: UseNewslettersOptions) {
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const currentUserId = currentUser?.id;
+
+  // Flipping `enabled` drops the cached list and restarts (or stops) loading.
+  // That reset is applied while rendering the change rather than one commit later.
+  const [lastEnabled, setLastEnabled] = useState(enabled);
+  if (lastEnabled !== enabled) {
+    setLastEnabled(enabled);
+    setHasLoaded(false);
+    setError(null);
+    setNewsletters([]);
+    setIsLoading(enabled);
+  }
 
   // ---------------------------------------------------------------------------
   // Initial fetch from PocketBase
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!enabled) {
-      setHasLoaded(false);
-      setIsLoading(false);
-      setError(null);
-      setNewsletters([]);
       return;
     }
 
     let cancelled = false;
 
-    setIsLoading(true);
     bootLogger.once('newsletters:initial-fetch-start', () => {
       bootLogger.step('newsletters', 'Initial newsletter fetch started');
     });
@@ -245,15 +252,15 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
   // Like toggle (optimistic)
   // ---------------------------------------------------------------------------
   const toggleNewsletterLike = useCallback(async (id: string): Promise<Newsletter | null> => {
-    if (!currentUser?.id) return null;
+    if (!currentUserId) return null;
 
     const existing = newsletters.find((n) => n.id === id);
     if (!existing) return null;
 
-    const hasLiked = existing.likedByUserIds.includes(currentUser.id);
+    const hasLiked = existing.likedByUserIds.includes(currentUserId);
     const likedByUserIds = hasLiked
-      ? existing.likedByUserIds.filter((uid) => uid !== currentUser.id)
-      : [...existing.likedByUserIds, currentUser.id];
+      ? existing.likedByUserIds.filter((uid) => uid !== currentUserId)
+      : [...existing.likedByUserIds, currentUserId];
     const likes = Math.max(0, existing.likes + (hasLiked ? -1 : 1));
 
     // Optimistic
@@ -270,7 +277,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       console.error('toggleNewsletterLike error:', err);
       return null;
     }
-  }, [currentUser?.id, newsletters]);
+  }, [currentUserId, newsletters]);
 
   // ---------------------------------------------------------------------------
   // Add comment (optimistic)
@@ -319,7 +326,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
   // Toggle comment like (optimistic)
   // ---------------------------------------------------------------------------
   const toggleCommentLike = useCallback(async (newsletterId: string, commentId: string): Promise<NewsletterComment | null> => {
-    if (!currentUser?.id) return null;
+    if (!currentUserId) return null;
 
     const newsletter = newsletters.find((n) => n.id === newsletterId);
     if (!newsletter) return null;
@@ -328,13 +335,13 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
     if (commentIndex === -1) return null;
 
     const existingComment = newsletter.commentItems[commentIndex];
-    const hasLiked = existingComment.likedByUserIds.includes(currentUser.id);
+    const hasLiked = existingComment.likedByUserIds.includes(currentUserId);
     const updatedComment: NewsletterComment = {
       ...existingComment,
       likes: Math.max(0, existingComment.likes + (hasLiked ? -1 : 1)),
       likedByUserIds: hasLiked
-        ? existingComment.likedByUserIds.filter((uid) => uid !== currentUser.id)
-        : [...existingComment.likedByUserIds, currentUser.id],
+        ? existingComment.likedByUserIds.filter((uid) => uid !== currentUserId)
+        : [...existingComment.likedByUserIds, currentUserId],
     };
 
     const commentItems = [...newsletter.commentItems];
@@ -355,7 +362,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       console.error('toggleCommentLike error:', err);
       return null;
     }
-  }, [currentUser?.id, newsletters]);
+  }, [currentUserId, newsletters]);
 
   const uploadPresentation = useCallback(async (id: string, file: File) => {
     const existing = newsletters.find((newsletter) => newsletter.id === id);
@@ -387,15 +394,15 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
   // Bookmark toggle (optimistic)
   // ---------------------------------------------------------------------------
   const toggleBookmark = useCallback(async (id: string): Promise<Newsletter | null> => {
-    if (!currentUser?.id) return null;
+    if (!currentUserId) return null;
 
     const existing = newsletters.find((n) => n.id === id);
     if (!existing) return null;
 
-    const hasBookmarked = existing.bookmarkedByUserIds.includes(currentUser.id);
+    const hasBookmarked = existing.bookmarkedByUserIds.includes(currentUserId);
     const bookmarkedByUserIds = hasBookmarked
-      ? existing.bookmarkedByUserIds.filter((uid) => uid !== currentUser.id)
-      : [...existing.bookmarkedByUserIds, currentUser.id];
+      ? existing.bookmarkedByUserIds.filter((uid) => uid !== currentUserId)
+      : [...existing.bookmarkedByUserIds, currentUserId];
 
     // Optimistic
     const optimistic: Newsletter = { ...existing, bookmarkedByUserIds };
@@ -411,13 +418,13 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       console.error('toggleBookmark error:', err);
       return null;
     }
-  }, [currentUser?.id, newsletters]);
+  }, [currentUserId, newsletters]);
 
   // ---------------------------------------------------------------------------
   // Poll vote (optimistic)
   // ---------------------------------------------------------------------------
   const voteNewsletterPoll = useCallback(async (newsletterId: string, optionId: string): Promise<Newsletter | null> => {
-    if (!currentUser?.id) {
+    if (!currentUserId) {
       return null;
     }
 
@@ -429,13 +436,13 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
     }
 
     const currentPoll = newsletter.poll;
-    const existingVotedOption = currentPoll.options.find((opt) => opt.voterUserIds.includes(currentUser.id));
+    const existingVotedOption = currentPoll.options.find((opt) => opt.voterUserIds.includes(currentUserId));
     const isUnvoting = existingVotedOption?.id === optionId;
 
     const nextOptions = currentPoll.options.map((opt) => {
-      const filteredVoters = opt.voterUserIds.filter((uid) => uid !== currentUser.id);
+      const filteredVoters = opt.voterUserIds.filter((uid) => uid !== currentUserId);
       if (!isUnvoting && opt.id === optionId) {
-        filteredVoters.push(currentUser.id);
+        filteredVoters.push(currentUserId);
       }
       return {
         ...opt,
@@ -461,7 +468,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       console.error('voteNewsletterPoll error:', err);
       return null;
     }
-  }, [currentUser?.id, newsletters]);
+  }, [currentUserId, newsletters]);
 
   // ---------------------------------------------------------------------------
   // Event RSVP (optimistic)

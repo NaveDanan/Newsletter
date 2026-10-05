@@ -556,6 +556,78 @@ function canAccessProject(auth, record) {
   return includes(asStringArray(getRecordValue(record, 'allowedUserIds')), authId);
 }
 
+function readRecordJsonArray(record, field) {
+  // JSON fields come back from PocketBase as byte slices; getString yields their text.
+  var text = record && typeof record.getString === 'function' ? record.getString(field) : '';
+  return text ? asArray(text) : asArray(getRecordValue(record, field));
+}
+
+// The caller's own id is the only one a write may add to or remove from an
+// engagement list; every other id keeps its stored state. Like notifications
+// trust each newly added id as the actor, so this is what keeps them honest.
+function applyOwnToggle(storedIds, requestedIds, callerId) {
+  var next = asStringArray(storedIds).filter(function (id) { return id !== callerId; });
+  if (callerId && includes(asStringArray(requestedIds), callerId)) next.push(callerId);
+  return next;
+}
+
+function adjustedCount(storedCount, storedIds, nextIds) {
+  var base = typeof storedCount === 'number' && isFinite(storedCount) ? storedCount : storedIds.length;
+  return Math.max(0, base + nextIds.length - storedIds.length);
+}
+
+function constrainEngagementToCaller(payload, existing, callerId) {
+  ['likedByUserIds', 'bookmarkedByUserIds'].forEach(function (field) {
+    if (!Object.prototype.hasOwnProperty.call(payload, field)) return;
+    var stored = asStringArray(readRecordJsonArray(existing, field));
+    payload[field] = applyOwnToggle(stored, payload[field], callerId);
+    if (field === 'likedByUserIds' && Object.prototype.hasOwnProperty.call(payload, 'likes')) {
+      payload.likes = adjustedCount(Number(getRecordValue(existing, 'likes')), stored, payload[field]);
+    }
+  });
+
+  if (!Object.prototype.hasOwnProperty.call(payload, 'commentItems')) return;
+  var storedComments = Object.create(null);
+  readRecordJsonArray(existing, 'commentItems').forEach(function (comment) {
+    if (comment && comment.id) storedComments[comment.id] = comment;
+  });
+  payload.commentItems = asArray(payload.commentItems).map(function (comment) {
+    if (!comment || typeof comment !== 'object') return comment;
+    var stored = comment.id && Object.prototype.hasOwnProperty.call(storedComments, comment.id)
+      ? storedComments[comment.id] : null;
+    var storedIds = stored ? asStringArray(stored.likedByUserIds) : [];
+    var nextIds = applyOwnToggle(storedIds, comment.likedByUserIds, callerId);
+    var next = Object.assign({}, comment, {
+      likedByUserIds: nextIds,
+      likes: adjustedCount(stored ? stored.likes : 0, storedIds, nextIds),
+    });
+    // A new comment is always the caller's; a stored one keeps its author.
+    next.authorId = stored ? asString(stored.authorId) : callerId;
+    return next;
+  });
+}
+
+var ENGAGEMENT_FIELDS = ['likes', 'likedByUserIds', 'bookmarkedByUserIds', 'commentItems'];
+
+// The collection record API is a second write path into newsletters. Every
+// caller except a superuser gets the same caller-only engagement limits as
+// PATCH /api/newsletters/{id}, so like and comment alerts name the real actor.
+function handleNewsletterRecordUpdateRequest(e) {
+  if (!e.hasSuperuserAuth()) {
+    // The body only says which fields were sent: PocketBase hands JSON fields
+    // over as raw bytes there. The loaded record holds the readable values.
+    var sent = asObject(e.requestInfo().body);
+    var payload = {};
+    ENGAGEMENT_FIELDS.forEach(function (field) {
+      if (!Object.prototype.hasOwnProperty.call(sent, field)) return;
+      payload[field] = field === 'likes' ? e.record.get(field) : e.record.getString(field);
+    });
+    constrainEngagementToCaller(payload, e.record.original(), getAuthId(e.auth));
+    setRecordValues(e.record, payload);
+  }
+  return e.next();
+}
+
 function buildNewsletterPayload(body, auth, existing) {
   var source = asObject(body);
   var status = asString(source.status) || (existing ? getRecordValue(existing, 'status') : 'draft');
@@ -589,6 +661,9 @@ function buildNewsletterPayload(body, auth, existing) {
   });
 
   payload.status = status;
+  if (existing) {
+    constrainEngagementToCaller(payload, existing, getAuthId(auth));
+  }
   if (!existing) {
     payload.createdById = asString(source.createdById) || getAuthId(auth);
     payload.authorAvatar = Object.prototype.hasOwnProperty.call(source, 'authorAvatar') ? source.authorAvatar : '';
@@ -993,6 +1068,7 @@ module.exports = {
   canReadNewsletter: canReadNewsletter,
   canAccessProject: canAccessProject,
   buildNewsletterPayload: buildNewsletterPayload,
+  handleNewsletterRecordUpdateRequest: handleNewsletterRecordUpdateRequest,
   buildProjectPayload: buildProjectPayload,
   handleNewsletterList: handleNewsletterList,
   handleNewsletterCreate: handleNewsletterCreate,

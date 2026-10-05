@@ -21,6 +21,7 @@ import {
   type CommunityReport,
   type CommunityReportStatus,
 } from '@/types/community';
+import { FeaturedWritersManager } from './FeaturedWritersManager';
 
 // The moderation queue lives in the manager dashboard rather than inside the
 // community itself, because the roles that can act on a report are the same
@@ -44,6 +45,9 @@ export function CommunityModerationView({ currentUserRole }: CommunityModeration
   const [busyId, setBusyId] = useState('');
   const requestRef = useRef(0);
   const isAllowed = canModerateCommunity(currentUserRole);
+  // Curating the homepage writers row is an admin-only power, narrower than the
+  // moderation queue that managers also reach.
+  const canCurateWriters = currentUserRole === 'admin';
 
   const load = useCallback(async (nextCursor: string, nextStatus: CommunityReportStatus) => {
     const requestId = requestRef.current + 1;
@@ -124,7 +128,7 @@ export function CommunityModerationView({ currentUserRole }: CommunityModeration
           <p className="mt-1 text-sm text-[#737373]">{t('community.moderation.description')}</p>
         </div>
 
-        <div role="tablist" aria-label={t('community.moderation.title')} className="flex gap-1 rounded-full bg-[#F5F5F5] p-1">
+        <div role="tablist" aria-label={t('community.moderation.title')} className="flex gap-1 rounded-full bg-[var(--bg-card)] p-1 border border-[var(--border-subtle)]">
           {COMMUNITY_REPORT_STATUSES.map((value) => (
             <button
               key={value}
@@ -132,8 +136,8 @@ export function CommunityModerationView({ currentUserRole }: CommunityModeration
               role="tab"
               aria-selected={value === status}
               className={cn(
-                'rounded-full px-4 py-1.5 text-sm transition-colors',
-                value === status ? 'bg-white font-semibold text-[#171717] shadow-sm' : 'text-[#737373]',
+                'rounded-full px-4 py-1.5 text-xs sm:text-sm font-semibold transition-all',
+                value === status ? 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
               )}
               onClick={() => setStatus(value)}
             >
@@ -142,6 +146,8 @@ export function CommunityModerationView({ currentUserRole }: CommunityModeration
           ))}
         </div>
       </header>
+
+      {canCurateWriters ? <FeaturedWritersManager /> : null}
 
       {error ? (
         <div className="dashboard-card space-y-3">

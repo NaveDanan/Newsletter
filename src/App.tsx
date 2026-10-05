@@ -3,6 +3,7 @@ import { Navigation } from './components/Navigation';
 import { HeroBanner } from './sections/HeroBanner';
 import { PopularArticles } from './sections/PopularArticles';
 import { LatestArticles } from './sections/LatestArticles';
+import { OurWriters } from './sections/OurWriters';
 import { Sidebar } from './sections/Sidebar';
 import { ManagerDashboard, type Tab as ManagerTab } from './sections/ManagerDashboard';
 import { GanttEditorPage } from './sections/manager/GanttEditorPage';
@@ -21,6 +22,8 @@ import { useNewsletters } from './hooks/useNewsletters';
 import { canAccessManagerTab, hasManagerAccess } from './lib/auth/permissions';
 import { parseCommunityRoute } from './lib/community-routes';
 import { bootLogger } from './lib/bootLogger';
+import { AppStageShell } from './components/AppStageShell';
+import { QuickComposeCard } from './components/QuickComposeCard';
 import { Toaster } from 'sonner';
 import { toast } from 'sonner';
 import type { Newsletter } from './types/newsletter';
@@ -278,7 +281,9 @@ function App() {
       replace,
     });
 
-    window.history[historyMethod]({}, '', nextRoute.pathname);
+    // Pushed entries are tagged so a page's Back button can tell whether
+    // history.back() would stay inside the app.
+    window.history[historyMethod](replace ? window.history.state : { appNavigation: true }, '', nextRoute.pathname);
     window.dispatchEvent(new Event('app:navigate'));
   }, []);
 
@@ -488,9 +493,31 @@ function App() {
     navigateTo('/community');
   };
 
+  // Posts are only ever created in the community, so the home card routes there.
+  const handleQuickCompose = (files?: File[]) => {
+    navigateTo('/community');
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('community:compose', { detail: { files } }));
+    }, 0);
+  };
+
   const handleRequireAuth = () => {
     toast.error(t('app.authRequiredDiscussion'));
     navigateTo('/sign-in');
+  };
+
+  // The mobile "+" opens the dashboard for managers and the community
+  // composer for everyone else, who would otherwise bounce off the manager guard.
+  const handleCreateClick = () => {
+    if (!isUserAuthenticated) {
+      handleSignInClick();
+      return;
+    }
+    if (hasManagerAccess(userRole)) {
+      handleManagerClick();
+      return;
+    }
+    handleQuickCompose();
   };
 
   const handleAuthSuccess = () => {
@@ -506,6 +533,17 @@ function App() {
       navigateTo('/community/profile');
     } else {
       navigateTo('/profile');
+    }
+  };
+
+  // The profile page is reached from both the site and the community, so Back
+  // returns to wherever the user came from when that was inside the app.
+  const handleProfileBack = () => {
+    const state: unknown = window.history.state;
+    if (state && typeof state === 'object' && 'appNavigation' in state) {
+      window.history.back();
+    } else {
+      handleHomeClick();
     }
   };
 
@@ -571,33 +609,51 @@ function App() {
   // Render article view
   if (currentRoute.view === 'article' && selectedArticle) {
     return (
-      <div className="min-h-screen bg-white">
-        <Toaster position={toasterPosition} richColors />
-        <NewsletterViewer
-          newsletter={selectedArticle}
-          currentUser={user}
-          onBack={handleBackToHome}
-          onRequireAuth={handleRequireAuth}
-          onToggleLike={handleArticleLike}
-          onAddComment={handleArticleComment}
-          onToggleCommentLike={handleCommentLike}
-          isBookmarked={Boolean(user?.id && selectedArticle.bookmarkedByUserIds.includes(user.id))}
-          onToggleBookmark={handleToggleBookmark}
-          onVotePoll={handleVotePoll}
-          onRsvpEvent={handleRsvpEvent}
-        />
-      </div>
+      <AppStageShell
+        activeTab="home"
+        onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
+        onCreateClick={handleCreateClick}
+        onProfileClick={handleProfileClick}
+        user={user}
+      >
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+          <Toaster position={toasterPosition} richColors />
+          <NewsletterViewer
+            newsletter={selectedArticle}
+            currentUser={user}
+            onBack={handleBackToHome}
+            onRequireAuth={handleRequireAuth}
+            onToggleLike={handleArticleLike}
+            onAddComment={handleArticleComment}
+            onToggleCommentLike={handleCommentLike}
+            isBookmarked={Boolean(user?.id && selectedArticle.bookmarkedByUserIds.includes(user.id))}
+            onToggleBookmark={handleToggleBookmark}
+            onVotePoll={handleVotePoll}
+            onRsvpEvent={handleRsvpEvent}
+          />
+        </div>
+      </AppStageShell>
     );
   }
 
   if (currentRoute.view === 'article') {
     return (
-      <div className="min-h-screen bg-white">
-        <Toaster position={toasterPosition} richColors />
-        <div className="flex min-h-screen items-center justify-center text-sm font-medium text-[#737373]">
-          {t('app.loadingArticle')}
+      <AppStageShell
+        activeTab="home"
+        onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
+        onCreateClick={handleCreateClick}
+        onProfileClick={handleProfileClick}
+        user={user}
+      >
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] flex items-center justify-center">
+          <Toaster position={toasterPosition} richColors />
+          <div className="text-sm font-semibold text-[var(--text-secondary)]">
+            {t('app.loadingArticle')}
+          </div>
         </div>
-      </div>
+      </AppStageShell>
     );
   }
 
@@ -605,41 +661,72 @@ function App() {
   if (currentRoute.view === 'manager' || currentRoute.view === 'gantt-editor') {
     if (isAuthLoading) {
       return (
-        <div className="min-h-screen bg-white">
-          <Toaster position={toasterPosition} richColors />
-          <div className="flex min-h-screen items-center justify-center text-sm font-medium text-[#737373]">
-            {t('app.loadingManager')}
+        <AppStageShell
+          activeTab="manager"
+          onHomeClick={handleHomeClick}
+          onCommunityClick={handleCommunityClick}
+          onCreateClick={handleCreateClick}
+          onProfileClick={handleProfileClick}
+          user={user}
+        >
+          <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center">
+            <Toaster position={toasterPosition} richColors />
+            <div className="text-sm font-semibold text-[var(--text-secondary)]">
+              {t('app.loadingManager')}
+            </div>
           </div>
-        </div>
+        </AppStageShell>
       );
     }
 
     if (!isUserAuthenticated || !hasManagerAccess(userRole)) {
       return (
-        <div className="min-h-screen bg-white">
-          <Toaster position={toasterPosition} richColors />
-          <div className="flex min-h-screen items-center justify-center text-sm font-medium text-[#737373]">
-            Redirecting to an allowed page...
+        <AppStageShell
+          activeTab="manager"
+          onHomeClick={handleHomeClick}
+          onCommunityClick={handleCommunityClick}
+          onCreateClick={handleCreateClick}
+          onProfileClick={handleProfileClick}
+          user={user}
+        >
+          <div className="min-h-screen bg-[var(--bg-app)] flex items-center justify-center">
+            <Toaster position={toasterPosition} richColors />
+            <div className="text-sm font-semibold text-[var(--text-secondary)]">
+              Redirecting to an allowed page...
+            </div>
           </div>
-        </div>
+        </AppStageShell>
       );
     }
 
     if (currentRoute.view === 'gantt-editor' && currentRoute.projectId) {
       return (
-        <div className="min-h-screen bg-white">
+        <>
           <Toaster position={toasterPosition} richColors />
           <GanttEditorPage
             key={currentRoute.projectId}
             projectId={currentRoute.projectId}
             onBack={() => navigateTo('/manager/gantt')}
+            renderShell={(content, onNavigate) => (
+              <AppStageShell
+                activeTab="manager"
+                onHomeClick={handleHomeClick}
+                onCommunityClick={handleCommunityClick}
+                onCreateClick={handleCreateClick}
+                onProfileClick={handleProfileClick}
+                onNavigate={onNavigate}
+                user={user}
+              >
+                {content}
+              </AppStageShell>
+            )}
           />
-        </div>
+        </>
       );
     }
 
     return (
-      <div className="min-h-screen bg-white">
+      <>
         <Toaster position={toasterPosition} richColors />
         <ManagerDashboard
           activeTab={currentRoute.managerSection ?? 'newsletters'}
@@ -648,6 +735,8 @@ function App() {
           onLogout={handleSignOut}
           onProfileClick={handleProfileClick}
           onHomeClick={handleHomeClick}
+          onCommunityClick={handleCommunityClick}
+          onCreateClick={handleCreateClick}
           currentUser={user}
           currentUserRole={userRole}
           newsletters={newsletters}
@@ -663,69 +752,114 @@ function App() {
           onVoteNewsletterPoll={handleVotePoll}
           onRsvpNewsletterEvent={handleRsvpEvent}
         />
-      </div>
+      </>
     );
   }
 
   if (currentRoute.view === 'migrate') {
     return (
-      <div className="min-h-screen bg-white">
-        <Toaster position={toasterPosition} richColors />
-        <MigratePage onBack={handleHomeClick} />
-      </div>
+      <AppStageShell
+        activeTab="home"
+        onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
+        onCreateClick={handleCreateClick}
+        onProfileClick={handleProfileClick}
+        user={user}
+      >
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+          <Toaster position={toasterPosition} richColors />
+          <MigratePage onBack={handleHomeClick} />
+        </div>
+      </AppStageShell>
     );
   }
 
   if (currentRoute.view === 'signin') {
     return (
-      <div className="min-h-screen bg-white">
-        <Toaster position={toasterPosition} richColors />
-        <SignIn onBack={handleHomeClick} onSuccess={handleAuthSuccess} />
-      </div>
+      <AppStageShell
+        activeTab="home"
+        onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
+        onCreateClick={handleCreateClick}
+        onProfileClick={handleProfileClick}
+        user={user}
+      >
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+          <Toaster position={toasterPosition} richColors />
+          <SignIn onBack={handleHomeClick} onSuccess={handleAuthSuccess} />
+        </div>
+      </AppStageShell>
     );
   }
 
   if (currentRoute.view === 'reset-password' && currentRoute.token) {
     return (
-      <div className="min-h-screen bg-white">
-        <Toaster position={toasterPosition} richColors />
-        <PasswordResetPage
-          token={currentRoute.token}
-          onBack={() => navigateTo('/sign-in', { replace: true })}
-          onSuccess={handlePasswordResetSuccess}
-        />
-      </div>
+      <AppStageShell
+        activeTab="home"
+        onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
+        onCreateClick={handleCreateClick}
+        onProfileClick={handleProfileClick}
+        user={user}
+      >
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+          <Toaster position={toasterPosition} richColors />
+          <PasswordResetPage
+            token={currentRoute.token}
+            onBack={() => navigateTo('/sign-in', { replace: true })}
+            onSuccess={handlePasswordResetSuccess}
+          />
+        </div>
+      </AppStageShell>
     );
   }
 
   if (currentRoute.view === 'verify-email' && currentRoute.token) {
     return (
-      <div className="min-h-screen bg-white">
-        <Toaster position={toasterPosition} richColors />
-        <VerifyEmailPage
-          token={currentRoute.token}
-          onBack={() => navigateTo('/sign-in', { replace: true })}
-          onSuccess={handleAuthSuccess}
-        />
-      </div>
+      <AppStageShell
+        activeTab="home"
+        onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
+        onCreateClick={handleCreateClick}
+        onProfileClick={handleProfileClick}
+        user={user}
+      >
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+          <Toaster position={toasterPosition} richColors />
+          <VerifyEmailPage
+            token={currentRoute.token}
+            onBack={() => navigateTo('/sign-in', { replace: true })}
+            onSuccess={handleAuthSuccess}
+          />
+        </div>
+      </AppStageShell>
     );
   }
 
   if (currentRoute.view === 'sso-callback') {
     return (
-      <div className="min-h-screen bg-white">
-        <Toaster position={toasterPosition} richColors />
-        <SSOCallback
-          onFinish={handleAuthSuccess}
-          onRetry={() => navigateTo('/sign-in', { replace: true })}
-        />
-      </div>
+      <AppStageShell
+        activeTab="home"
+        onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
+        onCreateClick={handleCreateClick}
+        onProfileClick={handleProfileClick}
+        user={user}
+      >
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+          <Toaster position={toasterPosition} richColors />
+          <SSOCallback
+            onFinish={handleAuthSuccess}
+            onRetry={() => navigateTo('/sign-in', { replace: true })}
+          />
+        </div>
+      </AppStageShell>
     );
   }
 
   if (currentRoute.view === 'profile') {
     if (isAuthLoading) {
-      return <div className="min-h-screen bg-[#FAFAFA]" />;
+      return <div className="min-h-screen bg-[var(--bg-app)]" />;
     }
 
     if (!isUserAuthenticated) {
@@ -733,25 +867,92 @@ function App() {
     }
 
     return (
-      <div className="min-h-screen bg-[#FAFAFA]">
-        <Toaster position={toasterPosition} richColors />
-        <ProfilePage onBack={handleHomeClick} />
-      </div>
+      <AppStageShell
+        activeTab="profile"
+        onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
+        onCreateClick={handleCreateClick}
+        onProfileClick={handleProfileClick}
+        user={user}
+      >
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+          <Toaster position={toasterPosition} richColors />
+          <ProfilePage onBack={handleProfileBack} />
+        </div>
+      </AppStageShell>
     );
   }
 
   if (currentRoute.view === 'unsubscribe') {
     return (
-      <div className="min-h-screen bg-white">
-        <Toaster position={toasterPosition} richColors />
-        <UnsubscribePage onBack={handleHomeClick} />
-      </div>
+      <AppStageShell
+        activeTab="home"
+        onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
+        onCreateClick={handleCreateClick}
+        onProfileClick={handleProfileClick}
+        user={user}
+      >
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+          <Toaster position={toasterPosition} richColors />
+          <UnsubscribePage onBack={handleHomeClick} />
+        </div>
+      </AppStageShell>
     );
   }
 
   if (currentRoute.view === 'community') {
     return (
-      <div className="min-h-screen bg-white">
+      <AppStageShell
+        activeTab="community"
+        onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
+        onCreateClick={handleCreateClick}
+        onProfileClick={handleProfileClick}
+        user={user}
+      >
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+          <Toaster position={toasterPosition} richColors />
+          <Navigation
+            onManagerClick={handleManagerClick}
+            onHomeClick={handleHomeClick}
+            onCommunityClick={handleCommunityClick}
+            onSignInClick={handleSignInClick}
+            onSignOut={handleSignOut}
+            onProfileClick={handleProfileClick}
+            onSearch={(query) => {
+              setSearchQuery(query);
+              navigateTo(`/?search=${encodeURIComponent(query)}`);
+            }}
+            onSearchChange={setSearchQuery}
+            isAuthenticated={isUserAuthenticated}
+            authName={user?.name}
+            activeTab="community"
+          />
+          <CommunityPage
+            pathname={currentRoute.pathname}
+            isAuthenticated={isUserAuthenticated}
+            onNavigate={(pathname) => navigateTo(pathname)}
+            onRequireAuth={handleRequireAuth}
+            onLeave={handleHomeClick}
+            onOpenModeration={() => navigateTo('/manager/community')}
+          />
+        </div>
+      </AppStageShell>
+    );
+  }
+
+  // Render home page
+  return (
+    <AppStageShell
+      activeTab="home"
+      onHomeClick={handleHomeClick}
+      onCommunityClick={handleCommunityClick}
+      onCreateClick={handleCreateClick}
+      onProfileClick={handleProfileClick}
+      user={user}
+    >
+      <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
         <Toaster position={toasterPosition} richColors />
         <Navigation
           onManagerClick={handleManagerClick}
@@ -760,103 +961,93 @@ function App() {
           onSignInClick={handleSignInClick}
           onSignOut={handleSignOut}
           onProfileClick={handleProfileClick}
-          onSearch={(query) => {
-            setSearchQuery(query);
-            navigateTo(`/?search=${encodeURIComponent(query)}`);
-          }}
+          onSearch={setSearchQuery}
           onSearchChange={setSearchQuery}
           isAuthenticated={isUserAuthenticated}
           authName={user?.name}
-          activeTab="community"
         />
-        <CommunityPage
-          pathname={currentRoute.pathname}
-          isAuthenticated={isUserAuthenticated}
-          onNavigate={(pathname) => navigateTo(pathname)}
-          onRequireAuth={handleRequireAuth}
-          onLeave={handleHomeClick}
-          onOpenModeration={() => navigateTo('/manager/community')}
-        />
-      </div>
-    );
-  }
-
-  // Render home page
-  return (
-    <div className="min-h-screen bg-white">
-      <Toaster position={toasterPosition} richColors />
-      <Navigation
-        onManagerClick={handleManagerClick}
-        onHomeClick={handleHomeClick}
-        onCommunityClick={handleCommunityClick}
-        onSignInClick={handleSignInClick}
-        onSignOut={handleSignOut}
-        onProfileClick={handleProfileClick}
-        onSearch={setSearchQuery}
-        onSearchChange={setSearchQuery}
-        isAuthenticated={isUserAuthenticated}
-        authName={user?.name}
-      />
-      <main>
-        {!isSearchActive ? (
-          <HeroBanner
-            featuredNewsletter={publishedNewsletters[0] ?? null}
-            onArticleClick={handleArticleClick}
-          />
-        ) : null}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          {isSearchActive ? (
-            <section className="mb-10 rounded-2xl border border-[#E5E5E5] bg-[#FAFAFA] px-5 py-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#D93A3A]">
-                    {t('app.search.label')}
-                  </p>
-                  <h2 className="mt-1 text-2xl font-bold text-[#171717]">
-                    {t('app.search.results', { count: filteredNewsletters.length })}
-                  </h2>
-                </div>
-                <p className="text-sm text-[#737373]">
-                  {t('app.search.matches', { query: trimmedSearchQuery })}
-                </p>
-              </div>
-            </section>
+        <main>
+          {!isSearchActive ? (
+            <HeroBanner
+              featuredNewsletter={publishedNewsletters[0] ?? null}
+              onArticleClick={handleArticleClick}
+            />
           ) : null}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-12">
-              {filteredNewsletters.length > 0 ? (
-                <>
-                  <PopularArticles
-                    newsletters={filteredNewsletters}
-                    onArticleClick={handleArticleClick}
-                  />
-                  <LatestArticles
-                    newsletters={filteredNewsletters}
-                    currentUserId={user?.id}
-                    onArticleClick={handleArticleClick}
-                  />
-                </>
-              ) : (
-                <section className="rounded-2xl border border-dashed border-[#D4D4D8] bg-[#FAFAFA] px-6 py-10 text-center">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#D93A3A]">
-                    {t('app.search.noMatchesLabel')}
+
+          <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+            {isSearchActive ? (
+              <section className="mb-8 rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-5 shadow-sm">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--primary-accent)]">
+                      {t('app.search.label')}
+                    </p>
+                    <h2 className="mt-1 text-xl sm:text-2xl font-extrabold text-[var(--text-primary)]">
+                      {t('app.search.results', { count: filteredNewsletters.length })}
+                    </h2>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
+                    {t('app.search.matches', { query: trimmedSearchQuery })}
                   </p>
-                  <h2 className="mt-3 text-2xl font-bold text-[#171717]">
-                    {t('app.search.noMatchesTitle')}
-                  </h2>
-                  <p className="mt-3 text-sm text-[#737373]">
-                    {t('app.search.noMatchesDescription')}
-                  </p>
-                </section>
-              )}
-            </div>
-            <div className="lg:col-span-1">
-              <Sidebar publishedCount={publishedNewsletters.length} />
+                </div>
+              </section>
+            ) : null}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Center Main Feed Column */}
+              <div className="lg:col-span-8 space-y-8">
+                {!isSearchActive && (
+                  <>
+                    <OurWriters
+                      newsletters={publishedNewsletters}
+                      onArticleClick={handleArticleClick}
+                      onNavigate={navigateTo}
+                    />
+
+                    {/* Reference: Create Post / Quick Compose Card */}
+                    <QuickComposeCard user={user} onCompose={handleQuickCompose} />
+                  </>
+                )}
+
+                {filteredNewsletters.length > 0 ? (
+                  <>
+                    <PopularArticles
+                      newsletters={filteredNewsletters}
+                      onArticleClick={handleArticleClick}
+                    />
+                    <LatestArticles
+                      newsletters={filteredNewsletters}
+                      currentUserId={user?.id}
+                      onArticleClick={handleArticleClick}
+                    />
+                  </>
+                ) : (
+                  <section className="rounded-3xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-12 text-center shadow-sm">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--primary-accent)]">
+                      {t('app.search.noMatchesLabel')}
+                    </p>
+                    <h2 className="mt-3 text-xl sm:text-2xl font-extrabold text-[var(--text-primary)]">
+                      {t('app.search.noMatchesTitle')}
+                    </h2>
+                    <p className="mt-2 text-xs sm:text-sm text-[var(--text-secondary)]">
+                      {t('app.search.noMatchesDescription')}
+                    </p>
+                  </section>
+                )}
+              </div>
+
+              {/* Right Sidebar Column */}
+              <div className="lg:col-span-4 sticky top-20">
+                <Sidebar
+                  publishedCount={publishedNewsletters.length}
+                  onNavigate={navigateTo}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
+    </AppStageShell>
   );
 }
 

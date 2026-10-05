@@ -13,6 +13,34 @@ interface RichTextEditorProps {
   placeholder?: string;
 }
 
+interface ToolbarButtonProps {
+  onClick: () => void;
+  active?: boolean;
+  icon: IconSvgElement;
+  title: string;
+}
+
+function ToolbarButton({ onClick, active = false, icon: Icon, title }: ToolbarButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`p-2 rounded-lg transition-colors ${
+        active 
+          ? 'bg-[#D93A3A] text-white' 
+          : 'text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717]'
+      }`}
+    >
+      <HugeiconsIcon icon={Icon} className="w-4 h-4" />
+    </button>
+  );
+}
+
+function Divider() {
+  return <div className="w-px h-6 bg-[#E5E5E5] mx-1" />;
+}
+
 export function RichTextEditor({ content, onChange, placeholder = 'Start writing your newsletter...' }: RichTextEditorProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -39,12 +67,12 @@ export function RichTextEditor({ content, onChange, placeholder = 'Start writing
     },
   });
 
-  if (!editor) {
-    return null;
-  }
-
   // Process and upload image file
   const processImageFile = useCallback((file: File) => {
+    if (!editor) {
+      return;
+    }
+
     // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload an image file');
@@ -80,6 +108,10 @@ export function RichTextEditor({ content, onChange, placeholder = 'Start writing
 
   // Add image via URL
   const addImageByUrl = useCallback(() => {
+    if (!editor) {
+      return;
+    }
+
     const url = window.prompt('Enter image URL');
     if (url) {
       editor.chain().focus().setResizableImage({
@@ -160,38 +192,19 @@ export function RichTextEditor({ content, onChange, placeholder = 'Start writing
   }, [processImageFile]);
 
   const addLink = useCallback(() => {
+    if (!editor) {
+      return;
+    }
+
     const url = window.prompt('Enter URL');
     if (url) {
       editor.chain().focus().setLink({ href: url }).run();
     }
   }, [editor]);
 
-  const ToolbarButton = ({ 
-    onClick, 
-    active = false, 
-    icon: Icon,
-    title,
-  }: { 
-    onClick: () => void; 
-    active?: boolean; 
-    icon: IconSvgElement;
-    title: string;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={`p-2 rounded-lg transition-colors ${
-        active 
-          ? 'bg-[#D93A3A] text-white' 
-          : 'text-[#737373] hover:bg-[#F3F4F6] hover:text-[#171717]'
-      }`}
-    >
-      <HugeiconsIcon icon={Icon} className="w-4 h-4" />
-    </button>
-  );
-
-  const Divider = () => <div className="w-px h-6 bg-[#E5E5E5] mx-1" />;
+  if (!editor) {
+    return null;
+  }
 
   return (
     <div className="border border-[#E5E5E5] rounded-xl overflow-hidden bg-white">

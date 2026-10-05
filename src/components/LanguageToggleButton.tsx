@@ -18,8 +18,8 @@ export function LanguageToggleButton({ className, compact = false }: LanguageTog
       title={isRTL ? t('common.switchToEnglish') : t('common.switchToHebrew')}
       aria-label={t('common.languageToggle')}
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-full border border-[#E5E5E5] bg-white px-3 py-2 text-sm font-medium text-[#171717] transition-colors hover:border-[#D93A3A] hover:text-[#D93A3A]',
-        compact && 'h-10 w-10 px-0',
+        'inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-xs sm:text-sm font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--primary-accent)] hover:text-[var(--primary-accent)]',
+        compact && 'h-9 w-9 px-0',
         className,
       )}
     >

@@ -362,6 +362,12 @@ export async function updateCommunityProfile(patch: CommunityProfilePatch): Prom
         body[key] = patch[key];
       }
     });
+    if (patch.removeBanner) {
+      body.removeBanner = true;
+    }
+    if (patch.removeAvatar) {
+      body.removeAvatar = true;
+    }
     const value = record(await sendJson('/api/community/me', 'PATCH', body));
     return mapCommunityProfile(value.profile);
   }
@@ -437,9 +443,13 @@ export async function fetchCommunityFeed(
 
 export async function fetchCommunityThread(
   postId: string,
-  options: { cursor?: string; perPage?: number } = {},
+  options: { cursor?: string; perPage?: number; tree?: boolean } = {},
 ): Promise<CommunityThread> {
-  const query = buildQuery({ cursor: options.cursor, perPage: options.perPage });
+  const query = buildQuery({
+    cursor: options.cursor,
+    perPage: options.perPage,
+    tree: options.tree ? 'true' : undefined,
+  });
   const value = record(await getJson(`/api/community/posts/${encodeURIComponent(postId)}${query}`));
   return {
     post: mapCommunityPost(value.post),

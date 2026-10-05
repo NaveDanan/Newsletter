@@ -12,12 +12,161 @@ const WORD_CLASS = '0-9A-Za-z_\u00C0-\u024F\u0590-\u05FF\u0600-\u06FF';
 const HASHTAG_PATTERN = new RegExp('(^|[^' + WORD_CLASS + '#])#([' + WORD_CLASS + ']{1,80})', 'g');
 const MENTION_PATTERN = new RegExp('(^|[^' + WORD_CLASS + '@])@([0-9A-Za-z_]{3,30})', 'g');
 const URL_PATTERN = /\bhttps?:\/\/[^\s<>"']{4,2000}/gi;
-const TRAILING_PUNCTUATION = /[.,;:!?)\]]+$/;
+const SENTENCE_PUNCTUATION = '.,;:!?';
+
+export type CommunityBodyMark = 'bold' | 'italic' | 'underline' | 'strike';
 
 export interface CommunityBodySegment {
   key: string;
   text: string;
   entity: CommunityEntity | null;
+  marks: CommunityBodyMark[];
+}
+
+interface FormattingToken {
+  start: number;
+  width: number;
+  mark: CommunityBodyMark;
+  explicit: boolean;
+}
+
+interface FormattingProjection {
+  text: string;
+  offsets: number[];
+  marks: CommunityBodyMark[][];
+}
+
+// Mirror of projectFormatting in community-core.js. Entities are scanned on
+// visible text, then mapped back to the unchanged stored body. A delimiter
+// may sit inside a URL or span several entities; it is removed only after its
+// matching delimiter is found. Bare URL asterisks remain literal.
+function projectFormatting(body: string): FormattingProjection {
+  const urlRanges: Array<{ start: number; end: number }> = [];
+  const urlPattern = new RegExp(URL_PATTERN.source, 'gi');
+  let match: RegExpExecArray | null;
+  while ((match = urlPattern.exec(body)) !== null) {
+    urlRanges.push({ start: match.index, end: match.index + match[0].length });
+  }
+
+  const open: Partial<Record<CommunityBodyMark, FormattingToken>> = {};
+  const removed = new Set<number>();
+  const starts: Record<number, CommunityBodyMark[]> = {};
+  const ends: Record<number, CommunityBodyMark[]> = {};
+  let index = 0;
+  let urlIndex = 0;
+
+  while (index < body.length) {
+    while (urlRanges[urlIndex] && index >= urlRanges[urlIndex].end) {
+      urlIndex += 1;
+    }
+    if (body[index] === '\n' && !open.italic?.explicit) {
+      delete open.italic;
+    }
+
+    if (body[index] === '\\' && '\\*+~<>'.includes(body[index + 1] ?? '\0')) {
+      removed.add(index);
+      index += 2;
+      continue;
+    }
+
+    // New rich-editor output explicitly prefixes a formatting opener inside
+    // a URL with \!. This distinguishes styling from legacy literal /a*b*.
+    const explicit = body.slice(index, index + 2) === '\\!';
+    const tokenStart = index + (explicit ? 2 : 0);
+    const pair = body.slice(tokenStart, tokenStart + 2);
+    let mark: CommunityBodyMark | null = null;
+    let width = 2;
+    if (body.slice(tokenStart, tokenStart + 3) === '***' && !open.bold && !open.italic) {
+      mark = 'italic';
+      width = 1;
+    } else if (pair === '**') {
+      mark = 'bold';
+    } else if (pair === '~~') {
+      mark = 'strike';
+    } else if (pair === '++') {
+      mark = 'underline';
+    } else if (body[tokenStart] === '*') {
+      mark = 'italic';
+      width = 1;
+    }
+
+    if (!mark) {
+      index += 1;
+      continue;
+    }
+
+    if (explicit) width += 2;
+
+    const opener = open[mark];
+    if (opener) {
+      if (index > opener.start + opener.width) {
+        for (let offset = 0; offset < opener.width; offset += 1) removed.add(opener.start + offset);
+        for (let offset = 0; offset < width; offset += 1) removed.add(index + offset);
+        (starts[opener.start + opener.width] ??= []).push(mark);
+        (ends[index] ??= []).push(mark);
+      }
+      delete open[mark];
+    } else {
+      const insideUrl = urlRanges[urlIndex] && index >= urlRanges[urlIndex].start;
+      // A pair wholly within an otherwise unformatted URL can be a valid path
+      // such as /a*b*. Formatting already opened outside that URL is explicit.
+      if (explicit || !insideUrl || Object.keys(open).length > 0) {
+        open[mark] = { start: index, width, mark, explicit };
+      }
+    }
+    index += width;
+  }
+
+  const characters: string[] = [];
+  const offsets: number[] = [];
+  const marks: CommunityBodyMark[][] = [];
+  let active: CommunityBodyMark[] = [];
+  for (index = 0; index < body.length; index += 1) {
+    if (ends[index]) active = active.filter((mark) => !ends[index].includes(mark));
+    if (starts[index]) active.push(...starts[index]);
+    if (!removed.has(index)) {
+      characters.push(body[index]);
+      offsets.push(index);
+      marks.push([...active]);
+    }
+  }
+  return { text: characters.join(''), offsets, marks };
+}
+
+function countCharacter(value: string, character: string): number {
+  let total = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    if (value.charAt(index) === character) {
+      total += 1;
+    }
+  }
+  return total;
+}
+
+// Sentence punctuation is never part of a URL, but a closing bracket is when
+// the URL itself opened it: `/wiki/Foo_(bar)` keeps its parenthesis while
+// `(https://example.com/a)` does not.
+function trimTrailingPunctuation(value: string): string {
+  let result = value;
+
+  while (result.length > 0) {
+    const last = result.charAt(result.length - 1);
+    if (SENTENCE_PUNCTUATION.indexOf(last) !== -1) {
+      result = result.slice(0, -1);
+      continue;
+    }
+    if (last === ')' && countCharacter(result, ')') > countCharacter(result, '(')) {
+      result = result.slice(0, -1);
+      continue;
+    }
+    if (last === ']' && countCharacter(result, ']') > countCharacter(result, '[')) {
+      result = result.slice(0, -1);
+      continue;
+    }
+    break;
+  }
+
+  return result;
 }
 
 // normalizeHashtag in pb_hooks/lib/community-core.js, character for
@@ -25,6 +174,14 @@ export interface CommunityBodySegment {
 // 80-character cap the hashtag column has.
 export function normalizeCommunityHashtag(value: string): string {
   return (typeof value === 'string' ? value : '').replace(/^#+/, '').toLowerCase().slice(0, 80);
+}
+
+export function escapeCommunityBodyLiteral(value: string): string {
+  return value.replace(/[\\*+~<>]/g, '\\$&');
+}
+
+export function visibleCommunityBody(value: string): string {
+  return projectFormatting(value).text;
 }
 
 // normalizeHandle in pb_hooks/lib/community-core.js: trim first, then strip
@@ -112,13 +269,14 @@ function pushEntity(entities: CommunityEntity[], candidate: CommunityEntity): vo
 }
 
 export function parseCommunityEntities(body: string): CommunityEntity[] {
-  const text = typeof body === 'string' ? body : '';
+  const projection = projectFormatting(typeof body === 'string' ? body : '');
+  const text = projection.text;
   const entities: CommunityEntity[] = [];
   let match: RegExpExecArray | null;
 
   URL_PATTERN.lastIndex = 0;
   while ((match = URL_PATTERN.exec(text)) !== null) {
-    const raw = match[0].replace(TRAILING_PUNCTUATION, '');
+    const raw = trimTrailingPunctuation(match[0]);
     // The entity carries the normalized URL and displays the raw text, which
     // is what the hook stores; a URL normalizeCommunityUrl refuses is no
     // entity at all, so the highlighting matches what the post will hold.
@@ -126,8 +284,8 @@ export function parseCommunityEntities(body: string): CommunityEntity[] {
     if (normalized) {
       pushEntity(entities, {
         type: 'url',
-        start: match.index,
-        end: match.index + raw.length,
+        start: projection.offsets[match.index],
+        end: projection.offsets[match.index + raw.length - 1] + 1,
         value: normalized,
         display: raw,
       });
@@ -144,8 +302,8 @@ export function parseCommunityEntities(body: string): CommunityEntity[] {
     if (tag) {
       pushEntity(entities, {
         type: 'hashtag',
-        start,
-        end: start + match[2].length + 1,
+        start: projection.offsets[start],
+        end: projection.offsets[start + match[2].length] + 1,
         value: tag,
         display: match[2],
       });
@@ -162,8 +320,8 @@ export function parseCommunityEntities(body: string): CommunityEntity[] {
     if (isValidCommunityHandle(handle)) {
       pushEntity(entities, {
         type: 'mention',
-        start,
-        end: start + match[2].length + 1,
+        start: projection.offsets[start],
+        end: projection.offsets[start + match[2].length] + 1,
         value: handle,
         display: match[2],
       });
@@ -181,9 +339,6 @@ export function firstCommunityUrl(body: string): string {
   return found ? found.value : '';
 }
 
-// Splits a body into alternating plain and entity segments. The renderer turns
-// the entity segments into buttons; it never builds HTML, because
-// src/lib/comment-formatting.ts bans anchors and strips attributes.
 export function splitCommunityBody(body: string, entities: CommunityEntity[]): CommunityBodySegment[] {
   const text = typeof body === 'string' ? body : '';
   if (!text) {
@@ -192,24 +347,36 @@ export function splitCommunityBody(body: string, entities: CommunityEntity[]): C
 
   const ranges = [...entities]
     .filter((entity) => entity.start >= 0 && entity.end <= text.length && entity.end > entity.start)
-    .sort((a, b) => a.start - b.start);
+    .sort((a, b) => a.start - b.start)
+    .map((entity) => ({ ...entity }));
 
   const segments: CommunityBodySegment[] = [];
-  let index = 0;
-
-  ranges.forEach((entity, position) => {
-    if (entity.start < index) {
-      return;
+  const projection = projectFormatting(text);
+  const urlText = new Map<CommunityEntity, string>();
+  let rangeIndex = 0;
+  for (let index = 0; index < projection.text.length; index += 1) {
+    const offset = projection.offsets[index];
+    while (ranges[rangeIndex] && offset >= ranges[rangeIndex].end) rangeIndex += 1;
+    const range = ranges[rangeIndex];
+    const entity = range && offset >= range.start ? range : null;
+    if (entity?.type === 'url') urlText.set(entity, (urlText.get(entity) ?? '') + projection.text[index]);
+    const marks = projection.marks[index];
+    const previous = segments[segments.length - 1];
+    if (previous && previous.entity === entity && previous.marks.join('|') === marks.join('|')) {
+      previous.text += projection.text[index];
+    } else {
+      segments.push({ key: `s${offset}`, text: projection.text[index], entity, marks });
     }
-    if (entity.start > index) {
-      segments.push({ key: `t${index}`, text: text.slice(index, entity.start), entity: null });
-    }
-    segments.push({ key: `e${position}-${entity.start}`, text: text.slice(entity.start, entity.end), entity });
-    index = entity.end;
-  });
+  }
 
-  if (index < text.length) {
-    segments.push({ key: `t${index}`, text: text.slice(index), entity: null });
+  // Older records can contain the former scanner's marker-corrupted href.
+  // Reconstruct it from visible source text without mutating stored entities.
+  for (const [entity, display] of urlText) {
+    entity.value = normalizeCommunityUrl(trimTrailingPunctuation(display));
+    entity.display = display;
+    if (!entity.value) {
+      for (const segment of segments) if (segment.entity === entity) segment.entity = null;
+    }
   }
 
   return segments;

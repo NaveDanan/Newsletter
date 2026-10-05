@@ -26,6 +26,13 @@ export const PROJECTS_SCHEMA = {
   deleteRule: '@request.auth.role = "admin" || @request.auth.role = "general_manager" || createdBy = @request.auth.id || allowedUserIds ~ @request.auth.id',
 };
 
+// Collection API writes follow the same policy as /api/newsletters: authoring
+// roles create, an admin or the owning author updates, only an admin deletes.
+// pb_hooks also limits non-superuser engagement edits to the caller's own id.
+const HAS_NEWSLETTER_AUTHOR_ROLE = `(${['author', 'manager', 'general_manager', 'admin']
+  .map((role) => `@request.auth.role = "${role}"`)
+  .join(' || ')})`;
+
 export const NEWSLETTERS_SCHEMA = {
   name: 'newsletters',
   type: 'base',
@@ -69,9 +76,9 @@ export const NEWSLETTERS_SCHEMA = {
   ],
   listRule: '',
   viewRule: '',
-  createRule: '@request.auth.id != ""',
-  updateRule: '@request.auth.id != ""',
-  deleteRule: '@request.auth.id != ""',
+  createRule: HAS_NEWSLETTER_AUTHOR_ROLE,
+  updateRule: `@request.auth.role = "admin" || (createdById = @request.auth.id && ${HAS_NEWSLETTER_AUTHOR_ROLE})`,
+  deleteRule: '@request.auth.role = "admin"',
 };
 
 export const NAVIGATION_LINKS_SCHEMA = {

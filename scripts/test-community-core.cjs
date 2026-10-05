@@ -144,6 +144,69 @@ assert.deepEqual(hebrew.handles, ['nave_d']);
 const trailing = plain(community.parseEntities('see https://example.com/a.'));
 assert.deepEqual(trailing.urls, ['https://example.com/a'], 'trailing punctuation is not part of the URL');
 
+// --- Formatted URLs --------------------------------------------------------
+
+// The body is stored as marker text (`**bold**`, `*italic*`, `++underline++`,
+// `~~strike~~`), and URL_PATTERN stops only at whitespace, so a formatted link
+// used to hand its own closing markers to the href, the stored entity and the
+// link preview request.
+function urlEntity(body) {
+  const found = plain(community.parseEntities(body)).entities.filter((entity) => entity.type === 'url');
+  return found.length ? found[0] : null;
+}
+
+function assertUrl(body, expected, message) {
+  const entity = urlEntity(body);
+  assert.ok(entity, `${message}: a URL entity is produced for ${JSON.stringify(body)}`);
+  assert.equal(entity.value, expected, message);
+  assert.equal(entity.display, expected, `${message} (display)`);
+  assert.equal(body.slice(entity.start, entity.end), expected, `${message} (offsets)`);
+  assert.deepEqual(plain(community.parseEntities(body)).urls, [expected], `${message} (preview url)`);
+}
+
+assertUrl('read **https://example.com/page** now', 'https://example.com/page', 'bold markers stay out of the URL');
+assertUrl('read *https://example.com/page* now', 'https://example.com/page', 'italic markers stay out of the URL');
+assertUrl('read ~~https://example.com/page~~ now', 'https://example.com/page', 'strike markers stay out of the URL');
+assertUrl('read ++https://example.com/page++ now', 'https://example.com/page', 'underline markers stay out of the URL');
+assertUrl('read ***https://example.com/page*** now', 'https://example.com/page', 'bold and italic nest around the URL');
+assertUrl('read **~~https://example.com/page~~** now', 'https://example.com/page', 'bold and strike nest around the URL');
+assertUrl('**https://example.com/page**', 'https://example.com/page', 'a body that is only a bold link still links');
+assertUrl('read **https://example.com/page.** now', 'https://example.com/page', 'a full stop inside the bold run is still punctuation');
+
+// Characters that look like markers but belong to the URL.
+assertUrl(
+  'wiki https://en.wikipedia.org/wiki/Foo_(bar) link',
+  'https://en.wikipedia.org/wiki/Foo_(bar)',
+  'a balanced parenthesis belongs to the URL',
+);
+assertUrl(
+  'bold **https://en.wikipedia.org/wiki/Foo_(bar)** link',
+  'https://en.wikipedia.org/wiki/Foo_(bar)',
+  'a balanced parenthesis survives a bold run',
+);
+assertUrl('under https://example.com/a_b_c kept', 'https://example.com/a_b_c', 'underscores are ordinary URL characters');
+assertUrl('stars https://example.com/a*b* kept', 'https://example.com/a*b*', 'asterisks are kept when no run is open');
+assertUrl('tilde https://example.com/~user/a kept', 'https://example.com/~user/a', 'a tilde is an ordinary URL character');
+assertUrl(
+  'closed *emphasis* then https://example.com/a* kept',
+  'https://example.com/a*',
+  'a closed italic run does not claim an asterisk in the URL',
+);
+assertUrl('unopened https://example.com/a** kept', 'https://example.com/a**', 'an unopened bold run does not trim the URL');
+assertUrl(
+  '*unclosed\nnext https://example.com/a* tail',
+  'https://example.com/a*',
+  'an italic run never crosses a line break',
+);
+
+assertUrl('look (https://example.com/a) here', 'https://example.com/a', 'a parenthesis the URL did not open is dropped');
+assertUrl('array [https://example.com/a] here', 'https://example.com/a', 'a bracket the URL did not open is dropped');
+assertUrl(
+  'both https://example.com/a(b)[c] here',
+  'https://example.com/a(b)[c]',
+  'balanced brackets belong to the URL',
+);
+
 const repeated = plain(community.parseEntities('#one #one #two'));
 assert.deepEqual(repeated.hashtags, ['one', 'two'], 'hashtags are deduplicated');
 assert.equal(repeated.entities.length, 3, 'every occurrence still gets a render range');

@@ -1,8 +1,6 @@
 import PocketBase from 'pocketbase';
 import { loadProjectEnv, resolvePocketBaseUrl } from './pocketbase/load-env.mjs';
-
-const USER_ROLES = ['viewer', 'author', 'manager', 'general_manager', 'admin'];
-const USER_LOCALES = ['he', 'en'];
+import { buildUsersCollectionUpdate } from './pocketbase/users-schema.mjs';
 
 function escapeFilterValue(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -17,58 +15,6 @@ function requireEnvValue(env, keys) {
   }
 
   throw new Error(`Missing required configuration. Tried: ${keys.join(', ')}`);
-}
-
-function ensureRoleField(fields) {
-  const roleField = {
-    name: 'role',
-    type: 'select',
-    required: false,
-    hidden: false,
-    maxSelect: 1,
-    values: USER_ROLES,
-  };
-
-  const existingIndex = fields.findIndex((field) => field.name === 'role');
-  if (existingIndex === -1) {
-    return [...fields, roleField];
-  }
-
-  const existingField = fields[existingIndex];
-  const nextFields = [...fields];
-  nextFields[existingIndex] = {
-    ...existingField,
-    ...roleField,
-    id: existingField.id,
-  };
-
-  return nextFields;
-}
-
-function ensureLocaleField(fields) {
-  const localeField = {
-    name: 'locale',
-    type: 'select',
-    required: false,
-    hidden: false,
-    maxSelect: 1,
-    values: USER_LOCALES,
-  };
-
-  const existingIndex = fields.findIndex((field) => field.name === 'locale');
-  if (existingIndex === -1) {
-    return [...fields, localeField];
-  }
-
-  const existingField = fields[existingIndex];
-  const nextFields = [...fields];
-  nextFields[existingIndex] = {
-    ...existingField,
-    ...localeField,
-    id: existingField.id,
-  };
-
-  return nextFields;
 }
 
 async function syncRoleByEmail(pb, email, role) {
@@ -104,17 +50,7 @@ async function main() {
   await pb.collection('_superusers').authWithPassword(superuserEmail, superuserPassword);
 
   const usersCollection = await pb.collections.getOne('users');
-  const nextFields = ensureLocaleField(ensureRoleField(usersCollection.fields));
-
-  await pb.collections.update('users', {
-    fields: nextFields,
-    createRule: '@request.body.role:isset = false || @request.body.role = "viewer"',
-    listRule: 'id = @request.auth.id || @request.auth.role = "admin"',
-    viewRule: 'id = @request.auth.id || @request.auth.role = "admin"',
-    updateRule: '(@request.auth.id = id && @request.body.role:changed = false) || @request.auth.role = "admin"',
-    deleteRule: 'id = @request.auth.id || @request.auth.role = "admin"',
-    manageRule: '@request.auth.role = "admin"',
-  });
+  await pb.collections.update('users', buildUsersCollectionUpdate(usersCollection.fields));
 
   console.log('Synced users collection schema.');
 

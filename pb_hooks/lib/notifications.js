@@ -49,7 +49,8 @@ function create(app, options) {
   var params = Object.assign({ user: options.userId, kind: options.kind }, post.params, actor.params);
   if (c.findOneOrNull(tx, 'community_notifications', 'userId = {:user} && kind = {:kind} && ' + post.filter + ' && ' + actor.filter, params)) return;
   var row = c.newRecord(tx, 'community_notifications');
-  c.setValues(row, Object.assign({}, options, { preview: c.buildPreview(options.preview || '').slice(0, 300), isRead: false }));
+  var communityMarkup = String(options.targetPath || '').indexOf('/community/') === 0;
+  c.setValues(row, Object.assign({}, options, { preview: c.buildPreview(options.preview || '', communityMarkup).slice(0, 300), isRead: false }));
   tx.save(row);
   require(__hooks + '/lib/notification-push.js').enqueue(tx, row);
   });
@@ -75,7 +76,10 @@ function postChanged(app, row, before) {
   var mentions = c.readJsonArray(row, 'mentionIds');
   var oldMentions = before ? c.readJsonArray(before, 'mentionIds') : [];
   var recipients = {};
-  var base = { actorId: actor, actorHandle: row.getString('authorHandle'), actorName: row.getString('authorName'), actorAvatarUrl: row.getString('authorAvatarUrl'), postId: id, rootId: row.getString('rootId') || id, preview: row.getString('body'), targetPath: '/community/post/' + id };
+  // A reply has no readable permalink of its own, so the alert opens the post
+  // the conversation hangs off and the preview carries the comment text.
+  var rootId = row.getString('rootId') || id;
+  var base = { actorId: actor, actorHandle: row.getString('authorHandle'), actorName: row.getString('authorName'), actorAvatarUrl: row.getString('authorAvatarUrl'), postId: id, rootId: rootId, preview: row.getString('body'), targetPath: '/community/post/' + rootId };
   function add(userId, kind) { if (userId && userId !== actor && !recipients[userId]) recipients[userId] = kind; }
   mentions.forEach(function (userId) { if (oldMentions.indexOf(userId) < 0) add(userId, 'mention'); });
   if (!before) {
@@ -101,17 +105,69 @@ function newsletterChanged(app, row, before) {
   if (!before || before.getString('status') !== 'published') {
     enqueue(app, 'newsletter:' + id, { broadcast: true, source: 'newsletters', sourceId: id, notification: { kind: 'newsletter', actorId: '', postId: id, preview: row.getString('title'), targetPath: path } });
   }
-  // Only newly added comments notify existing participants. Edits and likes do not.
+  // Only newly added comments notify existing participants. Edits do not.
   var previous = before ? c.readJsonArray(before, 'commentItems') : [];
   var comments = c.readJsonArray(row, 'commentItems');
   comments.forEach(function (comment) {
     if (!comment.id || previous.some(function (old) { return old.id === comment.id; })) return;
     var recipients = {};
     previous.forEach(function (old) { if (old.authorId) recipients[old.authorId] = true; });
+    // The stored authorName is client text; name the actor from their account.
+    var actor = comment.authorId ? c.findByIdOrNull(app, 'users', comment.authorId) : null;
     var deliveries = Object.keys(recipients).map(function (userId) {
-      return { userId: userId, actorId: comment.authorId, actorName: comment.authorName, kind: 'comment', postId: id + ':' + comment.id, preview: comment.body, targetPath: path };
+      return { userId: userId, actorId: comment.authorId, actorName: actor ? actor.getString('name') : '', kind: 'comment', postId: id + ':' + comment.id, preview: comment.body, targetPath: path };
     });
     enqueue(app, 'comment:' + id + ':' + comment.id, { deliveries: deliveries, source: 'newsletters', sourceId: id });
+  });
+  newsletterLikes(app, row, before, id, path, previous, comments);
+}
+// A newsletter carries its likes as id arrays on the record, so a new like is
+// whichever id was not in the array before the write.
+function newsletterLikes(app, row, before, id, path, previousComments, comments) {
+  if (!before) return;
+  var c = core();
+
+  function notifyNewLikers(ownerId, oldIds, newIds, key, preview, targetId) {
+    if (!ownerId) return;
+    newIds.forEach(function (actorId) {
+      if (!actorId || actorId === ownerId || oldIds.indexOf(actorId) >= 0) return;
+      var actor = c.findByIdOrNull(app, 'users', actorId);
+      enqueue(app, key + ':' + actorId, {
+        source: 'newsletters',
+        sourceId: id,
+        deliveries: [{
+          userId: ownerId,
+          actorId: actorId,
+          actorName: actor ? actor.getString('name') : '',
+          kind: 'like',
+          postId: targetId,
+          preview: preview,
+          targetPath: path,
+        }],
+      });
+    });
+  }
+
+  notifyNewLikers(
+    row.getString('createdById'),
+    c.readJsonArray(before, 'likedByUserIds'),
+    c.readJsonArray(row, 'likedByUserIds'),
+    'newsletter-like:' + id,
+    row.getString('title'),
+    id
+  );
+
+  comments.forEach(function (comment) {
+    if (!comment.id) return;
+    var old = previousComments.filter(function (item) { return item.id === comment.id; })[0];
+    notifyNewLikers(
+      comment.authorId,
+      old && Array.isArray(old.likedByUserIds) ? old.likedByUserIds : [],
+      Array.isArray(comment.likedByUserIds) ? comment.likedByUserIds : [],
+      'newsletter-comment-like:' + id + ':' + comment.id,
+      comment.body,
+      id + ':' + comment.id
+    );
   });
 }
 function capture(e, isUpdate) {

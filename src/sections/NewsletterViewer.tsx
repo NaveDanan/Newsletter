@@ -61,9 +61,12 @@ export function NewsletterViewer({
     window.scrollTo(0, 0);
   }, [newsletter]);
 
-  useEffect(() => {
+  // Reset the draft when a different newsletter is shown, without an effect round-trip.
+  const [draftNewsletterId, setDraftNewsletterId] = useState(newsletter.id);
+  if (draftNewsletterId !== newsletter.id) {
+    setDraftNewsletterId(newsletter.id);
     setCommentDraft('');
-  }, [newsletter.id]);
+  }
 
   const handleShare = (platform: string) => {
     const url = window.location.href;
@@ -122,21 +125,22 @@ export function NewsletterViewer({
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="sticky top-0 z-50 border-b border-[#E5E5E5] bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+      <header className="sticky top-0 z-50 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-[#737373] transition-colors hover:text-[#171717]"
+            className="flex items-center gap-2 text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
           >
             <HugeiconsIcon icon={ArrowLeft01Icon} className={cn('h-5 w-5', isRTL && 'rtl-rotate-180')} />
-            <span className="text-sm font-medium">{t('common.back')}</span>
+            <span className="text-sm font-semibold">{t('common.back')}</span>
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <LanguageToggleButton compact />
             <button
               onClick={() => handleShare('copy')}
-              className="p-2 text-[#737373] transition-colors hover:text-[#171717]"
+              className="p-2 text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+              title="Copy link"
             >
               <HugeiconsIcon icon={Link01Icon} className="h-5 w-5" />
             </button>
@@ -148,9 +152,10 @@ export function NewsletterViewer({
               className={cn(
                 'p-2 transition-colors',
                 isBookmarked
-                  ? 'text-[#D93A3A] hover:text-[#B91C1C]'
-                  : 'text-[#737373] hover:text-[#171717]'
+                  ? 'text-[var(--primary-accent)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               )}
+              title="Bookmark"
             >
               <HugeiconsIcon icon={isBookmarked ? BookmarkCheck01Icon : Bookmark01Icon} className="h-5 w-5" />
             </button>
@@ -160,13 +165,18 @@ export function NewsletterViewer({
 
       <article ref={articleRef} className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
         {newsletter.coverImage && (
-          <div className="relative mb-8 h-64 overflow-hidden rounded-2xl sm:h-80 lg:h-96">
+          <div className="post-media-frame relative mb-8 h-64 md:h-auto md:aspect-video overflow-hidden rounded-3xl border border-[var(--border-subtle)] shadow-[var(--shadow-card)]">
             <img
               src={newsletter.coverImage}
               alt={newsletter.title}
               className="h-full w-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+            <svg className="shatter-glass-overlay" viewBox="0 0 900 460" preserveAspectRatio="none">
+              <line x1="0" y1="120" x2="900" y2="340" stroke="#fff" strokeWidth="2" opacity="0.3" />
+              <line x1="280" y1="0" x2="620" y2="460" stroke="#fff" strokeWidth="2.5" opacity="0.4" />
+              <line x1="290" y1="10" x2="630" y2="450" stroke="var(--primary-accent)" strokeWidth="1.5" opacity="0.6" />
+            </svg>
           </div>
         )}
 
@@ -174,32 +184,32 @@ export function NewsletterViewer({
           <div className="mb-4 flex flex-wrap gap-2">
             {newsletter.tags.map((tag) => (
               <span key={tag} className="tag tag-red">
-                {tag}
+                #{tag}
               </span>
             ))}
           </div>
         )}
 
-        <h1 className="mb-4 text-3xl font-bold leading-tight text-[#171717] sm:text-4xl lg:text-5xl" dir="auto">
+        <h1 className="mb-4 text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-tight text-[var(--text-primary)] tracking-tight" dir="auto">
           {newsletter.title}
         </h1>
 
         {newsletter.subtitle && (
-          <p className="mb-6 text-xl text-[#737373]" dir="auto">
+          <p className="mb-6 text-base sm:text-lg text-[var(--text-secondary)] leading-relaxed" dir="auto">
             {newsletter.subtitle}
           </p>
         )}
 
-        <div className="mb-8 flex items-center justify-between border-y border-[#E5E5E5] py-6">
+        <div className="mb-8 flex items-center justify-between border-y border-[var(--border-subtle)] py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#D93A3A]/10">
-              <span className="text-lg font-semibold text-[#D93A3A]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--primary-accent)]/15 border border-[var(--primary-accent)]/20 shadow-sm">
+              <span className="text-base font-bold text-[var(--primary-accent)]">
                 {getInitials(newsletter.author)}
               </span>
             </div>
             <div>
-              <p className="font-semibold text-[#171717]">{newsletter.author}</p>
-              <p className="text-sm text-[#737373]">
+              <p className="font-bold text-sm text-[var(--text-primary)]">{newsletter.author}</p>
+              <p className="text-xs text-[var(--text-muted)]">
                 {formatDate(newsletter.publishedAt, {
                   month: 'long',
                   day: 'numeric',
@@ -211,12 +221,12 @@ export function NewsletterViewer({
             </div>
           </div>
 
-          <div className="hidden items-center gap-4 text-sm text-[#737373] sm:flex">
-            <span className="flex items-center gap-1">
-              <HugeiconsIcon icon={Heart} className="h-4 w-4" />
+          <div className="hidden items-center gap-4 text-xs font-semibold text-[var(--text-secondary)] sm:flex">
+            <span className="flex items-center gap-1.5 text-[var(--primary-accent)]">
+              <HugeiconsIcon icon={Heart} className="h-4 w-4 fill-current" />
               {formatNumber(newsletter.likes)}
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <HugeiconsIcon icon={Message01Icon} className="h-4 w-4" />
               {formatNumber(newsletter.comments)}
             </span>
@@ -224,18 +234,18 @@ export function NewsletterViewer({
         </div>
 
         {newsletter.hasAudio && (
-          <div className="mb-8 rounded-xl bg-[#F9FAFB] p-4">
+          <div className="mb-8 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] p-4 shadow-sm">
             <div className="flex items-center gap-4">
-              <button className="flex h-12 w-12 items-center justify-center rounded-full bg-[#D93A3A] transition-colors hover:bg-[#B91C1C]">
+              <button className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--primary-accent)] text-[var(--accent-contrast)] transition-transform hover:scale-105 shadow-md">
                 <HugeiconsIcon icon={PlayIcon} className="ml-0.5 h-5 w-5 fill-white text-white" />
               </button>
               <div className="flex-1">
-                <p className="font-medium text-[#171717]">{t('viewer.listen')}</p>
-                <p className="text-sm text-[#737373]">{newsletter.audioDuration || '5:30'}</p>
+                <p className="font-bold text-sm text-[var(--text-primary)]">{t('viewer.listen')}</p>
+                <p className="text-xs text-[var(--text-secondary)]">{newsletter.audioDuration || '5:30'}</p>
               </div>
               <div className="hidden items-center gap-2 sm:flex">
-                <div className="h-1 w-32 overflow-hidden rounded-full bg-[#E5E5E5]">
-                  <div className="h-full w-1/3 rounded-full bg-[#D93A3A]" />
+                <div className="h-1.5 w-32 overflow-hidden rounded-full bg-[var(--bg-pill)]">
+                  <div className="h-full w-1/3 rounded-full bg-[var(--primary-accent)]" />
                 </div>
               </div>
             </div>
@@ -276,56 +286,7 @@ export function NewsletterViewer({
           </div>
         )}
 
-        {/* <div className="mt-10 grid gap-4 rounded-[2rem] border border-[#E5E5E5] bg-[#FAFAFA] p-4 sm:grid-cols-3 sm:p-5">
-          <button
-            onClick={handleToggleLike}
-            className={`group flex items-center justify-between rounded-[1.4rem] border px-5 py-4 text-left transition-all ${
-              hasLikedNewsletter
-                ? 'border-[#D93A3A]/30 bg-[#D93A3A] text-white shadow-[0_18px_50px_-28px_rgba(217,58,58,0.85)]'
-                : 'border-[#E5E5E5] bg-white text-[#171717] hover:border-[#D93A3A]/30 hover:bg-[#FFF6F6]'
-            }`}
-          >
-            <span>
-              <span className="block text-xs uppercase tracking-[0.22em] opacity-70">Like</span>
-              <span className="mt-2 block text-2xl font-semibold">{newsletter.likes}</span>
-            </span>
-            <HugeiconsIcon icon={Heart} className={`h-6 w-6 ${hasLikedNewsletter ? 'fill-current' : 'group-hover:text-[#D93A3A]'}`} />
-          </button>
-
-          <button
-            onClick={jumpToDiscussion}
-            className="group flex items-center justify-between rounded-[1.4rem] border border-[#E5E5E5] bg-white px-5 py-4 text-left text-[#171717] transition-all hover:border-[#D93A3A]/30 hover:bg-[#FFF6F6]"
-          >
-            <span>
-              <span className="block text-xs uppercase tracking-[0.22em] text-[#737373]">Comments</span>
-              <span className="mt-2 block text-2xl font-semibold">{newsletter.comments}</span>
-            </span>
-            <MessageSquare className="h-6 w-6 text-[#737373] transition-colors group-hover:text-[#D93A3A]" />
-          </button>
-
-          <button
-            onClick={() => handleShare('copy')}
-            className="group flex items-center justify-between rounded-[1.4rem] border border-[#E5E5E5] bg-white px-5 py-4 text-left text-[#171717] transition-all hover:border-[#D93A3A]/30 hover:bg-[#FFF6F6]"
-          >
-            <span>
-              <span className="block text-xs uppercase tracking-[0.22em] text-[#737373]">Share</span>
-              <span className="mt-2 block text-2xl font-semibold">{newsletter.shares}</span>
-            </span>
-            <Share2 className="h-6 w-6 text-[#737373] transition-colors group-hover:text-[#D93A3A]" />
-          </button>
-        </div> */}
-
-        <section ref={discussionRef} className="mt-4 border-t border-[#E5E5E5] pt-6">
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              {/* <p className="text-xs uppercase tracking-[0.24em] text-[#D93A3A]">Community Threads</p> */}
-              {/* <h2 className="mt-2 text-3xl font-semibold text-[#171717]">Discuss this newsletter</h2> */}
-            </div>
-            {/* <p className="max-w-sm text-sm leading-6 text-[#737373]">
-              Registered readers can like the article, leave a comment, and react to comments from other members.
-            </p> */}
-          </div>
-
+        <section ref={discussionRef} className="mt-8 border-t border-[var(--border-subtle)] pt-6">
           <CommentReply
             title={t('viewer.communityThreads')}
             likeCount={newsletter.likes}

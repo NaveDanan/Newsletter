@@ -28,10 +28,10 @@ export function UserAvatarCircle({
   return (
     <Avatar
       style={{ width: size, height: size }}
-      className={cn('shrink-0 border border-[#E5E5E5] bg-[#F3F4F6]', className)}
+      className={cn('shrink-0 border border-[var(--border-subtle)] bg-[var(--bg-card-alt)]', className)}
     >
       <AvatarImage src={src ?? undefined} alt={label ?? ''} className="object-cover" />
-      <AvatarFallback className="bg-gradient-to-br from-[#D93A3A] to-[#B91C1C] font-bold leading-none text-white">
+      <AvatarFallback className="bg-gradient-to-br from-[var(--primary-accent)] to-[var(--primary-accent-hover)] font-bold leading-none text-[var(--accent-contrast)]">
         <span style={{ fontSize: Math.max(9, Math.round(size * 0.4)) }}>{initials(label)}</span>
       </AvatarFallback>
     </Avatar>

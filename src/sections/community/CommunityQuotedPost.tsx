@@ -24,7 +24,7 @@ export function CommunityQuotedPost({ post }: { post: CommunityPost }) {
   return (
     <button
       type="button"
-      className="mt-3 block w-full rounded-2xl border border-[#E5E5E5] px-4 py-3 text-start transition-colors hover:bg-[#FAFAFA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93A3A]"
+      className="mt-3 block w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card-alt)] px-4 py-3 text-start transition-colors hover:bg-[var(--bg-card-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)]"
       onClick={(event) => {
         event.stopPropagation();
         openPost(post.id);
@@ -38,13 +38,13 @@ export function CommunityQuotedPost({ post }: { post: CommunityPost }) {
           size="sm"
           className="size-6"
         />
-        <span className="truncate text-sm font-semibold text-[#171717]">{post.author.displayName}</span>
-        <span className="truncate text-sm text-[#737373]">@{post.author.handle}</span>
-        <span className="text-sm text-[#737373]">·</span>
-        <span className="whitespace-nowrap text-sm text-[#737373]">{formatRelativeTime(post.createdAt)}</span>
+        <span className="truncate text-sm font-bold text-[var(--text-primary)]">{post.author.displayName}</span>
+        <span className="truncate text-xs text-[var(--text-muted)]">@{post.author.handle}</span>
+        <span className="text-xs text-[var(--text-muted)]">·</span>
+        <span className="whitespace-nowrap text-xs text-[var(--text-muted)]">{formatRelativeTime(post.createdAt)}</span>
       </div>
       {post.body ? (
-        <p className="mt-1 line-clamp-4 whitespace-pre-wrap break-words text-sm text-[#171717]">{post.body}</p>
+        <p className="mt-1.5 line-clamp-4 whitespace-pre-wrap break-words text-sm text-[var(--text-secondary)]">{post.body}</p>
       ) : null}
       {firstImage ? (
         <img

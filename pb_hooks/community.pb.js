@@ -12,6 +12,17 @@ routerAdd('PATCH', '/api/community/me', function (e) {
   return e.json(200, require(__hooks + '/lib/community.js').updateProfile(e));
 }, $apis.bodyLimit(0), $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
 
+onRecordAfterUpdateSuccess(function (e) {
+  if (e.record.original().getString('avatar') !== e.record.getString('avatar')) {
+    try {
+      require(__hooks + '/lib/community.js').syncAccountAvatar(e.app, e.record);
+    } catch (error) {
+      e.app.logger().warn('Community avatar sync failed', 'userId', e.record.id, 'error', String(error));
+    }
+  }
+  return e.next();
+}, 'users');
+
 routerAdd('GET', '/api/community/profiles/{handle}', function (e) {
   return e.json(200, require(__hooks + '/lib/community.js').getProfile(e, e.request.pathValue('handle')));
 }, $apis.skipSuccessActivityLog());

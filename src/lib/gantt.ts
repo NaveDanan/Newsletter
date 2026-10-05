@@ -509,13 +509,13 @@ export function applyDependencyScheduling(tasks: GanttTask[], changedTaskId?: st
 export function getStatusBadgeClass(status: GanttTask['status']): string {
   switch (status) {
     case 'completed':
-      return 'bg-green-100 text-green-700';
+      return 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30';
     case 'in-progress':
-      return 'bg-yellow-100 text-yellow-700';
+      return 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30';
     case 'pending':
-      return 'bg-[#F3F4F6] text-[#737373]';
+      return 'bg-neutral-500/15 text-neutral-600 dark:text-neutral-400 border border-neutral-500/30';
     case 'delayed':
-      return 'bg-red-100 text-red-700';
+      return 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30';
   }
 }
 

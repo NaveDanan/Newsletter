@@ -122,40 +122,40 @@ export function ProjectView() {
     <div className="space-y-6">
       {/* Stats cards */}
 
-      <div className="dashboard-card flex flex-col items-center justify-center mx-auto w-fit px-4 py-2 min-w-[340px]">
+      <div className="feed-post-card flex flex-col items-center justify-center mx-auto w-fit px-6 py-4 min-w-[340px]">
         <div className="grid grid-cols-5 gap-4 h-5 w-full">
-          <p className="text-xs text-[#737373] mb-1 text-center">{t('manager.total')}</p>
-          <p className="text-xs text-[#737373] mb-1 text-center">{t('manager.completed')}</p>
-          <p className="text-xs text-[#737373] mb-1 text-center">{t('manager.inProgress')}</p>
-          <p className="text-xs text-[#737373] mb-1 text-center">{t('manager.pending')}</p>
-          <p className="text-xs text-[#737373] mb-1 text-center">{t('manager.delayed')}</p>
+          <p className="text-xs font-semibold text-[var(--text-secondary)] mb-1 text-center">{t('manager.total')}</p>
+          <p className="text-xs font-semibold text-[var(--text-secondary)] mb-1 text-center">{t('manager.completed')}</p>
+          <p className="text-xs font-semibold text-[var(--text-secondary)] mb-1 text-center">{t('manager.inProgress')}</p>
+          <p className="text-xs font-semibold text-[var(--text-secondary)] mb-1 text-center">{t('manager.pending')}</p>
+          <p className="text-xs font-semibold text-[var(--text-secondary)] mb-1 text-center">{t('manager.delayed')}</p>
         </div>
         <div className="grid grid-cols-5 gap-4 h-5 w-full">
-          <p className="text-lg font-bold text-[#171717] text-center">{formatNumber(stats.total)}</p>
-          <p className="text-lg font-bold text-green-600 text-center">{formatNumber(stats.completed)}</p>
-          <p className="text-lg font-bold text-yellow-600 text-center">{formatNumber(stats.inProgress)}</p>
-          <p className="text-lg font-bold text-[#A3A3A3] text-center">{formatNumber(stats.pending)}</p>
-          <p className="text-lg font-bold text-[#D93A3A] text-center">{formatNumber(stats.delayed)}</p>
+          <p className="text-lg font-extrabold text-[var(--text-primary)] text-center">{formatNumber(stats.total)}</p>
+          <p className="text-lg font-extrabold text-emerald-400 text-center">{formatNumber(stats.completed)}</p>
+          <p className="text-lg font-extrabold text-amber-400 text-center">{formatNumber(stats.inProgress)}</p>
+          <p className="text-lg font-extrabold text-[var(--text-muted)] text-center">{formatNumber(stats.pending)}</p>
+          <p className="text-lg font-extrabold text-[var(--primary-accent)] text-center">{formatNumber(stats.delayed)}</p>
         </div>
       </div>
 
       {/* Projects list */}
-      <div className="bg-white border border-[#E5E5E5] rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between p-6 border-b border-[#E5E5E5]">
+      <div className="feed-post-card p-0 overflow-hidden border border-[var(--border-subtle)]">
+        <div className="flex items-center justify-between p-6 border-b border-[var(--border-subtle)]">
           <button 
             onClick={() => setShowAddModal(true)}
-            className="btn-primary flex items-center gap-2"
+            className="btn-hire-me flex items-center gap-2 text-xs sm:text-sm py-2 px-5"
           >
             <HugeiconsIcon icon={Add01Icon} className="w-4 h-4" />
             {t('manager.addProject')}
           </button>
         </div>
 
-        <div className="divide-y divide-[#E5E5E5]">
+        <div className="divide-y divide-[var(--border-subtle)]">
           {projects.map((project) => (
             <div 
               key={project.id}
-              className="flex items-start gap-4 p-4 hover:bg-[#F9FAFB] transition-colors group"
+              className="flex items-start gap-4 p-4 hover:bg-[var(--bg-card-hover)] transition-colors group"
             >
               <button 
                 onClick={() => toggleStatus(project.id)}
@@ -167,7 +167,7 @@ export function ProjectView() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className={`font-medium ${project.status === 'completed' ? 'line-through text-[#A3A3A3]' : 'text-[#171717]'}`}>
+                    <h3 className={`font-semibold ${project.status === 'completed' ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
                       {project.title}
                     </h3>
                     <p className="text-sm text-[#737373] mt-1" dir="auto">{project.description || t('manager.noDescription')}</p>
@@ -215,59 +215,61 @@ export function ProjectView() {
 
       {/* Add Project Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl p-6">
-            <h3 className="text-lg font-bold text-[#171717] mb-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] w-full max-w-md rounded-3xl shadow-2xl p-6">
+            <h3 className="text-lg font-bold text-[var(--text-primary)] mb-4">
               {editingProjectId ? t('manager.editProject') : t('manager.addNewProject')}
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="text-sm text-[#737373] mb-1 block">{t('manager.projectTitle')}</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1 block">{t('manager.projectTitle')}</label>
                 <input
                   type="text"
                   value={newProject.title}
                   onChange={(e) => setNewProject({ ...newProject, title: e.target.value })}
                   placeholder={t('manager.enterProjectTitle')}
+                  className="w-full rounded-full bg-[var(--bg-input)] border border-[var(--border-subtle)] px-4 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)]"
                 />
               </div>
               <div>
-                <label className="text-sm text-[#737373] mb-1 block">{t('manager.division')}</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1 block">{t('manager.division')}</label>
                 <input
                   type="text"
                   value={newProject.devision}
                   onChange={(e) => setNewProject({ ...newProject, devision: e.target.value })}
                   placeholder={t('manager.enterDivision')}
+                  className="w-full rounded-full bg-[var(--bg-input)] border border-[var(--border-subtle)] px-4 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)]"
                 />
               </div>
               <div>
-                <label className="text-sm text-[#737373] mb-1 block">{t('manager.field')}</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1 block">{t('manager.field')}</label>
                 <input
                   type="text"
                   value={newProject.field}
                   onChange={(e) => setNewProject({ ...newProject, field: e.target.value })}
                   placeholder={t('manager.enterField')}
+                  className="w-full rounded-full bg-[var(--bg-input)] border border-[var(--border-subtle)] px-4 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)]"
                 />
               </div>
               <div>
-                <label className="text-sm text-[#737373] mb-1 block">{t('manager.department')}</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1 block">{t('manager.department')}</label>
                 <input
                   type="text"
                   value={newProject.department}
                   onChange={(e) => setNewProject({ ...newProject, department: e.target.value })}
                   placeholder={t('manager.enterDepartment')}
+                  className="w-full rounded-full bg-[var(--bg-input)] border border-[var(--border-subtle)] px-4 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)]"
                 />
               </div>
-              
 
-              
               <div>
-                <label className="text-sm text-[#737373] mb-1 block">{t('manager.description')}</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1 block">{t('manager.description')}</label>
                 <textarea
                   value={newProject.description}
                   onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
                   placeholder={t('manager.enterDescription')}
                   rows={3}
-                  className="w-full"
+                  className="w-full rounded-2xl bg-[var(--bg-input)] border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)] resize-none"
                 />
               </div>
               <div className="flex gap-3 pt-2">
@@ -279,7 +281,7 @@ export function ProjectView() {
                 </button>
                 <button 
                   onClick={handleAddProject}
-                  className="flex-1 btn-primary"
+                  className="flex-1 btn-hire-me"
                 >
                   {editingProjectId ? t('manager.saveProjectChanges') : t('manager.addProject')}
                 </button>

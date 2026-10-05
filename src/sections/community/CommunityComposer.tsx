@@ -8,12 +8,19 @@ import {
   Delete02Icon,
   ImageAdd01Icon,
   Loading02Icon,
+  SmileIcon,
+  TextBoldIcon,
+  TextItalicIcon,
+  TextStrikethroughIcon,
+  TextUnderlineIcon,
   ViewOffIcon,
   Video01Icon,
 } from '@hugeicons/core-free-icons';
 import { toast } from 'sonner';
+import Placeholder from '@tiptap/extension-placeholder';
+import StarterKit from '@tiptap/starter-kit';
+import { EditorContent, useEditor } from '@tiptap/react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import type { NewsletterEvent, NewsletterPoll } from '@/types/newsletter';
@@ -24,6 +31,7 @@ import {
   probeCommunityMedia,
 } from '@/lib/community-media';
 import { firstCommunityUrl, normalizeCommunityBody } from '@/lib/community-text';
+import { COMMENT_EMOJIS, htmlToCommentMarkup } from '@/lib/comment-formatting';
 import {
   createCommunityPost,
   fetchCommunityLinkPreview,
@@ -56,6 +64,8 @@ interface CommunityComposerProps {
   quoted?: CommunityPost | null;
   onPosted: (post: CommunityPost) => void;
   onCancel?: () => void;
+  /** Attachments picked before the composer opened, uploaded once on mount. */
+  initialFiles?: File[];
   autoFocus?: boolean;
   compact?: boolean;
   className?: string;
@@ -91,6 +101,7 @@ export function CommunityComposer({
   quoted = null,
   onPosted,
   onCancel,
+  initialFiles,
   autoFocus = false,
   compact = false,
   className,
@@ -106,9 +117,9 @@ export function CommunityComposer({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [poll, setPoll] = useState<NewsletterPoll | null>(null);
   const [event, setEvent] = useState<NewsletterEvent | null>(null);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const clientIdRef = useRef(newClientId());
   const itemsRef = useRef<PendingMedia[]>(items);
   itemsRef.current = items;
@@ -126,12 +137,6 @@ export function CommunityComposer({
   const hasEvent = Boolean(event && event.title.trim() && event.startDate);
   const canSubmit = !isSubmitting && !isUploading && !isOverLimit
     && (length > 0 || hasMedia || Boolean(quoted) || hasPoll || hasEvent);
-
-  useEffect(() => {
-    if (autoFocus) {
-      textareaRef.current?.focus();
-    }
-  }, [autoFocus]);
 
   // Object URLs are revoked on unmount so a long composing session does not
   // pin every discarded attachment in memory. The ref carries the latest list
@@ -228,6 +233,16 @@ export function CommunityComposer({
       }
     }
   }, [isAuthenticated, requireAuth, t]);
+
+  const hasIngestedInitialFiles = useRef(false);
+
+  useEffect(() => {
+    if (hasIngestedInitialFiles.current || !initialFiles || initialFiles.length === 0) {
+      return;
+    }
+    hasIngestedInitialFiles.current = true;
+    void addFiles(initialFiles);
+  }, [addFiles, initialFiles]);
 
   const removeItem = useCallback((key: string) => {
     setItems((current) => {
@@ -340,6 +355,50 @@ export function CommunityComposer({
       ? 'community.composer.quotePlaceholder'
       : 'community.composer.placeholder';
 
+  // The field is rich text so formatting is shown rather than typed, but the
+  // post itself is still stored as the plain marker text the feed renders.
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        bulletList: false,
+        orderedList: false,
+        codeBlock: false,
+        blockquote: false,
+        heading: false,
+        horizontalRule: false,
+      }),
+      Placeholder.configure({ placeholder: t(placeholderKey) }),
+    ],
+    autofocus: autoFocus,
+    onUpdate: ({ editor: current }) => {
+      setBody(htmlToCommentMarkup(current.getHTML()));
+      setPreviewDismissed(false);
+    },
+    editorProps: {
+      attributes: {
+        class: 'composer-textarea px-0 py-2 text-[17px] leading-7 text-[var(--text-primary)]',
+        dir: isRTL ? 'rtl' : 'ltr',
+      },
+      handleKeyDown: (_view, keyboardEvent) => {
+        if ((keyboardEvent.metaKey || keyboardEvent.ctrlKey) && keyboardEvent.key === 'Enter') {
+          keyboardEvent.preventDefault();
+          void submitRef.current();
+          return true;
+        }
+        return false;
+      },
+    },
+  });
+
+  useEffect(() => {
+    if (editor && body === '' && editor.getText().trim() !== '') {
+      editor.commands.clearContent();
+    }
+  }, [body, editor]);
+
   const authorAvatarUrl = profile?.avatarUrl || user?.avatar || '';
   const authorDisplayName = profile?.displayName || user?.name || '';
   const authorHandle = profile?.handle || (user?.email ? user.email.split('@')[0] : '');
@@ -420,6 +479,18 @@ export function CommunityComposer({
     setEvent((prev) => (prev ? { ...prev, ...fields } : prev));
   };
 
+  const insertEmoji = (emoji: string) => {
+    editor?.chain().focus().insertContent(emoji).run();
+    setIsEmojiPickerOpen(false);
+  };
+
+  const formatButtons = [
+    { key: 'bold', icon: TextBoldIcon, label: t('comment.bold'), toggle: () => editor?.chain().focus().toggleBold().run() },
+    { key: 'italic', icon: TextItalicIcon, label: t('comment.italic'), toggle: () => editor?.chain().focus().toggleItalic().run() },
+    { key: 'underline', icon: TextUnderlineIcon, label: t('comment.underline'), toggle: () => editor?.chain().focus().toggleUnderline().run() },
+    { key: 'strike', icon: TextStrikethroughIcon, label: t('comment.strikethrough'), toggle: () => editor?.chain().focus().toggleStrike().run() },
+  ];
+
   return (
     <div className={cn('flex gap-3 px-4 py-3', className)}>
       <CommunityAvatar
@@ -430,24 +501,64 @@ export function CommunityComposer({
       />
 
       <div className="min-w-0 flex-1">
-        <Textarea
-          ref={textareaRef}
-          value={body}
-          onChange={(event) => {
-            setBody(event.target.value);
-            setPreviewDismissed(false);
-          }}
-          onKeyDown={(event) => {
-            // Ctrl or Cmd with Enter posts, exactly like X.
-            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-              event.preventDefault();
-              void submit();
-            }
-          }}
-          placeholder={t(placeholderKey)}
-          rows={compact ? 2 : 3}
-          className="min-h-[60px] resize-none border-none bg-transparent px-0 text-[17px] shadow-none focus-visible:ring-0"
-        />
+        <div className="cursor-text" onClick={() => editor?.chain().focus().run()}>
+          <EditorContent editor={editor} />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1 pt-2">
+          {formatButtons.map((button) => (
+            <button
+              key={button.key}
+              type="button"
+              title={button.label}
+              aria-label={button.label}
+              aria-pressed={Boolean(editor?.isActive(button.key))}
+              className={cn(
+                'rounded-lg p-1.5 transition-colors hover:bg-[var(--bg-pill-hover)] hover:text-[var(--text-primary)]',
+                editor?.isActive(button.key) ? 'text-[var(--primary-accent)]' : 'text-[var(--text-secondary)]',
+              )}
+              onClick={button.toggle}
+            >
+              <HugeiconsIcon icon={button.icon} className="size-4" />
+            </button>
+          ))}
+
+          <div className="relative">
+            <button
+              type="button"
+              title={t('comment.emoji')}
+              aria-label={t('comment.emoji')}
+              aria-expanded={isEmojiPickerOpen}
+              className={cn(
+                'rounded-lg p-1.5 transition-colors hover:bg-[var(--bg-pill-hover)] hover:text-[var(--text-primary)]',
+                isEmojiPickerOpen ? 'text-[var(--primary-accent)]' : 'text-[var(--text-secondary)]',
+              )}
+              onClick={() => setIsEmojiPickerOpen((open) => !open)}
+            >
+              <HugeiconsIcon icon={SmileIcon} className="size-4" />
+            </button>
+
+            {isEmojiPickerOpen ? (
+              <div
+                className={cn(
+                  'absolute top-9 z-20 grid w-48 grid-cols-5 gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 shadow-xl',
+                  isRTL ? 'right-0' : 'left-0',
+                )}
+              >
+                {COMMENT_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => insertEmoji(emoji)}
+                    className="flex size-8 items-center justify-center rounded-full text-lg transition-colors hover:bg-[var(--bg-pill-hover)]"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
 
         {items.length > 0 ? (
           <div className={cn('mt-2 grid gap-2', items.length === 1 ? 'grid-cols-1' : 'grid-cols-2')}>
@@ -499,10 +610,10 @@ export function CommunityComposer({
 
         {/* Poll Builder */}
         {poll ? (
-          <div className="mt-3 rounded-2xl border border-[#E5E5E5] bg-[#FAFAFA] p-3.5 sm:p-4">
-            <div className="mb-3 flex items-center justify-between border-b border-[#EBEBEB] pb-2">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#171717]">
-                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#D93A3A]/10 text-[#D93A3A]">
+          <div className="mt-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3.5 sm:p-4">
+            <div className="mb-3 flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[var(--primary-accent)]/10 text-[var(--primary-accent)]">
                   <HugeiconsIcon icon={BarChartIcon} className="size-3.5 -scale-y-100" />
                 </div>
                 <span>{t('viewer.poll')}</span>
@@ -511,7 +622,7 @@ export function CommunityComposer({
                 type="button"
                 aria-label={t('manager.removePoll')}
                 title={t('manager.removePoll')}
-                className="rounded-full p-1 text-[#737373] hover:bg-neutral-200 hover:text-red-600 transition-colors cursor-pointer"
+                className="rounded-full p-1 text-[var(--text-muted)] hover:bg-[var(--bg-pill-hover)] hover:text-red-500 transition-colors cursor-pointer"
                 onClick={() => setPoll(null)}
               >
                 <HugeiconsIcon icon={Cancel01Icon} className="size-4" />
@@ -524,7 +635,7 @@ export function CommunityComposer({
               onChange={(e) => setPoll((prev) => prev ? { ...prev, question: e.target.value } : prev)}
               dir={isRTL ? 'rtl' : 'ltr'}
               placeholder={t('manager.pollQuestionPlaceholder')}
-              className="mb-3 w-full rounded-xl border border-[#E5E5E5] bg-white px-3 py-2 text-sm text-[#171717] focus:border-[#D93A3A] focus:outline-hidden"
+              className="mb-3 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)] focus:outline-hidden"
             />
 
             <div className="space-y-2">
@@ -536,7 +647,7 @@ export function CommunityComposer({
                     onChange={(e) => handleUpdatePollOption(idx, e.target.value)}
                     dir={isRTL ? 'rtl' : 'ltr'}
                     placeholder={t('manager.pollOptionPlaceholder', { index: idx + 1 })}
-                    className="flex-1 rounded-xl border border-[#E5E5E5] bg-white px-3 py-1.5 text-sm text-[#171717] focus:border-[#D93A3A] focus:outline-hidden"
+                    className="flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)] focus:outline-hidden"
                   />
                   {poll.options.length > 2 && (
                     <button
@@ -544,7 +655,7 @@ export function CommunityComposer({
                       aria-label={t('manager.removeOption')}
                       title={t('manager.removeOption')}
                       onClick={() => handleRemovePollOption(idx)}
-                      className="p-1.5 text-[#A3A3A3] hover:text-red-600 transition-colors cursor-pointer"
+                      className="p-1.5 text-[var(--text-muted)] hover:text-red-500 transition-colors cursor-pointer"
                     >
                       <HugeiconsIcon icon={Delete02Icon} className="size-4" />
                     </button>
@@ -555,7 +666,7 @@ export function CommunityComposer({
               <button
                 type="button"
                 onClick={handleAddPollOption}
-                className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-[#D93A3A] hover:text-[#B91C1C] transition-colors cursor-pointer"
+                className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-[var(--primary-accent)] hover:underline transition-colors cursor-pointer"
               >
                 <HugeiconsIcon icon={Add01Icon} className="size-3.5" />
                 <span>{t('manager.addOption')}</span>
@@ -566,10 +677,10 @@ export function CommunityComposer({
 
         {/* Scheduled Event Builder */}
         {event ? (
-          <div className="mt-3 rounded-2xl border border-[#E5E5E5] bg-[#FAFAFA] p-3.5 sm:p-4">
-            <div className="mb-3 flex items-center justify-between border-b border-[#EBEBEB] pb-2">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#171717]">
-                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#D93A3A]/10 text-[#D93A3A]">
+          <div className="mt-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3.5 sm:p-4">
+            <div className="mb-3 flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[var(--primary-accent)]/10 text-[var(--primary-accent)]">
                   <HugeiconsIcon icon={Calendar03Icon} className="size-3.5" />
                 </div>
                 <span>{t('viewer.event')}</span>
@@ -578,7 +689,7 @@ export function CommunityComposer({
                 type="button"
                 aria-label={t('manager.removeEvent')}
                 title={t('manager.removeEvent')}
-                className="rounded-full p-1 text-[#737373] hover:bg-neutral-200 hover:text-red-600 transition-colors cursor-pointer"
+                className="rounded-full p-1 text-[var(--text-muted)] hover:bg-[var(--bg-pill-hover)] hover:text-red-500 transition-colors cursor-pointer"
                 onClick={() => setEvent(null)}
               >
                 <HugeiconsIcon icon={Cancel01Icon} className="size-4" />
@@ -587,7 +698,7 @@ export function CommunityComposer({
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-[#525252] mb-1">
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
                   {t('manager.eventTitle')} *
                 </label>
                 <input
@@ -596,38 +707,38 @@ export function CommunityComposer({
                   onChange={(e) => handleUpdateEvent({ title: e.target.value })}
                   dir={isRTL ? 'rtl' : 'ltr'}
                   placeholder={t('manager.eventTitlePlaceholder')}
-                  className="w-full rounded-xl border border-[#E5E5E5] bg-white px-3 py-1.5 text-sm text-[#171717] focus:border-[#D93A3A] focus:outline-hidden"
+                  className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)] focus:outline-hidden"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-[#525252] mb-1">
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
                     {t('manager.eventStartDate')} *
                   </label>
                   <input
                     type="datetime-local"
                     value={event.startDate ? event.startDate.slice(0, 16) : ''}
                     onChange={(e) => handleUpdateEvent({ startDate: e.target.value })}
-                    className="w-full rounded-xl border border-[#E5E5E5] bg-white px-3 py-1.5 text-sm text-[#171717] focus:border-[#D93A3A] focus:outline-hidden"
+                    className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)] focus:outline-hidden"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#525252] mb-1">
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
                     {t('manager.eventEndDate')}
                   </label>
                   <input
                     type="datetime-local"
                     value={event.endDate ? event.endDate.slice(0, 16) : ''}
                     onChange={(e) => handleUpdateEvent({ endDate: e.target.value })}
-                    className="w-full rounded-xl border border-[#E5E5E5] bg-white px-3 py-1.5 text-sm text-[#171717] focus:border-[#D93A3A] focus:outline-hidden"
+                    className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)] focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#525252] mb-1">
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
                   {t('manager.eventLocation')}
                 </label>
                 <input
@@ -636,12 +747,12 @@ export function CommunityComposer({
                   onChange={(e) => handleUpdateEvent({ location: e.target.value })}
                   dir={isRTL ? 'rtl' : 'ltr'}
                   placeholder={t('manager.eventLocationPlaceholder')}
-                  className="w-full rounded-xl border border-[#E5E5E5] bg-white px-3 py-1.5 text-sm text-[#171717] focus:border-[#D93A3A] focus:outline-hidden"
+                  className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)] focus:outline-hidden"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#525252] mb-1">
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
                   {t('manager.eventDescription')}
                 </label>
                 <textarea
@@ -650,15 +761,15 @@ export function CommunityComposer({
                   onChange={(e) => handleUpdateEvent({ description: e.target.value })}
                   dir={isRTL ? 'rtl' : 'ltr'}
                   placeholder={t('manager.eventDescriptionPlaceholder')}
-                  className="w-full rounded-xl border border-[#E5E5E5] bg-white p-2.5 text-sm text-[#171717] focus:border-[#D93A3A] focus:outline-hidden"
+                  className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] p-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--primary-accent)] focus:outline-hidden"
                 />
               </div>
             </div>
           </div>
         ) : null}
 
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#F5F5F5] pt-2">
-          <div className="flex items-center gap-1">
+        <div className="mt-2 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2">
+          <div className="composer-actions-sweep flex min-w-0 flex-1 items-center justify-start gap-3">
             <input
               ref={imageInputRef}
               type="file"
@@ -688,10 +799,11 @@ export function CommunityComposer({
               aria-label={t('community.composer.addImage')}
               title={t('community.composer.addImage')}
               disabled={items.length >= COMMUNITY_MAX_MEDIA_PER_POST}
-              className="rounded-full p-2 text-[#D93A3A] transition-colors hover:bg-[#D93A3A]/10 disabled:opacity-40"
+              className="create-action-btn flex items-center gap-2 text-sm text-emerald-500 transition-colors hover:bg-emerald-500/10 disabled:opacity-40"
               onClick={() => imageInputRef.current?.click()}
             >
-              <HugeiconsIcon icon={ImageAdd01Icon} className="size-5" />
+              <HugeiconsIcon icon={ImageAdd01Icon} className="size-[18px]" />
+              <span className="text-[var(--text-secondary)]">{t('quickCompose.image')}</span>
             </button>
 
             <button
@@ -699,10 +811,11 @@ export function CommunityComposer({
               aria-label={t('community.composer.addVideo')}
               title={t('community.composer.addVideo')}
               disabled={items.length >= COMMUNITY_MAX_MEDIA_PER_POST}
-              className="rounded-full p-2 text-[#D93A3A] transition-colors hover:bg-[#D93A3A]/10 disabled:opacity-40"
+              className="create-action-btn flex items-center gap-2 text-sm text-blue-500 transition-colors hover:bg-blue-500/10 disabled:opacity-40"
               onClick={() => videoInputRef.current?.click()}
             >
-              <HugeiconsIcon icon={Video01Icon} className="size-5" />
+              <HugeiconsIcon icon={Video01Icon} className="size-[18px]" />
+              <span className="text-[var(--text-secondary)]">{t('quickCompose.video')}</span>
             </button>
 
             <button
@@ -711,12 +824,13 @@ export function CommunityComposer({
               title={t('viewer.poll')}
               aria-pressed={Boolean(poll)}
               className={cn(
-                'rounded-full p-2 transition-colors cursor-pointer',
-                poll ? 'bg-[#D93A3A]/10 text-[#D93A3A]' : 'text-[#D93A3A] hover:bg-[#D93A3A]/10',
+                'create-action-btn flex items-center gap-2 text-sm text-rose-500 transition-colors cursor-pointer',
+                poll ? 'bg-rose-500/10' : 'hover:bg-rose-500/10',
               )}
               onClick={handleTogglePoll}
             >
-              <HugeiconsIcon icon={BarChartIcon} className="size-5 -scale-y-100" />
+              <HugeiconsIcon icon={BarChartIcon} className="size-[18px] -scale-y-100" />
+              <span className="text-[var(--text-secondary)]">{t('quickCompose.poll')}</span>
             </button>
 
             <button
@@ -725,12 +839,13 @@ export function CommunityComposer({
               title={t('viewer.event')}
               aria-pressed={Boolean(event)}
               className={cn(
-                'rounded-full p-2 transition-colors cursor-pointer',
-                event ? 'bg-[#D93A3A]/10 text-[#D93A3A]' : 'text-[#D93A3A] hover:bg-[#D93A3A]/10',
+                'create-action-btn flex items-center gap-2 text-sm text-amber-500 transition-colors cursor-pointer',
+                event ? 'bg-amber-500/10' : 'hover:bg-amber-500/10',
               )}
               onClick={handleToggleEvent}
             >
-              <HugeiconsIcon icon={Calendar03Icon} className="size-5" />
+              <HugeiconsIcon icon={Calendar03Icon} className="size-[18px]" />
+              <span className="text-[var(--text-secondary)]">{t('quickCompose.schedule')}</span>
             </button>
 
             {hasMedia ? (
@@ -740,7 +855,7 @@ export function CommunityComposer({
                 title={t('community.composer.sensitive')}
                 className={cn(
                   'rounded-full p-2 transition-colors',
-                  sensitive ? 'bg-[#D93A3A]/10 text-[#D93A3A]' : 'text-[#737373] hover:bg-[#F5F5F5]',
+                  sensitive ? 'bg-[var(--primary-accent)]/10 text-[var(--primary-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-pill-hover)]',
                 )}
                 onClick={() => setSensitive((current) => !current)}
               >
@@ -749,32 +864,33 @@ export function CommunityComposer({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-3">
-            {length > 0 ? (
-              <span className={cn('text-xs', isOverLimit ? 'text-[#D93A3A]' : 'text-[#737373]')}>
-                {isOverLimit
-                  ? t('community.composer.overLimit')
-                  : t('community.composer.remaining', { count: remaining })}
-              </span>
-            ) : null}
-
+          <div className="flex shrink-0 flex-col items-start gap-1">
+            <div className="flex items-center gap-3">
             {onCancel ? (
-              <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+              <Button type="button" variant="ghost" size="sm" onClick={onCancel} className="text-xs text-[var(--text-secondary)]">
                 {t('common.cancel')}
               </Button>
             ) : null}
 
-            <Button
+            <button
               type="button"
-              size="sm"
               disabled={!canSubmit}
-              className="rounded-full bg-[#D93A3A] px-5 text-white hover:bg-[#C13232]"
+              className="btn-hire-me text-xs py-2 px-5 disabled:opacity-40 disabled:cursor-not-allowed"
               onClick={() => void submit()}
             >
               {isSubmitting
                 ? t('community.composer.posting')
                 : t(parent ? 'community.composer.reply' : 'community.composer.post')}
-            </Button>
+            </button>
+            </div>
+
+            {length > 0 ? (
+              <span className={cn('pt-1 text-xs font-semibold', isOverLimit ? 'text-[var(--primary-accent)]' : 'text-[var(--text-muted)]')}>
+                {isOverLimit
+                  ? t('community.composer.overLimit')
+                  : t('community.composer.remaining', { count: remaining })}
+              </span>
+            ) : null}
           </div>
         </div>
       </div>

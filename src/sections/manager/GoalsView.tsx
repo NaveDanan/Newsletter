@@ -195,26 +195,26 @@ export function GoalsView() {
   const getStatusIcon = (status: GoalStatus) => {
     switch (status) {
       case 'ahead':
-        return <HugeiconsIcon icon={AnalyticsUpIcon} className="w-5 h-5 text-green-600" />;
+        return <HugeiconsIcon icon={AnalyticsUpIcon} className="w-5 h-5 text-emerald-400" />;
       case 'on-track':
-        return <HugeiconsIcon icon={MinusSignIcon} className="w-5 h-5 text-[#D93A3A]" />;
+        return <HugeiconsIcon icon={MinusSignIcon} className="w-5 h-5 text-[var(--primary-accent)]" />;
       case 'behind':
-        return <HugeiconsIcon icon={AnalyticsDownIcon} className="w-5 h-5 text-red-600" />;
+        return <HugeiconsIcon icon={AnalyticsDownIcon} className="w-5 h-5 text-rose-400" />;
     }
   };
 
   const getStatusBadgeClass = (status: GoalStatus) => {
     switch (status) {
-      case 'ahead': return 'bg-green-100 text-green-700';
-      case 'on-track': return 'bg-[#D93A3A]/10 text-[#D93A3A]';
-      case 'behind': return 'bg-red-100 text-red-700';
+      case 'ahead': return 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+      case 'on-track': return 'bg-[var(--primary-accent)]/15 text-[var(--primary-accent)] border border-[var(--primary-accent)]/30';
+      case 'behind': return 'bg-rose-500/15 text-rose-400 border border-rose-500/30';
     }
   };
 
   const getProgressBarClass = (status: GoalStatus) => {
-    if (status === 'ahead') return 'bg-green-600';
-    if (status === 'behind') return 'bg-red-600';
-    return 'bg-[#D93A3A]';
+    if (status === 'ahead') return 'bg-emerald-400';
+    if (status === 'behind') return 'bg-rose-500';
+    return 'bg-[var(--primary-accent)]';
   };
 
   const getStatusLabel = (status: GoalStatus) => {
@@ -254,14 +254,14 @@ export function GoalsView() {
 
   // ── Project selector pills ──
   const projectSelector = projects.length > 0 ? (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={() => setSelectedProjectIds([])}
-        className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+        className={`rounded-full border px-4 py-1.5 text-xs sm:text-sm font-semibold transition-all ${
           selectedProjectIds.length === 0
-            ? 'border-[#D93A3A] bg-[#FEF2F2] text-[#D93A3A]'
-            : 'border-[#E5E5E5] bg-white text-[#525252] hover:border-[#D4D4D4] hover:bg-[#FAFAFA]'
+            ? 'border-[var(--primary-accent)] bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-md'
+            : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]'
         }`}
       >
         {t('manager.allProjects')}
@@ -271,10 +271,10 @@ export function GoalsView() {
           key={project.id}
           type="button"
           onClick={() => toggleProjectFilter(project.id)}
-          className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+          className={`rounded-full border px-4 py-1.5 text-xs sm:text-sm font-semibold transition-all ${
             selectedProjectIds.includes(project.id)
-              ? 'border-[#D93A3A] bg-[#FEF2F2] text-[#D93A3A]'
-              : 'border-[#E5E5E5] bg-white text-[#525252] hover:border-[#D4D4D4] hover:bg-[#FAFAFA]'
+              ? 'border-[var(--primary-accent)] bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-md'
+              : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]'
           }`}
           dir="auto"
         >
@@ -289,10 +289,10 @@ export function GoalsView() {
     return (
       <div className="space-y-6">
         {projectSelector}
-        <div className="dashboard-card flex flex-col items-center justify-center py-16 text-center">
-          <HugeiconsIcon icon={Target01Icon} className="w-12 h-12 text-[#D93A3A]/40 mb-4" />
-          <h2 className="text-lg font-bold text-[#171717] mb-1">{t('manager.noMilestonesFound')}</h2>
-          <p className="text-sm text-[#737373] max-w-xs">
+        <div className="feed-post-card flex flex-col items-center justify-center py-16 text-center">
+          <HugeiconsIcon icon={Target01Icon} className="w-12 h-12 text-[var(--primary-accent)] mb-4" />
+          <h2 className="text-lg font-bold text-[var(--text-primary)] mb-1">{t('manager.noMilestonesFound')}</h2>
+          <p className="text-sm text-[var(--text-secondary)] max-w-xs">
             {t('manager.noMilestonesDescription')}
           </p>
         </div>
@@ -305,11 +305,11 @@ export function GoalsView() {
       {projectSelector}
 
       {/* Overall Progress */}
-      <div className="dashboard-card">
+      <div className="feed-post-card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-bold text-[#171717]">{t('manager.overallProgress')}</h2>
-            <p className="text-sm text-[#737373]">
+            <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('manager.overallProgress')}</h2>
+            <p className="text-sm text-[var(--text-secondary)]">
               {t('manager.milestonesCompleted', {
                 completed: formatNumber(goals.filter((g) => g.status === 'ahead' && g.progress === 100).length),
                 total: formatNumber(goals.length),
@@ -317,13 +317,13 @@ export function GoalsView() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-[#D93A3A]">{formatNumber(overallProgress)}%</p>
-            <p className="text-sm text-[#737373]">{t('manager.milestonesAchieved')}</p>
+            <p className="text-3xl font-extrabold text-[var(--primary-accent)]">{formatNumber(overallProgress)}%</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('manager.milestonesAchieved')}</p>
           </div>
         </div>
-        <div className="h-3 bg-[#E5E5E5] rounded-full overflow-hidden">
+        <div className="h-3 bg-[var(--bg-input)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
           <div
-            className="h-full bg-gradient-to-r from-[#D93A3A] to-green-600 transition-all duration-500"
+            className="h-full bg-gradient-to-r from-[var(--primary-accent)] to-emerald-500 transition-all duration-500"
             style={{ width: `${overallProgress}%` }}
           />
         </div>
@@ -331,42 +331,42 @@ export function GoalsView() {
         {/* Manpower & cost usage */}
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           {/* Manpower hours used */}
-          <div className="rounded-xl bg-[#F8FAFC] px-4 py-3">
+          <div className="rounded-2xl bg-[var(--bg-card-alt)] border border-[var(--border-subtle)] px-4 py-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[#737373]">
+              <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
                 <HugeiconsIcon icon={Clock01Icon} className="w-4 h-4" />
-                <span className="text-sm">{t('manager.manpowerUsage')}</span>
+                <span className="text-sm font-semibold">{t('manager.manpowerUsage')}</span>
               </div>
-              <span className="text-xs font-medium text-[#525252]">{formatNumber(manpowerUsedPercent)}%</span>
+              <span className="text-xs font-bold text-[var(--text-primary)]">{formatNumber(manpowerUsedPercent)}%</span>
             </div>
-            <p className="mt-1.5 text-sm font-semibold text-[#171717]" dir="ltr">
+            <p className="mt-1.5 text-sm font-bold text-[var(--text-primary)]" dir="ltr">
               {formatNumber(Math.round(overallEffort.usedManpowerHours))}
-              <span className="text-[#A3A3A3]"> / {formatNumber(Math.round(overallEffort.totalManpowerHours))} {t('manager.hoursUnit')}</span>
+              <span className="text-[var(--text-muted)] font-normal"> / {formatNumber(Math.round(overallEffort.totalManpowerHours))} {t('manager.hoursUnit')}</span>
             </p>
-            <div className="mt-2 h-2 bg-[#E5E5E5] rounded-full overflow-hidden">
+            <div className="mt-2 h-2 bg-[var(--bg-pill)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
               <div
-                className="h-full bg-[#D93A3A] transition-all duration-500"
+                className="h-full bg-[var(--primary-accent)] transition-all duration-500"
                 style={{ width: `${manpowerUsedPercent}%` }}
               />
             </div>
           </div>
 
           {/* Cost spent */}
-          <div className="rounded-xl bg-[#F8FAFC] px-4 py-3">
+          <div className="rounded-2xl bg-[var(--bg-card-alt)] border border-[var(--border-subtle)] px-4 py-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[#737373]">
+              <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
                 <HugeiconsIcon icon={Coins01Icon} className="w-4 h-4" />
-                <span className="text-sm">{t('manager.costUsage')}</span>
+                <span className="text-sm font-semibold">{t('manager.costUsage')}</span>
               </div>
-              <span className="text-xs font-medium text-[#525252]">{formatNumber(costSpentPercent)}%</span>
+              <span className="text-xs font-bold text-[var(--text-primary)]">{formatNumber(costSpentPercent)}%</span>
             </div>
-            <p className="mt-1.5 text-sm font-semibold text-[#171717] truncate" dir="ltr" title={`${formatCost(overallEffort.spentCostsByCurrency)} / ${formatCost(overallEffort.totalCostsByCurrency)}`}>
+            <p className="mt-1.5 text-sm font-bold text-[var(--text-primary)] truncate" dir="ltr" title={`${formatCost(overallEffort.spentCostsByCurrency)} / ${formatCost(overallEffort.totalCostsByCurrency)}`}>
               {formatCost(overallEffort.spentCostsByCurrency)}
-              <span className="text-[#A3A3A3]"> / {formatCost(overallEffort.totalCostsByCurrency)}</span>
+              <span className="text-[var(--text-muted)] font-normal"> / {formatCost(overallEffort.totalCostsByCurrency)}</span>
             </p>
-            <div className="mt-2 h-2 bg-[#E5E5E5] rounded-full overflow-hidden">
+            <div className="mt-2 h-2 bg-[var(--bg-pill)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
               <div
-                className="h-full bg-[#D93A3A] transition-all duration-500"
+                className="h-full bg-[var(--primary-accent)] transition-all duration-500"
                 style={{ width: `${costSpentPercent}%` }}
               />
             </div>
@@ -377,16 +377,16 @@ export function GoalsView() {
       {/* Goals grid */}
       <div className="grid md:grid-cols-2 gap-4">
         {goals.map((goal) => (
-          <div key={goal.id} className="dashboard-card group">
+          <div key={goal.id} className="feed-post-card group p-5">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#D93A3A]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <HugeiconsIcon icon={Target01Icon} className="w-5 h-5 text-[#D93A3A]" />
+                <div className="w-10 h-10 bg-[var(--primary-accent)]/15 border border-[var(--primary-accent)]/30 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <HugeiconsIcon icon={Target01Icon} className="w-5 h-5 text-[var(--primary-accent)]" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-medium text-[#171717] truncate">{goal.milestoneName}</h3>
+                  <h3 className="font-bold text-sm sm:text-base text-[var(--text-primary)] truncate">{goal.milestoneName}</h3>
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadgeClass(goal.status)}`}
+                    className={`inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full mt-1 ${getStatusBadgeClass(goal.status)}`}
                   >
                     {getStatusLabel(goal.status)}
                   </span>
@@ -396,52 +396,52 @@ export function GoalsView() {
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-[#737373]">{t('manager.project')}</span>
-                <span className="font-medium text-[#171717] text-sm truncate max-w-[60%] text-right">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
+                <span className="text-[var(--text-secondary)]">{t('manager.project')}</span>
+                <span className="font-semibold text-[var(--text-primary)] truncate max-w-[60%] text-right">
                   {goal.projectTitle}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-[#737373]">{t('manager.targetDate')}</span>
-                <span className="text-sm text-[#171717]">{formatDate(goal.milestoneDate, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+              <div className="flex items-center justify-between text-xs sm:text-sm">
+                <span className="text-[var(--text-secondary)]">{t('manager.targetDate')}</span>
+                <span className="text-[var(--text-muted)]">{formatDate(goal.milestoneDate, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
               </div>
 
               {/* Manpower & estimated cost */}
               <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="rounded-xl bg-[#F8FAFC] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[#737373]">
+                <div className="rounded-2xl bg-[var(--bg-card-alt)] border border-[var(--border-subtle)] px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
                     <HugeiconsIcon icon={Clock01Icon} className="w-3.5 h-3.5" />
                     <span className="text-xs">{t('manager.manpowerHours')}</span>
                   </div>
-                  <p className="mt-1 text-sm font-semibold text-[#171717]">
+                  <p className="mt-1 text-xs sm:text-sm font-bold text-[var(--text-primary)]">
                     {formatNumber(Math.round(goal.manpowerHours))} {t('manager.hoursUnit')}
                   </p>
                   {goal.progress < 100 && goal.remainingManpowerHours > 0 ? (
-                    <p className="mt-0.5 text-xs font-medium text-[#D93A3A]">
+                    <p className="mt-0.5 text-xs font-semibold text-[var(--primary-accent)]">
                       {t('manager.manpowerHoursRemaining', {
                         hours: `${formatNumber(Math.round(goal.remainingManpowerHours))} ${t('manager.hoursUnit')}`,
                       })}
                     </p>
                   ) : null}
                 </div>
-                <div className="rounded-xl bg-[#F8FAFC] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[#737373]">
+                <div className="rounded-2xl bg-[var(--bg-card-alt)] border border-[var(--border-subtle)] px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
                     <HugeiconsIcon icon={Coins01Icon} className="w-3.5 h-3.5" />
                     <span className="text-xs">{t('manager.estimatedCost')}</span>
                   </div>
-                  <p className="mt-1 text-sm font-semibold text-[#171717] truncate" dir="ltr" title={formatCost(goal.costsByCurrency)}>
+                  <p className="mt-1 text-xs sm:text-sm font-bold text-[var(--text-primary)] truncate" dir="ltr" title={formatCost(goal.costsByCurrency)}>
                     {formatCost(goal.costsByCurrency)}
                   </p>
                   {goal.roleCosts.length > 0 ? (
                     <div className="mt-1.5 space-y-1">
                       {goal.roleCosts.map((roleCost) => (
                         <div key={roleCost.roleId} className="flex items-center justify-between gap-2 text-[11px]">
-                          <span className="min-w-0 truncate text-[#737373]" dir="auto">
+                          <span className="min-w-0 truncate text-[var(--text-secondary)]" dir="auto">
                             {roleCost.roleName || t('manager.role')}
                           </span>
-                          <span className="shrink-0 font-medium text-[#525252]">{formatNumber(roleCost.percent)}%</span>
+                          <span className="shrink-0 font-medium text-[var(--text-muted)]">{formatNumber(roleCost.percent)}%</span>
                         </div>
                       ))}
                     </div>
@@ -451,11 +451,11 @@ export function GoalsView() {
 
               {/* Progress bar */}
               <div className="pt-2">
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-[#737373]">{t('manager.progress')}</span>
-                  <span className="text-[#171717]">{formatNumber(goal.progress)}%</span>
+                <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
+                  <span className="text-[var(--text-secondary)]">{t('manager.progress')}</span>
+                  <span className="text-[var(--text-primary)] font-bold">{formatNumber(goal.progress)}%</span>
                 </div>
-                <div className="h-2 bg-[#E5E5E5] rounded-full overflow-hidden">
+                <div className="h-2 bg-[var(--bg-pill)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
                   <div
                     className={`h-full ${getProgressBarClass(goal.status)} transition-all duration-500`}
                     style={{ width: `${goal.progress}%` }}

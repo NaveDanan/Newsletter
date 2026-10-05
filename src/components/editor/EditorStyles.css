@@ -15,7 +15,7 @@
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: #A3A3A3;
+  color: var(--text-muted);
   pointer-events: none;
   height: 0;
 }
@@ -23,14 +23,14 @@
 .ProseMirror p {
   margin: 0 0 1em 0;
   line-height: 1.7;
-  color: #171717;
+  color: var(--text-primary);
 }
 
 .ProseMirror h1 {
   font-size: 2em;
   font-weight: 700;
   margin: 0 0 0.5em 0;
-  color: #171717;
+  color: var(--text-primary);
   line-height: 1.3;
 }
 
@@ -38,7 +38,7 @@
   font-size: 1.5em;
   font-weight: 600;
   margin: 1.5em 0 0.5em 0;
-  color: #171717;
+  color: var(--text-primary);
   line-height: 1.4;
 }
 
@@ -46,7 +46,7 @@
   font-size: 1.25em;
   font-weight: 600;
   margin: 1.5em 0 0.5em 0;
-  color: #171717;
+  color: var(--text-primary);
   line-height: 1.4;
 }
 
@@ -72,11 +72,11 @@
 }
 
 .ProseMirror blockquote {
-  border-left: 4px solid #D93A3A;
+  border-left: 4px solid var(--primary-accent);
   padding-left: 1em;
   margin: 1.5em 0;
   font-style: italic;
-  color: #737373;
+  color: var(--text-secondary);
 }
 
 .ProseMirror blockquote p {
@@ -84,17 +84,17 @@
 }
 
 .ProseMirror code {
-  background: #F3F4F6;
+  background: var(--bg-pill);
   padding: 0.2em 0.4em;
   border-radius: 4px;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.9em;
-  color: #171717;
+  color: var(--text-primary);
 }
 
 .ProseMirror pre {
-  background: #171717;
-  color: #F5F7FF;
+  background: var(--bg-input);
+  color: var(--text-primary);
   padding: 1em;
   border-radius: 8px;
   overflow-x: auto;
@@ -117,23 +117,23 @@
 
 .ProseMirror hr {
   border: none;
-  border-top: 1px solid #E5E5E5;
+  border-top: 1px solid var(--border-subtle);
   margin: 2em 0;
 }
 
 .ProseMirror a {
-  color: #D93A3A;
+  color: var(--primary-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .ProseMirror a:hover {
-  color: #B91C1C;
+  color: var(--primary-accent-hover);
 }
 
 .ProseMirror strong {
   font-weight: 700;
-  color: #171717;
+  color: var(--text-primary);
 }
 
 .ProseMirror em {
@@ -164,7 +164,7 @@
   font-weight: 700;
   line-height: 1.2;
   margin-bottom: 1rem;
-  color: #171717;
+  color: var(--text-primary);
 }
 
 .newsletter-article h2 {
@@ -173,7 +173,7 @@
   line-height: 1.3;
   margin-top: 2rem;
   margin-bottom: 1rem;
-  color: #171717;
+  color: var(--text-primary);
 }
 
 .newsletter-article h3 {
@@ -182,14 +182,23 @@
   line-height: 1.4;
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
-  color: #171717;
+  color: var(--text-primary);
 }
 
 .newsletter-article p {
   font-size: 1.125rem;
   line-height: 1.8;
   margin-bottom: 1.5rem;
-  color: #374151;
+  color: var(--text-secondary);
+}
+
+.newsletter-article li,
+.newsletter-article strong {
+  color: var(--text-primary);
+}
+
+.newsletter-article code {
+  color: var(--text-primary);
 }
 
 .newsletter-article ul,
@@ -205,11 +214,11 @@
 }
 
 .newsletter-article blockquote {
-  border-left: 4px solid #D93A3A;
+  border-left: 4px solid var(--primary-accent);
   padding-left: 1.5rem;
   margin: 2rem 0;
   font-style: italic;
-  color: #4B5563;
+  color: var(--text-secondary);
 }
 
 .newsletter-article blockquote p {
@@ -241,7 +250,7 @@
 }
 
 .newsletter-article code {
-  background: #F3F4F6;
+  background: var(--bg-pill);
   padding: 0.2em 0.4em;
   border-radius: 4px;
   font-family: 'IBM Plex Mono', monospace;
@@ -249,8 +258,8 @@
 }
 
 .newsletter-article pre {
-  background: #1F2937;
-  color: #F9FAFB;
+  background: var(--bg-input);
+  color: var(--text-primary);
   padding: 1.5rem;
   border-radius: 12px;
   overflow-x: auto;
@@ -263,18 +272,18 @@
 }
 
 .newsletter-article a {
-  color: #D93A3A;
+  color: var(--primary-accent);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
 .newsletter-article a:hover {
-  color: #B91C1C;
+  color: var(--primary-accent-hover);
 }
 
 .newsletter-article hr {
   border: none;
-  border-top: 1px solid #E5E5E5;
+  border-top: 1px solid var(--border-subtle);
   margin: 3rem 0;
 }
 
@@ -304,7 +313,7 @@
 
 .resizable-image-wrapper.selected,
 .media-embed-wrapper.selected {
-  outline: 2px solid #D93A3A;
+  outline: 2px solid var(--primary-accent);
   outline-offset: 4px;
   border-radius: 4px;
 }
@@ -333,8 +342,8 @@
   position: absolute;
   width: 12px;
   height: 12px;
-  background: white;
-  border: 2px solid #D93A3A;
+  background: var(--bg-card);
+  border: 2px solid var(--primary-accent);
   border-radius: 50%;
   z-index: 10;
   cursor: pointer;
@@ -342,7 +351,7 @@
 }
 
 .resize-handle:hover {
-  background: #D93A3A;
+  background: var(--primary-accent);
   transform: scale(1.2);
 }
 

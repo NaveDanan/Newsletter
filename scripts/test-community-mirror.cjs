@@ -65,6 +65,34 @@ const BODIES = [
   '#\u0645\u0631\u062d\u0628\u0627 arabic tag',
   'see https://example.com/a.',
   'trailing paren (https://example.com/a)',
+  'read **https://example.com/page** now',
+  'read *https://example.com/page* now',
+  'read ~~https://example.com/page~~ now',
+  'read ++https://example.com/page++ now',
+  'read ***https://example.com/page*** now',
+  'read **~~https://example.com/page~~** now',
+  '**https://example.com/page**',
+  'read **https://example.com/page.** now',
+  'wiki https://en.wikipedia.org/wiki/Foo_(bar) link',
+  'bold **https://en.wikipedia.org/wiki/Foo_(bar)** link',
+  'under https://example.com/a_b_c kept',
+  'stars https://example.com/a*b* kept',
+  'tilde https://example.com/~user/a kept',
+  'closed *emphasis* then https://example.com/a* kept',
+  'unopened https://example.com/a** kept',
+  'array [https://example.com/a] and https://example.com/a(b)[c]',
+  '**bold across\nlines https://example.com/a** end',
+  '*unclosed\nnext https://example.com/a* tail',
+  '**bold @nave and #tag and https://example.com/a**',
+  '**https://example.com**/article',
+  'https://example.com/\\!**article**/tail',
+  'https://example.com/a?q=\\!*hello*&x=1',
+  'https://example.com/\\!++under++/\\!~~struck~~',
+  'https://example.com/a\\*b\\*?q=a\\+b\\~c',
+  '**https://example.com/a\\*b\\***',
+  '#to**pic** and @al**ice**',
+  'literal \\\\!\\*\\* and \\<script\\>text\\</script\\>',
+  '\\!*hello\nworld at https://example.com/article*',
   '#one #one #two',
   'mention @12345 is numeric only',
   'mention @123_5 has an underscore',
@@ -176,6 +204,7 @@ const URLS = [
   'https://user@example.com',
   'https://example.com/a#frag',
   'https://example.com/a?q=1#frag',
+  'https://en.wikipedia.org/wiki/Foo_(bar)',
   'javascript:alert(1)',
   'ftp://example.com',
   'https://nodots/a',
@@ -216,6 +245,51 @@ HASHTAGS.forEach((sample) => {
     `normalizeCommunityHashtag must match normalizeHashtag for ${JSON.stringify(sample)}`,
   );
 });
+
+// --- Render segments (client only) -----------------------------------------
+
+for (const literal of ['C++ and C++', '*stars*', '\\\\srv\\path', '<manual>']) {
+  const escaped = client.escapeCommunityBodyLiteral(literal);
+  assert.equal(escaped, server.escapeBodyLiteral(literal), 'literal serialization agrees with server search escaping');
+  assert.equal(server.visibleCommunityBody(escaped), literal, 'server projection restores literal text');
+}
+
+// splitCommunityBody has no hook counterpart: the server stores offsets, the
+// client turns them into nodes. A formatting run that hugs an entity is
+// reported as marks on the entity segment, because its markers sit outside the
+// entity text and CommunityBody.tsx would otherwise print them beside the link
+// instead of making it bold.
+function segmentsFor(body) {
+  return client
+    .splitCommunityBody(body, client.parseCommunityEntities(body))
+    .map((segment) => [segment.text, segment.entity ? segment.entity.type : 'text', segment.marks.join('+')].join('|'));
+}
+
+assert.deepEqual(
+  segmentsFor('read **https://example.com/page** now'),
+  ['read |text|', 'https://example.com/page|url|bold', ' now|text|'],
+  'a bold link keeps the URL as its text and the bold as a mark',
+);
+assert.deepEqual(
+  segmentsFor('read ***https://example.com/page*** now'),
+  ['read |text|', 'https://example.com/page|url|italic+bold', ' now|text|'],
+  'nested runs stack as marks',
+);
+assert.deepEqual(
+  segmentsFor('read **~~https://example.com/page~~** now'),
+  ['read |text|', 'https://example.com/page|url|bold+strike', ' now|text|'],
+  'bold around strike stacks outermost first',
+);
+assert.deepEqual(
+  segmentsFor('tag **#AiBreak** and @nave'),
+  ['tag |text|', '#AiBreak|hashtag|bold', ' and |text|', '@nave|mention|'],
+  'hashtags and mentions take the same marks',
+);
+assert.deepEqual(
+  segmentsFor('under https://example.com/a_b_c kept'),
+  ['under |text|', 'https://example.com/a_b_c|url|', ' kept|text|'],
+  'an unformatted link carries no marks',
+);
 
 console.log(
   'community mirror checks passed: ' + BODIES.length + ' bodies, ' + WHITESPACE.length +

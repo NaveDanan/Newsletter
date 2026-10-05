@@ -133,49 +133,49 @@ export function NewsletterList({
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="dashboard-card">
-          <p className="text-sm text-[#737373] mb-1">{t('manager.total')}</p>
-          <p className="text-2xl font-bold text-[#171717]">{formatNumber(stats.total)}</p>
+        <div className="feed-post-card p-4 sm:p-5">
+          <p className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)] mb-1">{t('manager.total')}</p>
+          <p className="text-xl sm:text-2xl font-extrabold text-[var(--text-primary)]">{formatNumber(stats.total)}</p>
         </div>
-        <div className="dashboard-card">
-          <p className="text-sm text-[#737373] mb-1">{t('manager.published')}</p>
-          <p className="text-2xl font-bold text-green-600">{formatNumber(stats.published)}</p>
+        <div className="feed-post-card p-4 sm:p-5">
+          <p className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)] mb-1">{t('manager.published')}</p>
+          <p className="text-xl sm:text-2xl font-extrabold text-emerald-400">{formatNumber(stats.published)}</p>
         </div>
-        <div className="dashboard-card">
-          <p className="text-sm text-[#737373] mb-1">{t('manager.drafts')}</p>
-          <p className="text-2xl font-bold text-[#A3A3A3]">{formatNumber(stats.drafts)}</p>
+        <div className="feed-post-card p-4 sm:p-5">
+          <p className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)] mb-1">{t('manager.drafts')}</p>
+          <p className="text-xl sm:text-2xl font-extrabold text-[var(--text-muted)]">{formatNumber(stats.drafts)}</p>
         </div>
       </div>
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 bg-[var(--bg-card)] p-1 rounded-full border border-[var(--border-subtle)]">
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
               filter === 'all'
-                ? 'bg-[#171717] text-white'
-                : 'bg-white text-[#737373] border border-[#E5E5E5] hover:text-[#171717]'
+                ? 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-md'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]'
             }`}
           >
             {t('manager.all')}
           </button>
           <button
             onClick={() => setFilter('published')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
               filter === 'published'
-                ? 'bg-green-600 text-white'
-                : 'bg-white text-[#737373] border border-[#E5E5E5] hover:text-[#171717]'
+                ? 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-md'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]'
             }`}
           >
             {t('manager.published')}
           </button>
           <button
             onClick={() => setFilter('draft')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
               filter === 'draft'
-                ? 'bg-[#A3A3A3] text-white'
-                : 'bg-white text-[#737373] border border-[#E5E5E5] hover:text-[#171717]'
+                ? 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-md'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]'
             }`}
           >
             {t('manager.drafts')}
@@ -184,7 +184,7 @@ export function NewsletterList({
         {canCreate && (
           <button
             onClick={onCreate}
-            className="btn-primary flex items-center gap-2"
+            className="btn-hire-me flex items-center gap-2 text-xs sm:text-sm py-2 px-5"
           >
             <HugeiconsIcon icon={Add01Icon} className="w-4 h-4" />
             {t('manager.createNewsletter')}
@@ -195,29 +195,29 @@ export function NewsletterList({
       {/* Search */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-md">
-          <HugeiconsIcon icon={Search01Icon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]', isRTL ? 'right-3' : 'left-3')} />
+          <HugeiconsIcon icon={Search01Icon} className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]', isRTL ? 'right-3' : 'left-3')} />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             dir={isRTL ? 'rtl' : 'ltr'}
             placeholder={t('manager.searchNewsletters')}
-            className={cn('w-full', isRTL ? 'pr-10' : 'pl-10')}
+            className={cn('w-full h-10 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] px-4 text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-accent)] transition-all', isRTL ? 'pr-10' : 'pl-10')}
           />
         </div>
       </div>
 
       {/* Newsletter List */}
-      <div className="bg-white border border-[#E5E5E5] rounded-xl overflow-hidden">
+      <div className="feed-post-card p-0 overflow-hidden border border-[var(--border-subtle)]">
         {filteredNewsletters.length === 0 ? (
           <div className="p-12 text-center">
-            <HugeiconsIcon icon={FileAttachmentIcon} className="w-12 h-12 text-[#D4D4D4] mx-auto mb-4" />
-            <p className="text-[#737373]">
+            <HugeiconsIcon icon={FileAttachmentIcon} className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-4" />
+            <p className="text-[var(--text-secondary)]">
               {searchTerm ? t('manager.noNewslettersFound') : t('manager.noNewslettersYet')}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-[#E5E5E5]">
+          <div className="divide-y divide-[var(--border-subtle)]">
             {filteredNewsletters.map((newsletter) => {
               const canEditCurrent = canEdit(newsletter);
               const canDeleteCurrent = canDelete();
@@ -228,19 +228,19 @@ export function NewsletterList({
               return (
                 <div
                   key={newsletter.id}
-                  className="p-4 hover:bg-[#F9FAFB] transition-colors group"
+                  className="p-4 sm:p-5 hover:bg-[var(--bg-card-hover)] transition-colors group"
                 >
                   <div className="flex items-start gap-4">
                   {/* Cover Image */}
-                  <div className="w-24 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                  <div className="w-24 h-16 rounded-xl overflow-hidden flex-shrink-0 border border-[var(--border-subtle)] bg-[var(--bg-app)]">
                     {newsletter.coverImage ? (
                       <img
                         src={newsletter.coverImage}
                         alt={newsletter.title || 'Newsletter cover'}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-xs font-medium text-[#A3A3A3]">
+                      <div className="flex h-full w-full items-center justify-center bg-[var(--bg-pill)] text-xs font-semibold text-[var(--text-muted)]">
                         {t('manager.draft')}
                       </div>
                     )}
@@ -250,17 +250,17 @@ export function NewsletterList({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h3 className="font-semibold text-[#171717] line-clamp-1" dir="auto">
+                        <h3 className="font-bold text-sm sm:text-base text-[var(--text-primary)] group-hover:text-[var(--primary-accent)] transition-colors line-clamp-1" dir="auto">
                           {newsletter.title || t('manager.untitledDraft')}
                         </h3>
-                        <p className="text-sm text-[#737373] mt-1 line-clamp-1" dir="auto">
+                        <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-1 line-clamp-1" dir="auto">
                           {newsletter.subtitle || t('manager.noSubtitleYet')}
                         </p>
                       </div>
-                      <span className={`flex-shrink-0 text-xs px-2 py-1 rounded-full ${
+                      <span className={`flex-shrink-0 text-xs px-2.5 py-0.5 rounded-full font-semibold ${
                         newsletter.status === 'published'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-[#F3F4F6] text-[#737373]'
+                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-[var(--bg-pill)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
                       }`}>
                         {newsletter.status === 'published' ? (
                           <span className="flex items-center gap-1">
@@ -275,13 +275,13 @@ export function NewsletterList({
                         )}
                       </span>
                       {newsletter.event && (
-                        <span className="flex-shrink-0 flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                        <span className="flex-shrink-0 flex items-center gap-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 px-2 py-0.5 text-xs font-medium">
                           <HugeiconsIcon icon={Calendar03Icon} className="w-3 h-3" />
                           {t('viewer.event')}
                         </span>
                       )}
                       {newsletter.poll && (
-                        <span className="flex-shrink-0 flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        <span className="flex-shrink-0 flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 text-xs font-medium">
                           <HugeiconsIcon icon={BarChartIcon} className="w-3 h-3 -scale-y-100" />
                           {t('viewer.poll')}
                         </span>
@@ -289,7 +289,7 @@ export function NewsletterList({
                     </div>
 
                     {/* Meta */}
-                    <div className="flex items-center gap-4 mt-2 text-sm text-[#737373]">
+                    <div className="flex items-center gap-4 mt-2 text-xs sm:text-sm text-[var(--text-secondary)]">
                       <span dir="auto">{newsletter.author || t('manager.unknownAuthor')}</span>
                       <span>·</span>
                       <span>{newsletter.publishedAt}</span>
@@ -300,12 +300,12 @@ export function NewsletterList({
                           <span>·</span>
                           <span className="flex items-center gap-1">
                             {newsletter.tags.slice(0, 2).map(tag => (
-                              <span key={tag} className="tag tag-gray">
-                                {tag}
+                              <span key={tag} className="skill-tag text-[10px] py-0.5 px-2">
+                                #{tag}
                               </span>
                             ))}
                             {newsletter.tags.length > 2 && (
-                              <span className="text-[#A3A3A3]">+{formatNumber(newsletter.tags.length - 2)}</span>
+                              <span className="text-[var(--text-muted)] text-xs">+{formatNumber(newsletter.tags.length - 2)}</span>
                             )}
                           </span>
                         </>
@@ -313,7 +313,7 @@ export function NewsletterList({
                     </div>
 
                     {/* Engagement */}
-                    <div className="flex items-center gap-4 mt-2 text-sm text-[#737373]">
+                    <div className="flex items-center gap-4 mt-2 text-xs sm:text-sm text-[var(--text-muted)]">
                       <span>{formatNumber(newsletter.likes)} {t('manager.likes')}</span>
                       <span>{formatNumber(newsletter.comments)} {t('manager.comments')}</span>
                       <span>{formatNumber(newsletter.shares)} {t('manager.shares')}</span>
@@ -324,7 +324,7 @@ export function NewsletterList({
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => onView(newsletter)}
-                      className="p-2 text-[#737373] hover:text-[#171717] hover:bg-[#F3F4F6] rounded-lg transition-colors"
+                      className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] rounded-xl transition-colors"
                       title={t('manager.view')}
                     >
                       <HugeiconsIcon icon={ViewIcon} className="w-4 h-4" />
@@ -332,7 +332,7 @@ export function NewsletterList({
                     {canEditCurrent && (
                       <button
                         onClick={() => onEdit(newsletter)}
-                        className="p-2 text-[#737373] hover:text-[#171717] hover:bg-[#F3F4F6] rounded-lg transition-colors"
+                        className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] rounded-xl transition-colors"
                         title={t('manager.edit')}
                       >
                         <HugeiconsIcon icon={Edit02Icon} className="w-4 h-4" />
@@ -343,10 +343,10 @@ export function NewsletterList({
                         onClick={() => handleTogglePublish(newsletter)}
                         disabled={Boolean(togglingPublishId)}
                         className={cn(
-                          'p-2 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-60',
+                          'p-2 rounded-xl transition-colors disabled:cursor-wait disabled:opacity-60',
                           newsletter.status === 'published'
-                            ? 'text-[#737373] hover:text-amber-600 hover:bg-amber-50'
-                            : 'text-[#737373] hover:text-green-600 hover:bg-green-50'
+                            ? 'text-amber-500 hover:bg-amber-500/10'
+                            : 'text-emerald-500 hover:bg-emerald-500/10'
                         )}
                         title={
                           newsletter.status === 'published'

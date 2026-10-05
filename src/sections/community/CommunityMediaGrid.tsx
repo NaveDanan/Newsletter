@@ -48,12 +48,12 @@ export function CommunityMediaGrid({ media, sensitive, onOpenImage }: CommunityM
   const isHidden = sensitive && !revealed;
 
   return (
-    <div className="relative mt-3 overflow-hidden rounded-2xl border border-[#E5E5E5]">
+    <div className="relative mt-3 overflow-hidden rounded-2xl border border-[var(--border-subtle)]">
       <div className={cn('grid gap-0.5', layoutClassOf(items.length))}>
         {items.map((item, index) => (
           <div
             key={item.id}
-            className={cn('relative overflow-hidden bg-[#F5F5F5]', tileClassOf(items.length, index))}
+            className={cn('relative overflow-hidden bg-[var(--bg-card-alt)]', tileClassOf(items.length, index))}
           >
             {item.kind === 'video' ? (
               <video
@@ -68,7 +68,7 @@ export function CommunityMediaGrid({ media, sensitive, onOpenImage }: CommunityM
             ) : (
               <button
                 type="button"
-                className="size-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#D93A3A]"
+                className="size-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary-accent)]"
                 aria-label={item.altText || t('community.post.openImage')}
                 onClick={(event) => {
                   event.stopPropagation();

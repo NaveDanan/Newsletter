@@ -8,15 +8,16 @@ import {
   LogIn,
   UserRound,
   Newspaper,
+  Search,
   Sparkles,
   Users,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { AccountMenu } from '@/components/AccountMenu';
 import { DropdownNavigation, type DropdownNavigationItem } from '@/components/ui/dropdown-navigation';
-import { ExpandingSearchDock } from '@/components/ui/expanding-search-dock-shadcnui';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useNavigationData } from '@/contexts/NavigationDataContext';
+import { useCollapsingLabels } from '@/hooks/useCollapsingLabels';
 import { DEFAULT_DROPDOWN_IDS, SEED_DROPDOWNS } from '@/types/navigation-link';
 
 interface NavigationProps {
@@ -32,6 +33,9 @@ interface NavigationProps {
   authName?: string;
   activeTab?: 'home' | 'topics' | 'bookmarks' | 'community' | string;
 }
+
+// The order in which header labels fold away as the bar narrows.
+const FOLD = { search: 1, community: 2, account: 3, brand: 4 } as const;
 
 function normalizeDropdownLabel(value: string): string {
   return value.trim().toLowerCase();
@@ -62,8 +66,47 @@ export function Navigation({
 }: NavigationProps) {
   const { t } = useLocale();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // The side menu and the account menu share the header, so only one is open.
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const { dropdowns, links: navigationLinks } = useNavigationData();
   const isCommunityRoute = activeTab === 'community';
+  const barRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
+
+  useCollapsingLabels(barRef, FOLD.brand, (level) => {
+    // Once the inline field has room again the extra row is redundant.
+    if (level < FOLD.search) {
+      setIsSearchPanelOpen(false);
+    }
+  });
+
+  const updateSearch = (value: string) => {
+    setSearchQuery(value);
+    onSearchChange?.(value);
+  };
+
+  const toggleMobileMenu = () => {
+    setIsAccountMenuOpen(false);
+    setIsMobileMenuOpen((open) => !open);
+  };
+
+  const handleAccountMenuOpenChange = (open: boolean) => {
+    setIsAccountMenuOpen(open);
+    if (open) {
+      setIsMobileMenuOpen(false);
+    }
+  };
+
+  const handleSearchToggle = () => {
+    if (Number(barRef.current?.dataset.collapse ?? 0) >= FOLD.search) {
+      setIsSearchPanelOpen((open) => !open);
+      return;
+    }
+    searchInputRef.current?.focus();
+  };
 
   const resolvedDropdowns = useMemo(() => {
     const items = [...dropdowns];
@@ -256,46 +299,148 @@ export function Navigation({
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-[#E5E5E5]">
-      {/* Top bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14">
-          {/* Logo with GIF */}
-          <button 
-            onClick={onHomeClick}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-          >
-            <img 
-              src="/logo.gif" 
-              alt="AI Maor Break" 
-              className="w-16 h-16 object-contain"
+    <header className="app-floating-header">
+      {/* Top bar: labels fold to icons as it narrows, see useCollapsingLabels */}
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div ref={barRef} className="nav-bar flex h-16 items-center gap-3 sm:gap-4">
+          {/* Left: Brand Logo & Title */}
+          <div className="flex shrink-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={onHomeClick}
+              className="flex items-center group text-start"
+              aria-label="AI-BREAK Home"
+            >
+              <div className="brand-logo group-hover:scale-105 transition-transform">
+                <img
+                  src="/logo.gif"
+                  alt="AI-BREAK Logo"
+                  className="w-7 h-7 object-contain rounded-lg"
+                />
+              </div>
+              <span className="nav-label" data-collapse-order={FOLD.brand}>
+                <span>
+                  <span className="flex flex-col ps-3">
+                    <span className="font-extrabold text-lg text-[var(--text-primary)] tracking-tight leading-none group-hover:text-[var(--primary-accent)] transition-colors">
+                      AI-BREAK
+                    </span>
+                    <span className="text-[10px] font-semibold text-[var(--text-muted)] tracking-wider uppercase mt-1">
+                      Newsletter & Community
+                    </span>
+                  </span>
+                </span>
+              </span>
+            </button>
+
+            <div className="hidden xl:flex items-center gap-5 ms-2">
+              {navLinks.filter((link) => link.id !== 'community').map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  className={`nav-link whitespace-nowrap text-xs sm:text-sm ${link.active ? 'active' : ''}`}
+                  onClick={(event) => {
+                    if (link.id === 'home') {
+                      event.preventDefault();
+                      onHomeClick();
+                      return;
+                    }
+
+                    if (link.id === 'topics' || link.id === 'bookmarks') {
+                      if (activeTab !== 'home') {
+                        event.preventDefault();
+                        onHomeClick();
+                        window.location.hash = link.href.replace('/#', '#');
+                      }
+                    }
+                  }}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <div data-collapse-slack className="min-w-0 flex-1" />
+
+          {/* Center: Search (folds first) */}
+          {!isCommunityRoute ? (
+            <div className="nav-search">
+              <button
+                ref={searchToggleRef}
+                type="button"
+                className="nav-search-toggle"
+                aria-label={t('nav.openSearch')}
+                aria-expanded={isSearchPanelOpen}
+                onClick={handleSearchToggle}
+              >
+                <Search className="size-4" aria-hidden="true" />
+              </button>
+              <span className="nav-label" data-collapse-order={FOLD.search}>
+                <span>
+                  <span className="block pe-4">
+                    <input
+                      ref={searchInputRef}
+                      type="search"
+                      value={searchQuery}
+                      placeholder={t('nav.searchPlaceholder')}
+                      aria-label={t('nav.searchPlaceholder')}
+                      onChange={(event) => updateSearch(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          onSearch?.(searchQuery);
+                        }
+                      }}
+                      className="h-9 w-40 bg-transparent text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
+                    />
+                  </span>
+                </span>
+              </span>
+            </div>
+          ) : null}
+
+          <div data-collapse-slack className="min-w-0 flex-1" />
+
+          {/* Right side controls */}
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <div className="hidden lg:flex shrink-0 items-center">
+              {/* Opens toward the bar's centre so panels never pass its outer edge. */}
+              <DropdownNavigation navItems={dropdownNavItems} align="end" />
+            </div>
+
+            <button
+              type="button"
+              onClick={onCommunityClick}
+              aria-label={t('nav.community')}
+              title={t('nav.community')}
+              aria-current={isCommunityRoute ? 'page' : undefined}
+              className="nav-pill"
+            >
+              <Users className="size-4 shrink-0" aria-hidden="true" />
+              <span className="nav-label" data-collapse-order={FOLD.community}>
+                <span>
+                  <span className="block ps-2 pe-0.5">{t('nav.community')}</span>
+                </span>
+              </span>
+            </button>
+
+            <AccountMenu
+              onProfileClick={onProfileClick}
+              onManagerClick={onManagerClick}
+              onSignInClick={onSignInClick}
+              onSignOut={onSignOut}
+              foldOrder={FOLD.account}
+              open={isAccountMenuOpen}
+              onOpenChange={handleAccountMenuOpenChange}
             />
-            <span className="font-bold text-lg text-[#171717] mt-3">AI-BREAK</span>
-          </button>
 
-          {/* Right side */}
-          <div className="flex items-center gap-3">
-            {isCommunityRoute ? null : (
-              <>
-                <ExpandingSearchDock
-                  onSearch={onSearch}
-                  onQueryChange={onSearchChange}
-                  placeholder={t('nav.searchPlaceholder')}
-                />
-                <AccountMenu
-                  onProfileClick={onProfileClick}
-                  onManagerClick={onManagerClick}
-                  onSignInClick={onSignInClick}
-                  onSignOut={onSignOut}
-                  className="hidden sm:block"
-                />
-              </>
-            )}
-
-            <button 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            {/* Mobile Hamburger Menu button */}
+            <button
+              type="button"
+              onClick={toggleMobileMenu}
               aria-label={isMobileMenuOpen ? t('nav.closeMenu') : t('nav.openMenu')}
-              className="lg:hidden p-2 text-[#737373]"
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-navigation-menu"
+              className="lg:hidden p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] transition-colors"
             >
               {isMobileMenuOpen ? <HugeiconsIcon icon={Cancel01Icon} className="w-5 h-5" /> : <HugeiconsIcon icon={Menu01Icon} className="w-5 h-5" />}
             </button>
@@ -303,56 +448,42 @@ export function Navigation({
         </div>
       </div>
 
-      {/* Navigation bar */}
-      <nav className="border-t border-[#E5E5E5]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-6 h-12">
-          <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide">
-            {navLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className={`nav-link whitespace-nowrap ${link.active ? 'active' : ''}`}
-                onClick={(event) => {
-                  if (link.id === 'home') {
-                    event.preventDefault();
-                    onHomeClick();
-                    return;
-                  }
-
-                  if (link.id === 'community') {
-                    event.preventDefault();
-                    onCommunityClick();
-                    return;
-                  }
-
-                  if (link.id === 'topics' || link.id === 'bookmarks') {
-                    if (activeTab !== 'home') {
-                      event.preventDefault();
-                      onHomeClick();
-                      window.location.hash = link.href.replace('/#', '#');
-                    }
-                  }
-                }}
-              >
-                {link.label}
-              </a>
-            ))}
+      {/* Folded search opens as a row under the bar */}
+      {isSearchPanelOpen && !isCommunityRoute ? (
+        <div className="border-t border-[var(--border-subtle)] px-4 py-3 animate-in slide-in-from-top-2 duration-200">
+          <div className="nav-search w-full">
+            <Search className="ms-3 size-4 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
+            <input
+              autoFocus
+              type="search"
+              value={searchQuery}
+              placeholder={t('nav.searchPlaceholder')}
+              aria-label={t('nav.searchPlaceholder')}
+              onChange={(event) => updateSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  onSearch?.(searchQuery);
+                  setIsSearchPanelOpen(false);
+                } else if (event.key === 'Escape') {
+                  setIsSearchPanelOpen(false);
+                  searchToggleRef.current?.focus();
+                }
+              }}
+              className="h-9 min-w-0 flex-1 bg-transparent px-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
+            />
           </div>
-          <DropdownNavigation navItems={dropdownNavItems} />
         </div>
-        </div>
-      </nav>
+      ) : null}
 
-      {/* Mobile menu */}
+      {/* Mobile dropdown menu */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden border-t border-[#E5E5E5] bg-white">
-          <div className="px-4 py-4 space-y-3">
+        <div id="mobile-navigation-menu" className="lg:hidden max-h-[calc(100dvh-8rem)] overflow-y-auto rounded-b-[inherit] border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-4 space-y-3 shadow-2xl animate-in slide-in-from-top-2 duration-200">
+          <div className="space-y-1">
             {navLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
-                className="block py-2 text-[#171717] font-medium"
+                className="block py-2.5 px-3 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] transition-colors"
                 onClick={(event) => {
                   if (link.id === 'home') {
                     event.preventDefault();
@@ -374,37 +505,51 @@ export function Navigation({
                 {link.label}
               </a>
             ))}
-            {dropdownNavItems.map((link) => (
-              <a
-                key={link.id}
-                href={link.link}
-                className="block py-2 text-[#171717] font-medium"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                {link.label}
-              </a>
+            {dropdownNavItems.map((dropdown) => (
+              <details key={dropdown.id} className="rounded-xl text-[var(--text-secondary)]">
+                <summary className="cursor-pointer py-2.5 px-3 rounded-xl text-sm font-semibold hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]">
+                  {dropdown.label}
+                </summary>
+                <div className="space-y-3 px-3 pb-3">
+                  {dropdown.subMenus?.map((group) => (
+                    <section key={group.title}>
+                      <h3 className="py-2 text-xs font-semibold text-[var(--text-muted)]">{group.title}</h3>
+                      <ul className="space-y-1">
+                        {group.items.map((item) => {
+                          const className = 'block w-full text-start rounded-xl px-3 py-2 text-sm hover:bg-[var(--bg-pill-hover)]';
+                          const select = (event: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
+                            if (item.onSelect) {
+                              event.preventDefault();
+                              item.onSelect();
+                            } else if (item.href?.startsWith('#') && activeTab !== 'home') {
+                              event.preventDefault();
+                              onHomeClick();
+                              window.location.hash = item.href;
+                            }
+                            setIsMobileMenuOpen(false);
+                          };
+                          const content = (
+                            <>
+                              <span className="block font-medium text-[var(--text-primary)]">{item.label}</span>
+                              <span className="block text-xs text-[var(--text-muted)]">{item.description}</span>
+                            </>
+                          );
+                          return (
+                            <li key={item.label}>
+                              {item.href ? (
+                                <a href={item.href} className={className} onClick={select}>{content}</a>
+                              ) : (
+                                <button type="button" className={className} onClick={select}>{content}</button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  ))}
+                </div>
+              </details>
             ))}
-            <div className="pt-2">
-              <AccountMenu
-                variant="mobile"
-                onProfileClick={() => {
-                  onProfileClick();
-                  setIsMobileMenuOpen(false);
-                }}
-                onManagerClick={() => {
-                  onManagerClick();
-                  setIsMobileMenuOpen(false);
-                }}
-                onSignInClick={() => {
-                  onSignInClick();
-                  setIsMobileMenuOpen(false);
-                }}
-                onSignOut={() => {
-                  onSignOut();
-                  setIsMobileMenuOpen(false);
-                }}
-              />
-            </div>
           </div>
         </div>
       )}

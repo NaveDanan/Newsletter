@@ -282,7 +282,13 @@ function createPost(e) {
     throw new BadRequestError('The post could not be saved. Try again.');
   }
 
-  content().touchHashtags(app, parsed.hashtags, displayMap, 1);
+  // Trend bookkeeping runs after the post is committed, so a failure here must
+  // not report the published post as an error.
+  try {
+    content().touchHashtags(app, parsed.hashtags, displayMap, 1);
+  } catch (err) {
+    $app.logger().warn('community: hashtag update skipped', 'error', String(err));
+  }
 
   return content().serializePosts(app, [created], authorId, c.getAuthRole(e.auth))[0];
 }
@@ -541,21 +547,29 @@ function toggleJoin(e, options) {
     active = true;
   });
 
+  // The engagement itself is already committed, so a failing notification must
+  // not turn a successful like into an error response.
   if (options.notificationKind) {
-    if (active) {
-      content().createNotification(app, {
-        userId: post.getString('authorId'),
-        actorId: userId,
-        actorHandle: profile.getString('handle'),
-        actorName: profile.getString('displayName'),
-        actorAvatarUrl: c.profileAvatarUrl(app, profile),
-        kind: options.notificationKind,
-        postId: postId,
-        rootId: post.getString('rootId') || postId,
-        preview: c.buildPreview(post.getString('body')),
-      });
-    } else {
-      content().removeNotification(app, post.getString('authorId'), userId, options.notificationKind, postId);
+    var threadId = post.getString('rootId') || postId;
+    try {
+      if (active) {
+        content().createNotification(app, {
+          userId: post.getString('authorId'),
+          actorId: userId,
+          actorHandle: profile.getString('handle'),
+          actorName: profile.getString('displayName'),
+          actorAvatarUrl: c.profileAvatarUrl(app, profile),
+          kind: options.notificationKind,
+          postId: postId,
+          rootId: threadId,
+          preview: post.getString('body'),
+          targetPath: '/community/post/' + threadId,
+        });
+      } else {
+        content().removeNotification(app, post.getString('authorId'), userId, options.notificationKind, postId);
+      }
+    } catch (err) {
+      $app.logger().warn('community: notification skipped', 'error', String(err));
     }
   }
 
@@ -869,8 +883,17 @@ function getThread(e, postId) {
   var query = e.requestInfo().query || {};
   var limit = c.clampPageSize(query.perPage, c.FEED_PAGE_SIZE, c.MAX_FEED_PAGE_SIZE);
   var cursor = c.decodeCursor(query.cursor);
-  var params = { parentId: String(postId) };
-  var filter = appendBlockExclusion('parentId = {:parentId}', params, blockedUserIds(app, viewer.id));
+  var includeTree = query.tree === '1' || query.tree === 'true';
+  var params = includeTree
+    ? { parentId: String(postId), rootId: String(postId), selfId: String(postId) }
+    : { parentId: String(postId) };
+  // The tree form also returns deeper descendants, minus the post itself,
+  // whose own rootId points at itself.
+  var baseCondition = includeTree
+    ? '(parentId = {:parentId} || rootId = {:rootId}) && id != {:selfId}'
+    : 'parentId = {:parentId}';
+  var blocked = blockedUserIds(app, viewer.id);
+  var filter = appendBlockExclusion(baseCondition, params, blocked);
   var replyRecords = app.findRecordsByFilter(
     'community_posts',
     applyCursor(filter, params, cursor),
@@ -880,9 +903,57 @@ function getThread(e, postId) {
     params
   );
 
-  var replies = pageResult(replyRecords, limit, function (page) {
-    return content().serializePosts(app, page, viewer.id, viewer.role);
-  });
+  var hasMore = replyRecords.length > limit;
+  var page = hasMore ? replyRecords.slice(0, limit) : replyRecords;
+  var last = page.length ? page[page.length - 1] : null;
+  var pageRecords = page.slice();
+  var includedIds = {};
+  var requestedIds = {};
+  pageRecords.forEach(function (record) { includedIds[String(record.id)] = true; });
+
+  // A newest-first page can contain a reply without its older parent. Include
+  // the missing ancestors so client-side tree construction stays stable across
+  // pages; the cursor still advances only over the paginated reply records.
+  for (var depth = 0; depth < c.MAX_REPLY_DEPTH; depth += 1) {
+    var ancestorIds = [];
+    pageRecords.forEach(function (record) {
+      var parentId = record.getString('parentId');
+      if (parentId && parentId !== String(postId) && !includedIds[parentId] && !requestedIds[parentId]) {
+        requestedIds[parentId] = true;
+        ancestorIds.push(parentId);
+      }
+    });
+    if (!ancestorIds.length) {
+      break;
+    }
+
+    var ancestorParams = {};
+    var ancestorClauses = ancestorIds.map(function (id, index) {
+      var key = 'ancestor' + index;
+      ancestorParams[key] = id;
+      return 'id = {:' + key + '}';
+    });
+    var ancestorFilter = appendBlockExclusion(
+      '(' + ancestorClauses.join(' || ') + ')',
+      ancestorParams,
+      blocked
+    );
+    var ancestorsPage = app.findRecordsByFilter('community_posts', ancestorFilter, '-created,-id', ancestorIds.length, 0, ancestorParams);
+    ancestorsPage = ancestorsPage.filter(function (record) { return record.getString('rootId') === String(postId); });
+    ancestorsPage.forEach(function (record) {
+      var id = String(record.id);
+      if (!includedIds[id]) {
+        includedIds[id] = true;
+        pageRecords.push(record);
+      }
+    });
+  }
+
+  var replies = {
+    items: content().serializePosts(app, pageRecords, viewer.id, viewer.role),
+    hasMore: hasMore,
+    cursor: last ? c.encodeCursor(last.getString('created'), String(last.id)) : '',
+  };
 
   return {
     post: content().serializePosts(app, [post], viewer.id, viewer.role)[0],
@@ -1035,21 +1106,35 @@ function updateProfile(e) {
   var avatars = c.readUploadedFiles(e, 'avatar');
   if (avatars.length) {
     profile.set('avatar', avatars[0]);
+  } else if (body.removeAvatar === true || c.asText(body.removeAvatar) === 'true') {
+    // Profiles from before the unified editor may carry a community-only
+    // avatar; clearing it falls back to the account avatar, if any.
+    profile.set('avatar', '');
+    profile.set('avatarUrl', '');
   }
   var banners = c.readUploadedFiles(e, 'banner');
   if (banners.length) {
     profile.set('banner', banners[0]);
+  } else if (body.removeBanner === true || c.asText(body.removeBanner) === 'true') {
+    profile.set('banner', '');
   }
 
   app.save(profile);
+  refreshAuthorSnapshots(app, profile);
 
+  return { profile: c.serializeProfile(app, profile, { isSelf: true }) };
+}
+
+// Author identity is denormalized onto posts, so a profile edit has to rewrite
+// the copies. Bounded to the most recent 500 posts per edit; older posts keep
+// the name they were published under.
+function refreshAuthorSnapshots(app, profile) {
+  var c = core();
+  var userId = profile.getString('userId');
   var handleValue = profile.getString('handle');
   var nameValue = profile.getString('displayName');
   var avatarValue = c.profileAvatarUrl(app, profile);
 
-  // Author identity is denormalized onto posts, so a profile edit has to
-  // rewrite the copies. Bounded to the most recent 500 posts per edit; older
-  // posts keep the name they were published under.
   try {
     var posts = app.findRecordsByFilter('community_posts', 'authorId = {:authorId}', '-created', 500, 0, { authorId: userId });
     app.runInTransaction(function (tx) {
@@ -1065,8 +1150,23 @@ function updateProfile(e) {
       });
     });
   } catch (_) {}
+}
 
-  return { profile: c.serializeProfile(app, profile, { isSelf: true }) };
+// The account avatar is the one avatar the unified profile editor manages, so
+// changing it replaces any older community-only upload and refreshes every
+// copy derived from it.
+function syncAccountAvatar(app, user) {
+  var c = core();
+  var profile = c.findProfileByUserId(app, String(user.id));
+  if (!profile) {
+    return;
+  }
+
+  var avatar = user.getString('avatar');
+  profile.set('avatar', '');
+  profile.set('avatarUrl', avatar ? c.fileUrl(app, user, avatar) : '');
+  app.save(profile);
+  refreshAuthorSnapshots(app, profile);
 }
 
 function listProfilePosts(e, handle) {
@@ -1345,8 +1445,9 @@ function search(e) {
     };
   }
 
-  var params = { status: 'published', term: '%' + term + '%' };
-  var filter = 'status = {:status} && body ~ {:term}';
+  var params = { status: 'published', term: '%' + term + '%', literalTerm: '%' + c.escapeBodyLiteral(term) + '%' };
+  // Match legacy body text and literal characters escaped by the rich editor.
+  var filter = 'status = {:status} && (body ~ {:term} || body ~ {:literalTerm})';
 
   if (term.charAt(0) === '#') {
     params.tag = '%"' + c.normalizeHashtag(term) + '"%';
@@ -1740,6 +1841,7 @@ module.exports = {
   getMe: getMe,
   getProfile: getProfile,
   updateProfile: updateProfile,
+  syncAccountAvatar: syncAccountAvatar,
   listProfilePosts: listProfilePosts,
   listProfileConnections: listProfileConnections,
   listNotifications: listNotifications,

@@ -75,10 +75,10 @@ export function CommunityFollowButton({
       onFocus={() => setIsHovering(true)}
       onBlur={() => setIsHovering(false)}
       className={cn(
-        'rounded-full px-4 font-semibold',
+        'rounded-full px-4 font-bold transition-all',
         isFollowing
-          ? 'border border-[#E5E5E5] bg-white text-[#171717] hover:border-[#D93A3A]/40 hover:bg-[#D93A3A]/10 hover:text-[#D93A3A]'
-          : 'bg-[#171717] text-white hover:bg-[#171717]/90',
+          ? 'border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--primary-accent)] hover:text-[var(--primary-accent)]'
+          : 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] hover:bg-[var(--primary-accent-hover)] shadow-sm',
         className,
       )}
       onClick={(event) => {

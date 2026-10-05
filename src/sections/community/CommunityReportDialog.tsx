@@ -65,15 +65,15 @@ export function CommunityReportDialog({ target, onClose }: CommunityReportDialog
 
   return (
     <Dialog open={Boolean(target)} onOpenChange={(open) => { if (!open) { onClose(); } }}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg bg-[var(--bg-card)] border-[var(--border-subtle)] text-[var(--text-primary)]">
         <DialogHeader>
-          <DialogTitle>{t('community.report.title')}</DialogTitle>
-          <DialogDescription>{t('community.report.body')}</DialogDescription>
+          <DialogTitle className="text-[var(--text-primary)]">{t('community.report.title')}</DialogTitle>
+          <DialogDescription className="text-[var(--text-secondary)]">{t('community.report.body')}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>{t('community.report.reason')}</Label>
+            <Label className="text-[var(--text-primary)]">{t('community.report.reason')}</Label>
             <RadioGroup
               value={reason}
               onValueChange={(value) => setReason(value as CommunityReportReason)}
@@ -82,7 +82,7 @@ export function CommunityReportDialog({ target, onClose }: CommunityReportDialog
               {COMMUNITY_REPORT_REASONS.map((value) => (
                 <div key={value} className="flex items-center gap-2">
                   <RadioGroupItem value={value} id={'report-reason-' + value} />
-                  <Label htmlFor={'report-reason-' + value} className="font-normal">
+                  <Label htmlFor={'report-reason-' + value} className="font-normal text-[var(--text-secondary)]">
                     {t('community.report.reason.' + value)}
                   </Label>
                 </div>
@@ -91,24 +91,25 @@ export function CommunityReportDialog({ target, onClose }: CommunityReportDialog
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="report-details">{t('community.report.details')}</Label>
+            <Label htmlFor="report-details" className="text-[var(--text-primary)]">{t('community.report.details')}</Label>
             <Textarea
               id="report-details"
               value={details}
               maxLength={COMMUNITY_MAX_REPORT_DETAILS_LENGTH}
               onChange={(event) => setDetails(event.target.value)}
               rows={3}
+              className="bg-[var(--bg-input)] border-[var(--border-subtle)] text-[var(--text-primary)]"
             />
           </div>
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button type="button" variant="ghost" onClick={onClose} className="text-[var(--text-secondary)]">
             {t('common.cancel')}
           </Button>
-          <Button type="button" disabled={isSending} onClick={() => void submit()}>
+          <button type="button" disabled={isSending} onClick={() => void submit()} className="btn-hire-me text-xs py-2 px-5">
             {t('community.report.submit')}
-          </Button>
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

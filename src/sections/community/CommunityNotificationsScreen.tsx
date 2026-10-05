@@ -36,17 +36,37 @@ const ICON: Record<CommunityNotificationKind, typeof FavouriteIcon> = {
 };
 
 const COLOR: Record<CommunityNotificationKind, string> = {
-  like: 'text-[#D93A3A]',
+  like: 'text-[var(--primary-accent)]',
   reply: 'text-[#1D9BF0]',
   repost: 'text-[#00BA7C]',
   quote: 'text-[#00BA7C]',
   follow: 'text-[#1D9BF0]',
-  mention: 'text-[#D93A3A]',
-  comment: 'text-[#D93A3A]',
-  following_post: 'text-[#D93A3A]',
-  event: 'text-[#D93A3A]',
-  newsletter: 'text-[#D93A3A]',
+  mention: 'text-[var(--primary-accent)]',
+  comment: 'text-[var(--primary-accent)]',
+  following_post: 'text-[var(--primary-accent)]',
+  event: 'text-[var(--primary-accent)]',
+  newsletter: 'text-[var(--primary-accent)]',
 };
+
+// A newsletter comment is addressed as "<newsletterId>:<commentId>", which is
+// the only thing distinguishing a comment like from a whole-article like.
+function messageKeyOf(notification: CommunityNotification): string {
+  if (notification.kind === 'mention' && notification.rootId && notification.rootId !== notification.postId) {
+    return 'community.notifications.mentionInComment';
+  }
+  if (notification.kind === 'like') {
+    if (notification.postId.includes(':')) {
+      return 'community.notifications.likeComment';
+    }
+    if (notification.targetPath.startsWith('/article/')) {
+      return 'community.notifications.likeNewsletter';
+    }
+    if (notification.rootId && notification.rootId !== notification.postId) {
+      return 'community.notifications.likeComment';
+    }
+  }
+  return 'community.notifications.' + notification.kind;
+}
 
 export function CommunityNotificationsScreen({ onUnreadChange }: CommunityNotificationsScreenProps) {
   const { t, formatRelativeTime } = useLocale();
@@ -69,12 +89,12 @@ export function CommunityNotificationsScreen({ onUnreadChange }: CommunityNotifi
 
   return (
     <div>
-      <div className="sticky top-[104px] z-10 flex items-center justify-between gap-4 border-b border-[#E5E5E5] bg-white/85 px-4 py-3 backdrop-blur">
-        <h1 className="text-xl font-bold text-[#171717]">{t('community.notifications.title')}</h1>
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/85 px-4 py-3 backdrop-blur-md">
+        <h1 className="text-xl font-bold text-[var(--text-primary)]">{t('community.notifications.title')}</h1>
         <div className="flex flex-wrap items-center justify-end gap-2">
-        <a href="/profile#notification-preferences" className="text-sm text-[#737373] underline underline-offset-4 hover:text-[#D93A3A]">{t('notifications.settings.link')}</a>
+        <a href="/profile#notification-preferences" className="text-sm text-[var(--text-secondary)] underline underline-offset-4 hover:text-[var(--primary-accent)]">{t('notifications.settings.link')}</a>
         {feed.unreadCount > 0 ? (
-          <Button variant="ghost" size="sm" onClick={() => void feed.markAllRead()}>
+          <Button variant="ghost" size="sm" onClick={() => void feed.markAllRead()} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
             {t('community.notifications.markAllRead')}
           </Button>
         ) : null}
@@ -89,17 +109,17 @@ export function CommunityNotificationsScreen({ onUnreadChange }: CommunityNotifi
       ) : null}
 
       {feed.error && feed.notifications.length === 0 ? (
-        <div role="alert" className="space-y-3 px-6 py-12 text-center text-sm text-[#737373]"><p>{t('community.notifications.failed')}</p><Button variant="outline" onClick={() => void feed.refresh()}>{t('notifications.retry')}</Button></div>
+        <div role="alert" className="space-y-3 px-6 py-12 text-center text-sm text-[var(--text-secondary)]"><p>{t('community.notifications.failed')}</p><Button variant="outline" onClick={() => void feed.refresh()}>{t('notifications.retry')}</Button></div>
       ) : null}
       {feed.error && feed.notifications.length > 0 ? (
-        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E5E5] p-4 text-sm text-[#B91C1C]">
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] p-4 text-sm text-[var(--primary-accent)]">
           <p>{t('notifications.updateFailed')}</p>
           <Button variant="outline" size="sm" onClick={() => void feed.refresh()}>{t('notifications.retry')}</Button>
         </div>
       ) : null}
 
       {!feed.isLoading && !feed.error && feed.notifications.length === 0 ? (
-        <p className="px-6 py-16 text-center text-[15px] text-[#737373]">{t('community.notifications.empty')}</p>
+        <p className="px-6 py-16 text-center text-[15px] text-[var(--text-secondary)]">{t('community.notifications.empty')}</p>
       ) : null}
 
       <ul>
@@ -108,8 +128,8 @@ export function CommunityNotificationsScreen({ onUnreadChange }: CommunityNotifi
             <button
               type="button"
               className={cn(
-                'flex w-full items-start gap-3 border-b border-[#E5E5E5] px-4 py-4 text-start transition-colors hover:bg-[#FAFAFA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#D93A3A]',
-                notification.isRead ? 'bg-white' : 'bg-[#D93A3A]/5',
+                'flex w-full items-start gap-3 border-b border-[var(--border-subtle)] px-4 py-4 text-start transition-colors hover:bg-[var(--bg-card-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary-accent)]',
+                notification.isRead ? 'bg-[var(--bg-app)]' : 'bg-[var(--primary-accent)]/8',
               )}
               onClick={() => open(notification)}
             >
@@ -128,7 +148,7 @@ export function CommunityNotificationsScreen({ onUnreadChange }: CommunityNotifi
                     size="sm"
                   /> : null}
                   <span className="text-[15px] text-[#171717]">
-                    {t('community.notifications.' + notification.kind, {
+                    {t(messageKeyOf(notification), {
                       name: notification.actorName || notification.actorHandle,
                     })}
                   </span>

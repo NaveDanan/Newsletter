@@ -62,13 +62,13 @@ function hasMeaningfulContent(data: NewsletterFormData): boolean {
 
 export interface NewsletterEditorHandle {
   prepareToLeave: () => { requiresConfirmation: boolean };
-  savePublishedChanges: () => boolean;
+  savePublishedChanges: () => Promise<boolean>;
 }
 
 interface NewsletterEditorProps {
   newsletter?: Newsletter | null;
-  onSave: (data: NewsletterFormData) => void;
-  onUpdate?: (id: string, data: Partial<NewsletterFormData>) => void;
+  onSave: (data: NewsletterFormData) => Newsletter | null | void | Promise<Newsletter | null | void>;
+  onUpdate?: (id: string, data: Partial<NewsletterFormData>) => Newsletter | null | void | Promise<Newsletter | null | void>;
   onAutoSave?: (id: string | null, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
   onUploadPresentation?: (id: string, file: File) => Promise<{ newsletter: Newsletter; url: string; fileName: string; previewUrls?: string[]; previewStatus?: 'ready' | 'failed'; previewError?: string } | null> | { newsletter: Newsletter; url: string; fileName: string; previewUrls?: string[]; previewStatus?: 'ready' | 'failed'; previewError?: string } | null;
   onCancel: () => void;
@@ -269,7 +269,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [flushDraftAutoSave, hasUnsavedPublishedChanges, isAutoSaveEnabled]);
 
-  const handleSave = useCallback((status: 'draft' | 'published', shouldToast = true): boolean => {
+  const handleSave = useCallback(async (status: 'draft' | 'published', shouldToast = true): Promise<boolean> => {
     const nextFormData = getCurrentFormData();
 
     if (!nextFormData.title.trim()) {
@@ -335,10 +335,13 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
       status,
     };
     
-    if (isEditing && newsletter && onUpdate) {
-      onUpdate(newsletter.id, data);
-    } else {
-      onSave(data);
+    try {
+      const saved = isEditing && newsletter && onUpdate
+        ? await onUpdate(newsletter.id, data)
+        : await onSave(data);
+      if (saved === null) return false;
+    } catch {
+      return false;
     }
 
     if (shouldToast) {
@@ -357,7 +360,7 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
 
       return { requiresConfirmation: hasUnsavedPublishedChanges };
     },
-    savePublishedChanges: () => {
+    savePublishedChanges: async () => {
       if (!newsletter || newsletter.status !== 'published') {
         return true;
       }
@@ -954,17 +957,17 @@ export const NewsletterEditor = forwardRef<NewsletterEditorHandle, NewsletterEdi
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E5E5E5]">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-subtle)]">
           <button
             onClick={() => handleSave('draft')}
-            className="btn-secondary flex items-center gap-2"
+            className="btn-secondary flex items-center gap-2 text-xs sm:text-sm py-2 px-5"
           >
             <HugeiconsIcon icon={FloppyDiskIcon} className="w-4 h-4" />
             {t('manager.saveAsDraft')}
           </button>
           <button
             onClick={() => handleSave('published')}
-            className="btn-primary flex items-center gap-2"
+            className="btn-hire-me flex items-center gap-2 text-xs sm:text-sm py-2 px-6"
           >
             <HugeiconsIcon icon={FloppyDiskIcon} className="w-4 h-4" />
             {t('manager.publishNewsletter')}

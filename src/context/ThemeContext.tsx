@@ -1,72 +1,88 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext } from 'react';
 
-type Theme = 'light' | 'dark' | 'system';
+export type Theme = 'light' | 'dark' | 'system';
+export type DeviceMode = 'web' | 'mobile';
+export type AccentKey = 'red' | 'yellow' | 'lime' | 'cyan' | 'purple' | 'pink' | 'orange' | 'custom';
 
-interface ThemeContextType {
+export interface AccentPreset {
+  name: string;
+  color: string;
+  hover: string;
+  glow: string;
+  ambient: string;
+  contrast: string;
+}
+
+export const ACCENT_PRESETS: Record<Exclude<AccentKey, 'custom'>, AccentPreset> = {
+  red: {
+    name: 'Crimson Red',
+    color: '#ff3b53',
+    hover: '#e8253e',
+    glow: 'rgba(255, 59, 83, 0.38)',
+    ambient: 'rgba(255, 59, 83, 0.06)',
+    contrast: '#ffffff',
+  },
+  yellow: {
+    name: 'Electric Yellow',
+    color: '#ffe600',
+    hover: '#f3dc00',
+    glow: 'rgba(255, 230, 0, 0.35)',
+    ambient: 'rgba(255, 230, 0, 0.05)',
+    contrast: '#121214',
+  },
+  lime: {
+    name: 'Neon Lime',
+    color: '#10f57a',
+    hover: '#00e66b',
+    glow: 'rgba(16, 245, 122, 0.35)',
+    ambient: 'rgba(16, 245, 122, 0.05)',
+    contrast: '#121214',
+  },
+  cyan: {
+    name: 'Cyber Cyan',
+    color: '#00e5ff',
+    hover: '#00ccee',
+    glow: 'rgba(0, 229, 255, 0.35)',
+    ambient: 'rgba(0, 229, 255, 0.05)',
+    contrast: '#121214',
+  },
+  purple: {
+    name: 'Electric Purple',
+    color: '#b066ff',
+    hover: '#9c42ff',
+    glow: 'rgba(176, 102, 255, 0.38)',
+    ambient: 'rgba(176, 102, 255, 0.06)',
+    contrast: '#ffffff',
+  },
+  pink: {
+    name: 'Hot Magenta',
+    color: '#ff2a85',
+    hover: '#f71a78',
+    glow: 'rgba(255, 42, 133, 0.38)',
+    ambient: 'rgba(255, 42, 133, 0.06)',
+    contrast: '#ffffff',
+  },
+  orange: {
+    name: 'Sunset Orange',
+    color: '#ff7a00',
+    hover: '#f26e00',
+    glow: 'rgba(255, 122, 0, 0.38)',
+    ambient: 'rgba(255, 122, 0, 0.06)',
+    contrast: '#ffffff',
+  },
+};
+
+export interface ThemeContextType {
   theme: Theme;
   resolvedTheme: 'light' | 'dark';
   setTheme: (theme: Theme) => void;
+  deviceMode: DeviceMode;
+  accentKey: AccentKey;
+  customHex: string;
+  setAccentColor: (presetKey: AccentKey, customHex?: string) => void;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('pulse-ai-theme') as Theme;
-      return saved || 'system';
-    }
-    return 'system';
-  });
-
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    
-    const updateResolvedTheme = () => {
-      if (theme === 'system') {
-        setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
-      } else {
-        setResolvedTheme(theme);
-      }
-    };
-
-    updateResolvedTheme();
-    
-    const handler = (e: MediaQueryListEvent) => {
-      if (theme === 'system') {
-        setResolvedTheme(e.matches ? 'dark' : 'light');
-      }
-    };
-
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, [theme]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    
-    if (resolvedTheme === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    }
-  }, [resolvedTheme]);
-
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-    localStorage.setItem('pulse-ai-theme', newTheme);
-  };
-
-  return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
-}
+export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function useTheme() {
   const context = useContext(ThemeContext);

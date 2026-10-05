@@ -8,6 +8,9 @@ import {
   ViewOffIcon,
 } from '@hugeicons/core-free-icons';
 import { toast } from 'sonner';
+import Placeholder from '@tiptap/extension-placeholder';
+import StarterKit from '@tiptap/starter-kit';
+import { EditorContent, useEditor } from '@tiptap/react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,7 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { useLocale } from '@/contexts/LocaleContext';
 import {
   communityMediaKindOf,
@@ -25,6 +27,7 @@ import {
   probeCommunityMedia,
 } from '@/lib/community-media';
 import { normalizeCommunityBody } from '@/lib/community-text';
+import { formatCommunityBodyToHtml, htmlToCommentMarkup } from '@/lib/comment-formatting';
 import {
   getPocketBaseErrorMessage,
   resolveCommunityFileUrl,
@@ -60,6 +63,16 @@ function nextEditMediaKey(): string {
   return 'em-' + editMediaKeyCounter;
 }
 
+function initialItemsFor(post: CommunityPost): PendingMedia[] {
+  return (post.media || []).map((m) => ({
+    key: 'existing-' + m.id,
+    media: m,
+    previewUrl: resolveCommunityFileUrl(m.url),
+    kind: m.kind,
+    isUploading: false,
+  }));
+}
+
 export function CommunityEditPostDialog({
   open,
   post,
@@ -68,40 +81,95 @@ export function CommunityEditPostDialog({
 }: CommunityEditPostDialogProps) {
   const { t } = useLocale();
   const [body, setBody] = useState(post.body);
-  const [items, setItems] = useState<PendingMedia[]>([]);
+  const [items, setItems] = useState<PendingMedia[]>(() => (open ? initialItemsFor(post) : []));
   const [sensitive, setSensitive] = useState(Boolean(post.sensitive));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const itemsRef = useRef<PendingMedia[]>(items);
-  itemsRef.current = items;
+  const openRef = useRef(open);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        bulletList: false,
+        orderedList: false,
+        codeBlock: false,
+        blockquote: false,
+        heading: false,
+        horizontalRule: false,
+      }),
+      Placeholder.configure({ placeholder: t('community.composer.placeholder') }),
+    ],
+    content: formatCommunityBodyToHtml(post.body),
+    editable: !isSubmitting,
+    onUpdate: ({ editor: current }) => setBody(htmlToCommentMarkup(current.getHTML())),
+    editorProps: {
+      attributes: {
+        class: 'composer-textarea min-h-[100px] p-0 text-[16px] leading-relaxed focus:outline-none',
+        dir: 'auto',
+        role: 'textbox',
+        'aria-label': t('community.composer.placeholder'),
+        'aria-multiline': 'true',
+      },
+    },
+  });
 
   useEffect(() => {
+    if (open && editor) {
+      editor.commands.setContent(formatCommunityBodyToHtml(post.body), { emitUpdate: false });
+      editor.commands.focus('end');
+    }
+  }, [editor, open, post]);
+
+  useEffect(() => {
+    editor?.setEditable(!isSubmitting);
+  }, [editor, isSubmitting]);
+
+  // Mirrors the latest items so the close/unmount cleanups can revoke blob URLs
+  // without re-running on every media change.
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+
+  // Opening (or swapping the post) reseeds the editor from the post; closing
+  // discards the draft. Both are prop-driven resets, applied while rendering
+  // the change instead of one commit later.
+  const [lastSource, setLastSource] = useState<{ open: boolean; post: CommunityPost }>({ open, post });
+  if (lastSource.open !== open || lastSource.post !== post) {
+    setLastSource({ open, post });
     if (open) {
       setBody(post.body);
       setSensitive(Boolean(post.sensitive));
       setIsSubmitting(false);
-
-      const initialItems: PendingMedia[] = (post.media || []).map((m) => ({
-        key: 'existing-' + m.id,
-        media: m,
-        previewUrl: resolveCommunityFileUrl(m.url),
-        kind: m.kind,
-        isUploading: false,
-      }));
-      setItems(initialItems);
+      setItems(initialItemsFor(post));
     } else {
-      // Revoke any created blob URLs
+      setItems([]);
+    }
+  }
+
+  // Blob URLs created for freshly picked files are released when the dialog
+  // closes or unmounts, reading the items held just before the reset.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    return () => {
       itemsRef.current.forEach((item) => {
         if (item.previewUrl.startsWith('blob:')) {
           URL.revokeObjectURL(item.previewUrl);
         }
       });
-      setItems([]);
-    }
-  }, [open, post]);
+    };
+  }, [open]);
 
+  // Unmounting while closed still releases anything added after the close.
   useEffect(() => () => {
     itemsRef.current.forEach((item) => {
       if (item.previewUrl.startsWith('blob:')) {
@@ -157,6 +225,13 @@ export function CommunityEditPostDialog({
 
       const key = nextEditMediaKey();
       const probe = await probeCommunityMedia(file, kind);
+      if (!openRef.current) {
+        // Closed while the file was being read: the draft it belonged to is gone.
+        if (probe.previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(probe.previewUrl);
+        }
+        return;
+      }
       setItems((current) => current.concat({
         key,
         media: null,
@@ -244,14 +319,7 @@ export function CommunityEditPostDialog({
               />
             ) : null}
             <div className="min-w-0 flex-1">
-              <Textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder={t('community.composer.placeholder')}
-                className="min-h-[100px] resize-none border-none p-0 text-[16px] leading-relaxed shadow-none focus-visible:ring-0"
-                autoFocus
-                disabled={isSubmitting}
-              />
+              <EditorContent editor={editor} className="min-h-[100px]" />
 
               {items.length > 0 ? (
                 <div className={cn('mt-3 grid gap-2', items.length === 1 ? 'grid-cols-1' : 'grid-cols-2')}>
@@ -321,7 +389,7 @@ export function CommunityEditPostDialog({
                 aria-label={t('community.composer.addImage')}
                 title={t('community.composer.addImage')}
                 disabled={items.length >= COMMUNITY_MAX_MEDIA_PER_POST || isSubmitting}
-                className="rounded-full p-2 text-[#D93A3A] transition-colors hover:bg-[#D93A3A]/10 disabled:opacity-40"
+                className="rounded-full p-2 text-[var(--primary-accent)] transition-colors hover:bg-[var(--primary-accent)]/10 disabled:opacity-40"
                 onClick={() => imageInputRef.current?.click()}
               >
                 <HugeiconsIcon icon={ImageAdd01Icon} className="size-5" />
@@ -332,7 +400,7 @@ export function CommunityEditPostDialog({
                 aria-label={t('community.composer.addVideo')}
                 title={t('community.composer.addVideo')}
                 disabled={items.length >= COMMUNITY_MAX_MEDIA_PER_POST || isSubmitting}
-                className="rounded-full p-2 text-[#D93A3A] transition-colors hover:bg-[#D93A3A]/10 disabled:opacity-40"
+                className="rounded-full p-2 text-[var(--primary-accent)] transition-colors hover:bg-[var(--primary-accent)]/10 disabled:opacity-40"
                 onClick={() => videoInputRef.current?.click()}
               >
                 <HugeiconsIcon icon={Video01Icon} className="size-5" />
@@ -345,7 +413,7 @@ export function CommunityEditPostDialog({
                   title={t('community.composer.sensitive')}
                   className={cn(
                     'rounded-full p-2 transition-colors',
-                    sensitive ? 'bg-[#D93A3A]/10 text-[#D93A3A]' : 'text-[#737373] hover:bg-[#F5F5F5]',
+                    sensitive ? 'bg-[var(--primary-accent)]/15 text-[var(--primary-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-pill-hover)]',
                   )}
                   onClick={() => setSensitive((current) => !current)}
                 >
@@ -356,7 +424,7 @@ export function CommunityEditPostDialog({
 
             <div className="flex items-center gap-3 ms-auto">
               <span
-                className={`text-xs ${isOverLimit ? 'font-bold text-[#D93A3A]' : 'text-[#737373]'}`}
+                className={`text-xs ${isOverLimit ? 'font-bold text-[var(--primary-accent)]' : 'text-[var(--text-muted)]'}`}
               >
                 {isOverLimit
                   ? t('community.composer.overLimit')
@@ -366,16 +434,15 @@ export function CommunityEditPostDialog({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="rounded-full font-medium"
+                className="rounded-full font-medium text-[var(--text-secondary)]"
                 onClick={onClose}
                 disabled={isSubmitting}
               >
                 {t('common.cancel')}
               </Button>
-              <Button
+              <button
                 type="submit"
-                size="sm"
-                className="rounded-full bg-[#D93A3A] px-5 font-bold text-white hover:bg-[#C13232]"
+                className="btn-hire-me text-xs py-1.5 px-5 disabled:opacity-40"
                 disabled={!canSubmit}
               >
                 {isSubmitting ? (
@@ -386,7 +453,7 @@ export function CommunityEditPostDialog({
                 ) : (
                   t('community.post.saveEdit')
                 )}
-              </Button>
+              </button>
             </div>
           </DialogFooter>
         </form>

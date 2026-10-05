@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import PocketBase from 'pocketbase';
 import { APP_COLLECTION_SCHEMAS } from '../../scripts/pocketbase/app-schema.mjs';
-import { parseCommunityEntities } from '../../src/lib/community-text.ts';
+import { escapeCommunityBodyLiteral, parseCommunityEntities } from '../../src/lib/community-text.ts';
 
 const url = process.env.COMMUNITY_TEST_PB_URL;
 if (!url || !['localhost', '127.0.0.1'].includes(new URL(url).hostname)) throw new Error('Set COMMUNITY_TEST_PB_URL to a disposable local PocketBase instance.');
@@ -412,5 +412,26 @@ await assert.rejects(root.collection('community_media').getOne(media.id), (e) =>
 // A moderator may delete somebody else's post.
 assert.equal((await remove(manager, bulkIds[0])).deleted, true);
 await assert.rejects(get(anonymous, `/api/community/posts/${bulkIds[0]}`), (e) => e.status === 404);
+
+// Search supports old raw bodies and newly escaped literals; public previews
+// decode before truncating and match the text displayed in the community.
+const literalText = 'C++ *stars* \\\\srv\\p <manual>';
+const legacyLiteral = await post(author, '/api/community/posts', { body: literalText });
+const encodedLiteral = await post(author, '/api/community/posts', { body: escapeCommunityBodyLiteral(literalText) });
+for (const term of ['C++', '\\\\srv\\p', '<manual>']) {
+  const hits = await get(anonymous, `/api/community/search?q=${encodeURIComponent(term)}&type=posts`);
+  assert.deepEqual(hits.items.map((item) => item.id).sort(), [legacyLiteral.id, encodedLiteral.id].sort(), `search matches raw and escaped ${term}`);
+}
+await post(viewer, `/api/community/posts/${encodedLiteral.id}/like`);
+const literalNotice = (await get(author, '/api/community/notifications?kind=like')).items.find((item) => item.postId === encodedLiteral.id);
+assert.equal(literalNotice.preview, literalText, 'a community notification decodes escaped text once');
+const activity = await get(anonymous, '/api/site/activity?limit=10');
+const literalActivity = activity.items.find((item) => item.subjectId === encodedLiteral.id);
+assert.equal(literalActivity.subjectTitle, literalText, 'homepage community activity hides storage escapes');
+
+const partialLinkBody = 'https://example.com/\\!**article**/tail?q=\\!*hello*&x=1';
+const partialLink = await post(author, '/api/community/posts', { body: partialLinkBody });
+assert.deepEqual(partialLink.entities.map(({ type, start, end, value, display }) => ({ type, start, end, value, display })), parseCommunityEntities(partialLinkBody));
+assert.equal(partialLink.entities[0].value, 'https://example.com/article/tail?q=hello&x=1');
 
 console.log('Passed: anonymous read access with 12 rejected writes, lazy unique profiles, entity offsets matching src/lib/community-text.ts, clientId retry suppression, three-level threads, like/repost/bookmark counters across repeated toggles, follows and the following feed, 10 MB-capped media travelling separately from the 128 KB post body, 28 rows of keyset pagination with no repeats, six notification kinds with withdrawal on unlike, post/people/hashtag search including Hebrew, symmetric blocks that sever follows, and the moderation queue refusing a viewer and an author while a manager removes, restores, suspends and resolves.');

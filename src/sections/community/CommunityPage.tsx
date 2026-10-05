@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Bookmark01Icon,
@@ -9,7 +9,6 @@ import {
   UserIcon,
 } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useCommunityEngagement } from '@/hooks/useCommunityEngagement';
@@ -27,29 +26,34 @@ import {
 } from '@/lib/community-routes';
 import { cn } from '@/lib/utils';
 import { CommunityBookmarksScreen } from './CommunityBookmarksScreen';
-import { CommunityComposer } from './CommunityComposer';
 import { CommunityComposerDialog } from './CommunityComposerDialog';
 import { CommunityConnectionsScreen } from './CommunityConnectionsScreen';
-import { CommunityProvider, type CommunityContextValue } from './CommunityContext';
+import { type CommunityContextValue } from './CommunityContext';
+import { CommunityProvider } from './CommunityProvider';
 import { CommunityFeedScreen } from './CommunityFeedScreen';
 import { CommunityHashtagScreen } from './CommunityHashtagScreen';
 import { CommunityLeftRail } from './CommunityLeftRail';
 import { CommunityNotificationsScreen } from './CommunityNotificationsScreen';
-import { CommunityProfileEditor } from './CommunityProfileEditor';
 import { CommunityProfileScreen } from './CommunityProfileScreen';
 import { CommunityReportDialog } from './CommunityReportDialog';
 import { CommunityRightRail } from './CommunityRightRail';
 import { CommunitySearchScreen } from './CommunitySearchScreen';
 import { CommunityThreadScreen } from './CommunityThreadScreen';
+import {
+  createComposeRequest,
+  releaseComposeRequest,
+  type ComposeRequest,
+} from './compose-request';
 import type { CommunityPost, CommunitySearchType } from '@/types/community';
 
 // The single owner of community state. Everything below it reads the route out
 // of the context rather than out of window.location, so the eleven screens stay
 // unaware that App drives navigation with history.pushState.
 //
-// The composer, the report dialog and the profile editor live here instead of
-// inside the screens because any card anywhere can open them, and a modal that
-// unmounts with its screen would close itself on the navigation it triggered.
+// The composer and the report dialog live here instead of inside the screens
+// because any card anywhere can open them, and a modal that unmounts with its
+// screen would close itself on the navigation it triggered. Profile editing is
+// not a modal: it is the unified /profile page shared with the rest of the site.
 
 interface CommunityPageProps {
   pathname: string;
@@ -70,17 +74,55 @@ export function CommunityPage({
   isAuthenticated,
   onNavigate,
   onRequireAuth,
-  onLeave,
   onOpenModeration,
 }: CommunityPageProps) {
   const { t } = useLocale();
-  const { session, profile, isLoading, saveProfile, setUnreadNotifications } = useCommunitySession(isAuthenticated);
+  const { session, profile, isLoading, setUnreadNotifications } = useCommunitySession(isAuthenticated);
   const [composer, setComposer] = useState<ComposerState | null>(null);
-  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  // Held until the feed says it opened the composer with it. The feed can mount
+  // long after the request is made - a navigation away from another screen, or
+  // the session still loading - so the request waits rather than expires.
+  const [composeRequest, setComposeRequest] = useState<ComposeRequest | null>(null);
   const [reportTarget, setReportTarget] = useState<{ postId?: string; handle?: string } | null>(null);
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  const toggleTag = useCallback((tag: string) => {
+    const key = tag.toLowerCase();
+    setSelectedTags((current) => (
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key]
+    ));
+  }, []);
 
   const route = useMemo(() => parseCommunityRoute(pathname) ?? parseCommunityRoute('/community')!, [pathname]);
+
+  // Composing always happens inline in the feed, so a request from anywhere
+  // else lands on the feed first and then nudges the card open.
+  const requestCompose = useCallback((files?: File[]) => {
+    if (!isAuthenticated) {
+      onRequireAuth();
+      return;
+    }
+    if (route.section !== 'feed') {
+      onNavigate(communityFeedPath());
+    }
+    setComposeRequest(createComposeRequest(files));
+  }, [isAuthenticated, onNavigate, onRequireAuth, route.section]);
+
+  // One request, one composer: once the feed reports it opened with it, the
+  // page lets go of the request and of the files it was carrying.
+  const handleComposeRequestHandled = useCallback((requestId: number) => {
+    setComposeRequest((current) => releaseComposeRequest(current, requestId));
+  }, []);
+
+  // The home feed's quick-compose card carries selected attachments here.
+  useEffect(() => {
+    const handleCompose = (event: Event) => {
+      const detail = (event as CustomEvent<{ files?: File[] }>).detail;
+      requestCompose(detail?.files);
+    };
+    window.addEventListener('community:compose', handleCompose);
+    return () => { window.removeEventListener('community:compose', handleCompose); };
+  }, [requestCompose]);
 
   const navigate = useCallback((next: string) => {
     onNavigate(next);
@@ -155,6 +197,8 @@ export function CommunityPage({
     openReply,
     openQuote,
     openReport,
+    selectedTags,
+    toggleTag,
   }), [
     isAuthenticated,
     navigate,
@@ -167,7 +211,9 @@ export function CommunityPage({
     openReport,
     openSearch,
     profile,
+    selectedTags,
     session,
+    toggleTag,
   ]);
 
   const unreadCount = useNotificationCount();
@@ -200,7 +246,7 @@ export function CommunityPage({
           key={targetHandle + ':' + route.profileTab}
           handle={targetHandle}
           tab={route.profileTab}
-          onEditProfile={() => setIsEditorOpen(true)}
+          onEditProfile={() => onNavigate('/profile')}
         />
       );
     }
@@ -231,7 +277,14 @@ export function CommunityPage({
       return <CommunityHashtagScreen key={route.tag} tag={route.tag} />;
     }
 
-    return <CommunityFeedScreen key={route.feedTab} tab={route.feedTab} />;
+    return (
+      <CommunityFeedScreen
+        key={route.feedTab}
+        tab={route.feedTab}
+        composeRequest={composeRequest}
+        onComposeRequestHandled={handleComposeRequestHandled}
+      />
+    );
   };
 
   const mobileItems = [
@@ -264,23 +317,23 @@ export function CommunityPage({
 
   return (
     <CommunityProvider value={contextValue}>
-      <div className="min-h-screen bg-white">
-        <div className="mx-auto flex w-full max-w-[1265px] gap-0 px-0 lg:px-4">
-          <aside className="sticky top-[104px] hidden h-[calc(100vh-104px)] h-[calc(100dvh-104px)] shrink-0 lg:flex lg:flex-col lg:w-[88px] xl:w-[275px] z-10 select-none">
+      <div className="bg-transparent text-[var(--text-primary)] transition-colors">
+        {/* The row owns the viewport height so only the centre column scrolls. */}
+        <div className="mx-auto flex w-full items-stretch gap-0 px-0 lg:h-[calc(100dvh-104px)] lg:overflow-hidden lg:px-4">
+          <aside className="hidden h-full shrink-0 lg:flex lg:flex-col lg:w-[88px] xl:w-[275px] z-10 select-none">
             <CommunityLeftRail
               section={route.section}
               unreadCount={unreadCount}
-              onCompose={() => setIsComposeOpen(true)}
-              onLeave={onLeave}
+              onCompose={requestCompose}
               onOpenModeration={onOpenModeration}
             />
           </aside>
 
-          <main className="min-h-screen w-full min-w-0 flex-1 border-[#E5E5E5] pb-24 lg:max-w-[600px] lg:border-x lg:pb-0">
+          <main className="w-full min-w-0 flex-1 pb-24 lg:h-full lg:overflow-y-auto lg:pb-0">
             {profile && profile.isSuspended ? (
-              <div className="border-b border-[#E5E5E5] bg-[#FEF2F2] px-4 py-3">
-                <p className="text-sm font-semibold text-[#D93A3A]">{t('community.suspended.title')}</p>
-                <p className="mt-1 text-sm text-[#737373]">{t('community.suspended.body')}</p>
+              <div className="border-b border-[var(--border-subtle)] bg-[var(--primary-accent)]/10 px-4 py-3">
+                <p className="text-sm font-semibold text-[var(--primary-accent)]">{t('community.suspended.title')}</p>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">{t('community.suspended.body')}</p>
               </div>
             ) : null}
 
@@ -291,15 +344,15 @@ export function CommunityPage({
         </div>
 
         {!isAuthenticated ? (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E5E5E5] bg-[#171717] px-4 py-3 text-white lg:px-8">
+          <div className="fixed inset-x-0 bottom-0 max-md:bottom-[var(--mobile-shell-bar-height)] z-30 border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-3 text-[var(--text-primary)] lg:px-8 shadow-2xl">
             <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-bold">{t('community.signIn.title')}</p>
-                <p className="text-sm text-white/70">{t('community.signIn.body')}</p>
+                <p className="text-sm text-[var(--text-secondary)]">{t('community.signIn.body')}</p>
               </div>
               <Button
                 type="button"
-                className="rounded-full bg-[#D93A3A] px-6 font-bold text-white hover:bg-[#C13232]"
+                className="btn-hire-me text-xs"
                 onClick={onRequireAuth}
               >
                 {t('community.signIn.action')}
@@ -311,15 +364,15 @@ export function CommunityPage({
             <button
               type="button"
               aria-label={t('community.composer.post')}
-              className="fixed bottom-20 end-4 z-30 rounded-full bg-[#D93A3A] p-4 text-white shadow-lg transition-colors hover:bg-[#C13232] lg:hidden"
-              onClick={() => setIsComposeOpen(true)}
+              className="fixed bottom-20 max-md:bottom-[calc(var(--mobile-shell-bar-height)+5rem)] end-4 z-30 rounded-full bg-[var(--primary-accent)] p-4 text-[var(--accent-contrast)] shadow-xl hover:scale-105 active:scale-95 transition-all lg:hidden"
+              onClick={() => requestCompose()}
             >
               <HugeiconsIcon icon={PencilEdit01Icon} className="size-6" />
             </button>
 
             <nav
               aria-label={t('community.nav.menu')}
-              className="fixed inset-x-0 bottom-0 z-30 flex border-t border-[#E5E5E5] bg-white/95 backdrop-blur lg:hidden"
+              className="fixed inset-x-0 bottom-0 max-md:bottom-[var(--mobile-shell-bar-height)] z-30 flex border-t border-[var(--border-subtle)] bg-[var(--bg-card)]/95 backdrop-blur-md lg:hidden"
             >
               {mobileItems.map((item) => {
                 const isActive = item.key === route.section
@@ -334,7 +387,7 @@ export function CommunityPage({
                     aria-current={isActive ? 'page' : undefined}
                     className={cn(
                       'relative flex flex-1 items-center justify-center py-3 transition-colors',
-                      isActive ? 'text-[#D93A3A]' : 'text-[#737373]',
+                      isActive ? 'text-[var(--primary-accent)]' : 'text-[var(--text-secondary)]',
                     )}
                     onClick={() => {
                       if (item.guarded && !profile) {
@@ -346,7 +399,7 @@ export function CommunityPage({
                   >
                     <HugeiconsIcon icon={item.icon} className="size-6" strokeWidth={isActive ? 2 : 1.5} />
                     {item.key === 'notifications' && unreadCount > 0 ? (
-                      <span className="absolute top-2 ms-5 size-2 rounded-full bg-[#D93A3A]" />
+                      <span className="absolute top-2 ms-5 size-2 rounded-full bg-[var(--primary-accent)]" />
                     ) : null}
                   </button>
                 );
@@ -354,22 +407,6 @@ export function CommunityPage({
             </nav>
           </>
         )}
-
-        <Dialog open={isComposeOpen} onOpenChange={(next) => { if (!next) { setIsComposeOpen(false); } }}>
-          <DialogContent className="max-h-[85vh] gap-0 overflow-y-auto p-0 sm:max-w-xl">
-            <DialogHeader className="border-b border-[#E5E5E5] px-4 py-3">
-              <DialogTitle className="text-base">{t('community.composer.post')}</DialogTitle>
-            </DialogHeader>
-            <CommunityComposer
-              autoFocus
-              onPosted={(post) => {
-                setIsComposeOpen(false);
-                openPost(post.id);
-              }}
-              onCancel={() => setIsComposeOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
 
         <CommunityComposerDialog
           mode={composer ? composer.mode : null}
@@ -384,13 +421,6 @@ export function CommunityPage({
         />
 
         <CommunityReportDialog target={reportTarget} onClose={() => setReportTarget(null)} />
-
-        <CommunityProfileEditor
-          open={isEditorOpen}
-          profile={profile}
-          onSave={saveProfile}
-          onClose={() => setIsEditorOpen(false)}
-        />
       </div>
     </CommunityProvider>
   );

@@ -46,12 +46,12 @@
 
 /* Focus ring */
 :focus-visible {
-  outline: 2px solid #D93A3A;
+  outline: 2px solid var(--primary-accent);
   outline-offset: 2px;
 }
 
 /* Selection */
 ::selection {
-  background: rgba(217, 58, 58, 0.2);
-  color: #171717;
+  background: var(--primary-accent-glow);
+  color: var(--text-primary);
 }

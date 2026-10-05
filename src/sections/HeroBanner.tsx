@@ -42,82 +42,90 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
     : t('hero.defaultMeta');
 
   return (
-    <section id="features" ref={bannerRef} className="relative overflow-hidden">
-      <div className="hero-gradient min-h-[400px] lg:min-h-[450px] relative">
-        <div className="absolute inset-0 overflow-hidden">
-          {[...Array(20)].map((_, i) => (
+    <section id="features" ref={bannerRef} className="relative overflow-hidden mb-8 mx-auto w-full max-w-[1120px]">
+      <div className="hero-gradient rounded-3xl border border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-5 sm:p-6 lg:p-7 relative overflow-hidden transition-all">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(15)].map((_, i) => (
             <div
               key={i}
-              className="absolute w-1 h-1 bg-white/20 rounded-full animate-float"
+              className="absolute w-1.5 h-1.5 bg-[var(--primary-accent)]/30 rounded-full animate-float"
               style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 4}s`,
-                animationDuration: `${4 + Math.random() * 4}s`,
+                left: `${(i * 19 + 7) % 95}%`,
+                top: `${(i * 29 + 13) % 90}%`,
+                animationDelay: `${(i % 5) * 0.8}s`,
+                animationDuration: `${4 + (i % 4)}s`,
               }}
             />
           ))}
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-            <div ref={contentRef} className="relative z-10">
-              <span className="inline-block px-3 py-1 bg-[#D93A3A] text-white text-xs font-semibold rounded mb-4">
-                {featuredNewsletter ? t('hero.latestNewsletter') : t('hero.latest')}
-              </span>
-              <h1 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-white leading-tight mb-4" dir="auto">
-                {heroTitle}
-              </h1>
-              <p className="text-white/80 text-lg mb-6 max-w-lg" dir="auto">
-                {heroSubtitle}
-              </p>
-              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-                {featuredNewsletter ? (
-                  <button
-                    onClick={() => onArticleClick?.(featuredNewsletter)}
-                    className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#171717] transition-colors hover:bg-white/90"
-                  >
-                    {t('hero.readNewsletter')}
-                    <HugeiconsIcon icon={ArrowRight01Icon} className={cn('h-4 w-4', isRTL && 'rtl-rotate-180')} />
-                  </button>
-                ) : null}
-                <div className="text-white/70 text-sm">
-                  <span className="text-white font-medium">{heroMeta}</span>
-                </div>
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-4 items-center">
+          <div ref={contentRef} className="lg:col-span-6 flex flex-col items-start text-start">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--primary-accent)] text-[var(--accent-contrast)] text-xs font-bold rounded-full mb-4 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              {featuredNewsletter ? t('hero.latestNewsletter') : t('hero.latest')}
+            </span>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[var(--text-primary)] leading-tight mb-4 tracking-tight" dir="auto">
+              {heroTitle}
+            </h1>
+            <p className="text-[var(--text-secondary)] text-sm sm:text-base mb-6 max-w-xl leading-relaxed" dir="auto">
+              {heroSubtitle}
+            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              {featuredNewsletter ? (
+                <button
+                  onClick={() => onArticleClick?.(featuredNewsletter)}
+                  className="btn-hire-me inline-flex items-center gap-2 text-sm"
+                >
+                  <span>{t('hero.readNewsletter')}</span>
+                  <HugeiconsIcon icon={ArrowRight01Icon} className={cn('h-4 w-4', isRTL && 'rtl-rotate-180')} />
+                </button>
+              ) : null}
+              <div className="text-xs sm:text-sm text-[var(--text-muted)] font-medium">
+                <span>{heroMeta}</span>
               </div>
             </div>
+          </div>
 
-            <div ref={imageRef} className="relative">
-              <div className="relative rounded-xl overflow-hidden shadow-2xl">
-                <img
-                  src={heroImage}
-                  alt={featuredNewsletter?.title ?? t('hero.imageAlt')}
-                  className="w-full h-[250px] lg:h-[320px] object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+          <div ref={imageRef} className="lg:col-span-6 relative">
+            <div className="post-media-frame relative md:aspect-video rounded-2xl overflow-hidden shadow-2xl border border-[var(--border-subtle)] group cursor-pointer" onClick={() => featuredNewsletter && onArticleClick?.(featuredNewsletter)}>
+              <img
+                src={heroImage}
+                alt={featuredNewsletter?.title ?? t('hero.imageAlt')}
+                className="w-full h-[300px] md:h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
 
-                <div className="absolute bottom-4 left-4 right-4">
-                  <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src="/logo.gif"
-                        alt="AI Maor Break"
-                        className="w-10 h-10 object-contain"
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-[#171717]">{t('hero.brandLabel')}</p>
-                        <p className="text-xs text-[#737373]">
-                          {featuredNewsletter?.tags[0] ?? t('hero.brandTagline')}
-                        </p>
-                      </div>
+              {/* Decorative Glass Shatter Overlay from Reference */}
+              <svg className="shatter-glass-overlay" viewBox="0 0 900 460" preserveAspectRatio="none">
+                <line x1="0" y1="120" x2="900" y2="340" stroke="#fff" strokeWidth="2" opacity="0.4" />
+                <line x1="280" y1="0" x2="620" y2="460" stroke="#fff" strokeWidth="2.5" opacity="0.5" />
+                <line x1="290" y1="10" x2="630" y2="450" stroke="var(--primary-accent)" strokeWidth="1.5" opacity="0.7" />
+              </svg>
+
+              <div className="absolute bottom-3 inset-x-3">
+                <div className="bg-[var(--bg-card)]/90 backdrop-blur-md rounded-xl p-2.5 border border-[var(--border-subtle)] flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <img
+                      src="/logo.gif"
+                      alt="AI-BREAK"
+                      className="w-8 h-8 object-contain rounded-lg bg-[var(--bg-app)] p-0.5"
+                    />
+                    <div>
+                      <p className="text-xs font-bold text-[var(--text-primary)] leading-tight">{t('hero.brandLabel')}</p>
+                      <p className="text-[11px] text-[var(--text-secondary)]">
+                        {featuredNewsletter?.tags[0] ?? t('hero.brandTagline')}
+                      </p>
                     </div>
                   </div>
+                  <span className="text-[10px] font-bold text-[var(--primary-accent)] bg-[var(--primary-accent)]/10 px-2 py-0.5 rounded-full">
+                    Featured
+                  </span>
                 </div>
               </div>
-
-              <div className="absolute -top-4 -right-4 w-20 h-20 bg-[#D93A3A]/20 rounded-full blur-2xl" />
-              <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
             </div>
+
+            <div className="absolute -top-4 -right-4 w-24 h-24 bg-[var(--primary-accent-glow)] rounded-full blur-2xl pointer-events-none" />
           </div>
         </div>
       </div>

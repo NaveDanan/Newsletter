@@ -27,7 +27,7 @@ export function CommunityProfileRow({
       role="button"
       tabIndex={0}
       className={cn(
-        'flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors hover:bg-[#FAFAFA]',
+        'flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-card-hover)]',
         className,
       )}
       onClick={() => openProfile(profile.handle)}
@@ -46,12 +46,12 @@ export function CommunityProfileRow({
       />
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-semibold text-[#171717]">
+        <p className="truncate text-[15px] font-bold text-[var(--text-primary)]">
           {profile.displayName || profile.handle}
         </p>
-        <p className="truncate text-sm text-[#737373]">@{profile.handle}</p>
+        <p className="truncate text-sm text-[var(--text-secondary)]">@{profile.handle}</p>
         {showBio && profile.bio ? (
-          <p className="mt-1 line-clamp-2 text-sm text-[#404040]">{profile.bio}</p>
+          <p className="mt-1 line-clamp-2 text-sm text-[var(--text-secondary)]">{profile.bio}</p>
         ) : null}
       </div>
 

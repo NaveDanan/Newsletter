@@ -22,7 +22,6 @@ export function useProjects() {
   useEffect(() => {
     let cancelled = false;
 
-    setIsLoading(true);
     fetchProjects()
       .then((data) => {
         if (!cancelled) {

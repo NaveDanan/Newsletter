@@ -11,6 +11,8 @@ import type { CommunityPost } from '@/types/community';
 interface CommunityPostActionsProps {
   post: CommunityPost;
   actions: UseCommunityEngagementResult;
+  /** Overrides the default reply behaviour, e.g. to expand an inline composer. */
+  onReply?: () => void;
 }
 
 interface ActionButtonProps {
@@ -32,9 +34,9 @@ function ActionButton({ icon, label, count, active, activeClass, onClick }: Acti
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        'group inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[13px] text-[#737373] transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93A3A]',
-        active ? activeClass : 'hover:text-[#171717]',
+        'group inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[13px] text-[var(--text-secondary)] transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)]',
+        active ? activeClass : 'hover:text-[var(--text-primary)]',
       )}
       onClick={(event) => {
         event.stopPropagation();
@@ -49,7 +51,7 @@ function ActionButton({ icon, label, count, active, activeClass, onClick }: Acti
 
 // The bar under every post. Counts are hidden at zero, exactly like X, so a
 // quiet feed does not read as a wall of noughts.
-export function CommunityPostActions({ post, actions }: CommunityPostActionsProps) {
+export function CommunityPostActions({ post, actions, onReply }: CommunityPostActionsProps) {
   const { t } = useLocale();
   const { openReply } = useCommunity();
 
@@ -73,7 +75,7 @@ export function CommunityPostActions({ post, actions }: CommunityPostActionsProp
         label={t('community.post.reply')}
         count={post.replyCount}
         activeClass="text-[#1D9BF0]"
-        onClick={() => openReply(post)}
+        onClick={() => (onReply ? onReply() : openReply(post))}
       />
       <ActionButton
         icon={RepeatIcon}
@@ -88,7 +90,7 @@ export function CommunityPostActions({ post, actions }: CommunityPostActionsProp
         label={post.liked ? t('community.post.unlike') : t('community.post.like')}
         count={post.likeCount}
         active={post.liked}
-        activeClass="text-[#D93A3A]"
+        activeClass="text-[var(--primary-accent)]"
         onClick={() => void actions.toggleLike(post)}
       />
       <ActionButton

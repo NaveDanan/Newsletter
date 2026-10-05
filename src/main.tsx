@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { BootErrorBoundary } from './components/BootErrorBoundary.tsx'
-import { AuthProvider } from './contexts/AuthContext.tsx'
-import { LocaleProvider } from './contexts/LocaleContext.tsx'
+import { ThemeProvider } from './context/ThemeProvider.tsx'
+import { AuthProvider } from './contexts/AuthProvider.tsx'
+import { LocaleProvider } from './contexts/LocaleProvider.tsx'
 import { NavigationDataProvider } from './contexts/NavigationDataContext.tsx'
 import { NotificationsProvider } from './contexts/NotificationsContext.tsx'
 import { bootLogger } from './lib/bootLogger.ts'
@@ -57,13 +58,15 @@ bootLogger.step('bootstrap', 'React root created')
 root.render(
   <StrictMode>
     <BootErrorBoundary>
-      <LocaleProvider>
-        <AuthProvider>
-          <NavigationDataProvider>
-            <NotificationsProvider><App /></NotificationsProvider>
-          </NavigationDataProvider>
-        </AuthProvider>
-      </LocaleProvider>
+      <ThemeProvider>
+        <LocaleProvider>
+          <AuthProvider>
+            <NavigationDataProvider>
+              <NotificationsProvider><App /></NotificationsProvider>
+            </NavigationDataProvider>
+          </AuthProvider>
+        </LocaleProvider>
+      </ThemeProvider>
     </BootErrorBoundary>
   </StrictMode>,
 )

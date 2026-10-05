@@ -350,20 +350,20 @@ function MiniGanttViewer({ project }: { project: Project }) {
       <div style={{ minWidth: NAME_W + timelineWidth }} dir={isRTL ? 'rtl' : 'ltr'}>
 
         {/* Month header */}
-        <div style={{ display: 'flex', position: 'sticky', top: 0, zIndex: 10, borderBottom: '2px solid #E5E5E5' }}>
-          <div style={{ width: NAME_W, flexShrink: 0, background: '#F9FAFB', borderRight: isRTL ? undefined : '1px solid #E5E5E5', borderLeft: isRTL ? '1px solid #E5E5E5' : undefined, padding: '6px 12px', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: '0.08em', position: 'sticky', ...stickySide, zIndex: 12, textAlign: isRTL ? 'right' : 'left' }}>{t('manager.task')}</div>
+        <div style={{ display: 'flex', position: 'sticky', top: 0, zIndex: 10, borderBottom: '2px solid var(--border-subtle)' }}>
+          <div style={{ width: NAME_W, flexShrink: 0, background: 'var(--bg-card-alt)', borderRight: isRTL ? undefined : '1px solid var(--border-subtle)', borderLeft: isRTL ? '1px solid var(--border-subtle)' : undefined, padding: '6px 12px', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.08em', position: 'sticky', ...stickySide, zIndex: 12, textAlign: isRTL ? 'right' : 'left' }}>{t('manager.task')}</div>
           {months.map((m, i) => (
-            <div key={i} style={{ width: m.count * DAY_W, flexShrink: 0, background: '#F9FAFB', borderLeft: i > 0 ? '1px solid #E5E5E5' : undefined, padding: '6px 4px', fontSize: 11, fontWeight: 700, color: '#D93A3A', textAlign: 'center' }}>{m.label}</div>
+            <div key={i} style={{ width: m.count * DAY_W, flexShrink: 0, background: 'var(--bg-card-alt)', borderLeft: i > 0 ? '1px solid var(--border-subtle)' : undefined, padding: '6px 4px', fontSize: 11, fontWeight: 700, color: 'var(--primary-accent)', textAlign: 'center' }}>{m.label}</div>
           ))}
         </div>
 
         {/* Day header */}
-        <div style={{ display: 'flex', position: 'sticky', top: 29, zIndex: 9, borderBottom: '1px solid #E5E5E5' }}>
-          <div style={{ width: NAME_W, flexShrink: 0, background: '#FAFAFA', borderRight: isRTL ? undefined : '1px solid #E5E5E5', borderLeft: isRTL ? '1px solid #E5E5E5' : undefined, position: 'sticky', ...stickySide, zIndex: 11 }} />
+        <div style={{ display: 'flex', position: 'sticky', top: 29, zIndex: 9, borderBottom: '1px solid var(--border-subtle)' }}>
+          <div style={{ width: NAME_W, flexShrink: 0, background: 'var(--bg-card-alt)', borderRight: isRTL ? undefined : '1px solid var(--border-subtle)', borderLeft: isRTL ? '1px solid var(--border-subtle)' : undefined, position: 'sticky', ...stickySide, zIndex: 11 }} />
           {days.map((d, i) => {
             const weekend = d.getDay() === 5 || d.getDay() === 6;
             const todayDay = isToday(d);
-            return <div key={i} title={formatDate(d, { weekday: 'short', month: 'short', day: 'numeric' })} style={{ width: DAY_W, flexShrink: 0, textAlign: 'center', padding: '3px 0', fontSize: 9, fontWeight: todayDay ? 700 : 400, color: todayDay ? '#D93A3A' : weekend ? '#D1D5DB' : '#9CA3AF', background: weekend ? '#F3F4F6' : '#FAFAFA', borderLeft: '1px solid #F3F4F6' }}>{formatNumber(d.getDate())}</div>;
+            return <div key={i} title={formatDate(d, { weekday: 'short', month: 'short', day: 'numeric' })} style={{ width: DAY_W, flexShrink: 0, textAlign: 'center', padding: '3px 0', fontSize: 9, fontWeight: todayDay ? 700 : 400, color: todayDay ? 'var(--primary-accent)' : weekend ? 'var(--text-muted)' : 'var(--text-secondary)', background: weekend ? 'var(--bg-pill)' : 'var(--bg-card-alt)', borderLeft: '1px solid var(--border-subtle)' }}>{formatNumber(d.getDate())}</div>;
           })}
         </div>
 
@@ -381,15 +381,15 @@ function MiniGanttViewer({ project }: { project: Project }) {
           const num = taskNums.get(task.id) ?? '';
 
           return (
-            <div key={task.id} style={{ display: 'flex', borderBottom: '1px solid #F3F4F6', height: 36 }}>
-              <div style={{ width: NAME_W, flexShrink: 0, display: 'flex', alignItems: 'center', paddingLeft: isRTL ? 8 : 12 + task.indentLevel * 14, paddingRight: isRTL ? 12 + task.indentLevel * 14 : 8, fontSize: 12, color: '#171717', fontWeight: isMile ? 600 : 400, borderRight: isRTL ? undefined : '1px solid #E5E5E5', borderLeft: isRTL ? '1px solid #E5E5E5' : undefined, background: '#fff', overflow: 'hidden', whiteSpace: 'nowrap', gap: 4, position: 'sticky', ...stickySide, zIndex: 8 }}>
-                <span style={{ color: '#A3A3A3', fontSize: 10, flexShrink: 0, minWidth: 20, fontFamily: 'monospace' }}>{num}</span>
+            <div key={task.id} style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', height: 36 }}>
+              <div style={{ width: NAME_W, flexShrink: 0, display: 'flex', alignItems: 'center', paddingLeft: isRTL ? 8 : 12 + task.indentLevel * 14, paddingRight: isRTL ? 12 + task.indentLevel * 14 : 8, fontSize: 12, color: 'var(--text-primary)', fontWeight: isMile ? 600 : 400, borderRight: isRTL ? undefined : '1px solid var(--border-subtle)', borderLeft: isRTL ? '1px solid var(--border-subtle)' : undefined, background: 'var(--bg-card)', overflow: 'hidden', whiteSpace: 'nowrap', gap: 4, position: 'sticky', ...stickySide, zIndex: 8 }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: 10, flexShrink: 0, minWidth: 20, fontFamily: 'monospace' }}>{num}</span>
                 {isMile && <span style={{ color: c.bg, fontSize: 10, flexShrink: 0 }}>◆</span>}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.name}</span>
               </div>
-              <div style={{ flex: 1, minWidth: timelineWidth, height: '100%', position: 'relative', backgroundImage: `repeating-linear-gradient(to right, transparent ${DAY_W - 1}px, #F3F4F6 ${DAY_W - 1}px, #F3F4F6 ${DAY_W}px)` }}>
+              <div style={{ flex: 1, minWidth: timelineWidth, height: '100%', position: 'relative', backgroundImage: `repeating-linear-gradient(to right, transparent ${DAY_W - 1}px, var(--border-subtle) ${DAY_W - 1}px, var(--border-subtle) ${DAY_W}px)` }}>
                 {todayOff >= 0 && todayOff < days.length && (
-                  <div style={{ position: 'absolute', top: 0, bottom: 0, left: todayLeft, width: 1.5, background: '#D93A3A', opacity: 0.45, zIndex: 2 }} />
+                  <div style={{ position: 'absolute', top: 0, bottom: 0, left: todayLeft, width: 1.5, background: 'var(--primary-accent)', opacity: 0.65, zIndex: 2 }} />
                 )}
                 {isMile ? (
                   <div title={task.name} style={{ position: 'absolute', top: '50%', left: milestoneLeft, width: 14, height: 14, transform: 'translateY(-50%) rotate(45deg)', background: c.bg, borderRadius: 2, zIndex: 3 }} />
@@ -965,37 +965,37 @@ export function SpreadsheetView() {
       </div>
 
       {/* Projects Table */}
-      <div className="bg-white border border-[#E5E5E5] rounded-xl overflow-hidden">
+      <div className="feed-post-card p-0 overflow-hidden border border-[var(--border-subtle)]">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-[#F9FAFB]">
+              <tr className="bg-[var(--bg-card-alt)] border-b border-[var(--border-subtle)]">
                 {[t('manager.project'), t('manager.department'), t('manager.status'), t('manager.dueDate')].map(h => (
-                  <th key={h} className="text-left py-3 px-4 text-xs font-medium text-[#737373] uppercase tracking-wider">{h}</th>
+                  <th key={h} className="text-left py-3 px-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E5E5E5]">
+            <tbody className="divide-y divide-[var(--border-subtle)]">
               {filteredProjects.length === 0 ? (
-                <tr><td colSpan={4} className="py-10 text-center text-sm text-[#737373]">
+                <tr><td colSpan={4} className="py-10 text-center text-sm text-[var(--text-secondary)]">
                   {searchTerm ? t('manager.noSearchResults', { query: searchTerm }) : t('manager.noProjectsYet')}
                 </td></tr>
               ) : filteredProjects.map(project => {
                 const isSelected = project.id === selectedProjectId;
                 return (
                   <tr key={project.id} onClick={() => { setSelectedProjectId(isSelected ? null : project.id); setActiveSheet('gantt'); setViewMode('visual'); }}
-                    className={`cursor-pointer transition-all ${isSelected ? 'bg-[#D93A3A]/5 border-l-2 border-l-[#D93A3A]' : 'hover:bg-[#F9FAFB]'}`}>
+                    className={`cursor-pointer transition-all ${isSelected ? 'bg-[var(--primary-accent)]/15 border-l-2 border-l-[var(--primary-accent)]' : 'hover:bg-[var(--bg-card-hover)]'}`}>
                     <td className="py-3 px-4">
-                      <span className={`font-medium ${isSelected ? 'text-[#D93A3A]' : 'text-[#171717]'}`} dir="auto">{project.title || t('manager.untitledProject')}</span>
-                      {project.devision && <div className="text-xs text-[#A3A3A3] mt-0.5" dir="auto">{project.devision}</div>}
+                      <span className={`font-semibold text-sm sm:text-base ${isSelected ? 'text-[var(--primary-accent)]' : 'text-[var(--text-primary)]'}`} dir="auto">{project.title || t('manager.untitledProject')}</span>
+                      {project.devision && <div className="text-xs text-[var(--text-muted)] mt-0.5" dir="auto">{project.devision}</div>}
                     </td>
-                    <td className="py-3 px-4 text-[#737373] text-sm">
+                    <td className="py-3 px-4 text-[var(--text-secondary)] text-sm">
                       <span className="flex items-center gap-1.5"><HugeiconsIcon icon={Building02Icon} className="w-3.5 h-3.5 flex-shrink-0" />{project.department}</span>
                     </td>
                     <td className="py-3 px-4">
                       <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${getStatusBadgeClass(project.status)}`}>{getProjectStatusLabel(project.status)}</span>
                     </td>
-                    <td className="py-3 px-4 text-sm text-[#737373] font-mono">{getProjectDueDate(project) === '—' ? '—' : formatDate(getProjectDueDate(project), { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                    <td className="py-3 px-4 text-xs sm:text-sm text-[var(--text-muted)] font-mono">{getProjectDueDate(project) === '—' ? '—' : formatDate(getProjectDueDate(project), { year: 'numeric', month: 'short', day: 'numeric' })}</td>
                   </tr>
                 );
               })}
@@ -1006,33 +1006,33 @@ export function SpreadsheetView() {
 
       {/* ── Excel Viewer ── */}
       {selectedProject && (
-        <div className="min-w-0 max-w-full overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm">
+        <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
 
           {/* Header */}
-          <div className="sticky top-0 z-30 flex items-center gap-3 px-4 pt-3 border-b border-[#E5E5E5] bg-[#FAFAFA] flex-wrap gap-y-2">
-            <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center flex-shrink-0">
+          <div className="sticky top-0 z-30 flex items-center gap-3 px-4 pt-3 border-b border-[var(--border-subtle)] bg-[var(--bg-card-alt)] flex-wrap gap-y-2">
+            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
               <HugeiconsIcon icon={FileSpreadsheetIcon} className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-[#171717] truncate">{selectedProject.title}</p>
-              <p className="text-xs text-[#737373]">{selectedProject.department}</p>
+              <p className="text-sm font-bold text-[var(--text-primary)] truncate">{selectedProject.title}</p>
+              <p className="text-xs text-[var(--text-secondary)]">{selectedProject.department}</p>
             </div>
 
             {/* Visual / Raw toggle */}
-            <div className="flex items-center gap-1 bg-[#F3F4F6] rounded-lg p-0.5">
+            <div className="flex items-center gap-1 bg-[var(--bg-pill)] rounded-full p-1 border border-[var(--border-subtle)]">
               {(['visual', 'raw'] as ViewMode[]).map(mode => (
                 <button key={mode} onClick={() => setViewMode(mode)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === mode ? 'bg-white text-[#171717] shadow-sm' : 'text-[#737373] hover:text-[#171717]'}`}>
+                  className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${viewMode === mode ? 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
                   {mode === 'visual' ? `📊 ${t('manager.visual')}` : `📄 ${t('manager.raw')}`}
                 </button>
               ))}
             </div>
 
             {/* Sheet tabs */}
-            <div className="flex items-end gap-px">
+            <div className="flex items-end gap-1">
               {SHEET_TABS.map(tab => (
                 <button key={tab.id} onClick={() => setActiveSheet(tab.id)}
-                  className={`px-3 py-2 text-xs font-medium rounded-t-lg border transition-colors whitespace-nowrap ${activeSheet === tab.id ? 'bg-white border-[#E5E5E5] border-b-white text-[#171717] -mb-px relative z-10' : 'bg-[#F3F4F6] border-transparent text-[#737373] hover:text-[#171717] hover:bg-white'}`}>
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-t-xl border border-b-0 transition-colors whitespace-nowrap ${activeSheet === tab.id ? 'bg-[var(--bg-card)] border-[var(--border-subtle)] text-[var(--primary-accent)] -mb-px relative z-10' : 'bg-[var(--bg-pill)] border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
                   {tab.id === 'gantt' ? `📊 ${t('manager.gantt')}` : tab.id === 'projects' ? `📋 ${t('manager.projects')}` : tab.id === 'goals' ? `🎯 ${t('manager.goals')}` : tab.id === 'resources' ? `👤 ${t('manager.resources')}` : `🎭 ${t('manager.roles')}`}
                 </button>
               ))}
@@ -1052,25 +1052,25 @@ export function SpreadsheetView() {
             {activeSheet === 'projects' && (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead><tr className="bg-[#F9FAFB] border-b border-[#E5E5E5]">
+                  <thead><tr className="bg-[var(--bg-card-alt)] border-b border-[var(--border-subtle)]">
                     {[t('manager.title'), t('manager.department'), t('manager.division'), t('manager.field'), t('manager.status'), t('manager.dueDate'), t('manager.description')].map(c => (
-                      <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>
+                      <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{c}</th>
                     ))}
                   </tr></thead>
-                  <tbody className="divide-y divide-[#F3F4F6]">
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
                     {projects.map(p => (
-                      <tr key={p.id} className={p.id === selectedProjectId ? 'bg-[#D93A3A]/5' : 'hover:bg-[#FAFAFA]'}>
-                        <td className="py-2 px-4 font-medium text-[#171717] whitespace-nowrap" dir="auto">{p.title}</td>
-                        <td className="py-2 px-4 text-[#737373] whitespace-nowrap">{p.department}</td>
-                        <td className="py-2 px-4 text-[#737373] whitespace-nowrap">{p.devision}</td>
-                        <td className="py-2 px-4 text-[#737373] whitespace-nowrap">{p.field}</td>
+                      <tr key={p.id} className={p.id === selectedProjectId ? 'bg-[var(--primary-accent)]/15' : 'hover:bg-[var(--bg-card-hover)]'}>
+                        <td className="py-2 px-4 font-semibold text-[var(--text-primary)] whitespace-nowrap" dir="auto">{p.title}</td>
+                        <td className="py-2 px-4 text-[var(--text-secondary)] whitespace-nowrap">{p.department}</td>
+                        <td className="py-2 px-4 text-[var(--text-secondary)] whitespace-nowrap">{p.devision}</td>
+                        <td className="py-2 px-4 text-[var(--text-secondary)] whitespace-nowrap">{p.field}</td>
                         <td className="py-2 px-4 whitespace-nowrap">
                           {viewMode === 'visual'
                             ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadgeClass(p.status)}`}>{getProjectStatusLabel(p.status)}</span>
-                            : <span className="text-xs text-[#737373]">{getProjectStatusLabel(p.status)}</span>}
+                            : <span className="text-xs text-[var(--text-secondary)]">{getProjectStatusLabel(p.status)}</span>}
                         </td>
-                        <td className="py-2 px-4 text-[#737373] font-mono text-xs whitespace-nowrap">{getProjectDueDate(p) === '—' ? '—' : formatDate(getProjectDueDate(p), { year: 'numeric', month: 'short', day: 'numeric' })}</td>
-                        <td className="py-2 px-4 text-[#737373] max-w-xs truncate" dir="auto">{p.description}</td>
+                        <td className="py-2 px-4 text-[var(--text-muted)] font-mono text-xs whitespace-nowrap">{getProjectDueDate(p) === '—' ? '—' : formatDate(getProjectDueDate(p), { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                        <td className="py-2 px-4 text-[var(--text-secondary)] max-w-xs truncate" dir="auto">{p.description}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1082,43 +1082,43 @@ export function SpreadsheetView() {
             {activeSheet === 'goals' && (
               displayedGoals.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-center gap-2 py-8">
-                  <HugeiconsIcon icon={Target01Icon} className="w-10 h-10 text-[#E5E5E5]" />
-                  <p className="text-sm text-[#737373]">{t('manager.noMilestonesSpreadsheet')}</p>
+                  <HugeiconsIcon icon={Target01Icon} className="w-10 h-10 text-[var(--text-muted)]" />
+                  <p className="text-sm text-[var(--text-secondary)]">{t('manager.noMilestonesSpreadsheet')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead><tr className="bg-[#F9FAFB] border-b border-[#E5E5E5]">
+                    <thead><tr className="bg-[var(--bg-card-alt)] border-b border-[var(--border-subtle)]">
                       {[t('manager.project'), t('manager.milestone'), t('manager.date'), t('manager.progressPercent'), t('manager.status')].map(c => (
-                        <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>
+                        <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{c}</th>
                       ))}
                     </tr></thead>
-                    <tbody className="divide-y divide-[#F3F4F6]">
+                    <tbody className="divide-y divide-[var(--border-subtle)]">
                       {displayedGoals.map(g => (
-                        <tr key={g.id} className="hover:bg-[#FAFAFA]">
-                          <td className="py-2.5 px-4 font-medium text-[#171717] whitespace-nowrap">{g.projectTitle}</td>
-                          <td className="py-2.5 px-4 text-[#737373] whitespace-nowrap">
+                        <tr key={g.id} className="hover:bg-[var(--bg-card-hover)]">
+                          <td className="py-2.5 px-4 font-semibold text-[var(--text-primary)] whitespace-nowrap">{g.projectTitle}</td>
+                          <td className="py-2.5 px-4 text-[var(--text-secondary)] whitespace-nowrap">
                             {viewMode === 'visual'
-                              ? <span className="flex items-center gap-1.5"><HugeiconsIcon icon={Target01Icon} className="w-3.5 h-3.5 text-[#D93A3A] flex-shrink-0" />{g.milestoneName}</span>
-                              : <span className="text-[#737373]">{g.milestoneName}</span>}
+                              ? <span className="flex items-center gap-1.5"><HugeiconsIcon icon={Target01Icon} className="w-3.5 h-3.5 text-[var(--primary-accent)] flex-shrink-0" />{g.milestoneName}</span>
+                              : <span className="text-[var(--text-secondary)]">{g.milestoneName}</span>}
                           </td>
-                          <td className="py-2.5 px-4 text-[#737373] font-mono text-xs whitespace-nowrap">{formatDate(g.milestoneDate, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                          <td className="py-2.5 px-4 text-[var(--text-muted)] font-mono text-xs whitespace-nowrap">{formatDate(g.milestoneDate, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
                           <td className="py-2.5 px-4 whitespace-nowrap">
                             {viewMode === 'visual'
                               ? <div className="flex items-center gap-2">
-                                  <div className="w-20 h-1.5 bg-[#E5E5E5] rounded-full overflow-hidden">
-                                    <div className="h-full bg-[#D93A3A] rounded-full" style={{ width: `${g.progress}%` }} />
+                                  <div className="w-20 h-1.5 bg-[var(--bg-pill)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
+                                    <div className="h-full bg-[var(--primary-accent)] rounded-full" style={{ width: `${g.progress}%` }} />
                                   </div>
-                                  <span className="text-xs text-[#737373]">{formatNumber(g.progress)}%</span>
+                                  <span className="text-xs text-[var(--text-secondary)]">{formatNumber(g.progress)}%</span>
                                 </div>
-                              : <span className="text-xs text-[#737373]">{formatNumber(g.progress)}%</span>}
+                              : <span className="text-xs text-[var(--text-secondary)]">{formatNumber(g.progress)}%</span>}
                           </td>
                           <td className="py-2.5 px-4">
                             {viewMode === 'visual'
                               ? <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${goalBadge(g.status)}`}>
                                   {goalIcon(g.status)}{getGoalStatusLabel(g.status)}
                                 </span>
-                              : <span className="text-xs text-[#737373]">{getGoalStatusLabel(g.status)}</span>}
+                              : <span className="text-xs text-[var(--text-secondary)]">{getGoalStatusLabel(g.status)}</span>}
                           </td>
                         </tr>
                       ))}
@@ -1136,37 +1136,37 @@ export function SpreadsheetView() {
               return resources.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-center gap-2 py-8">
                   <span className="text-4xl">👤</span>
-                  <p className="text-sm text-[#737373]">{t('manager.noResourcesSpreadsheet')}</p>
+                  <p className="text-sm text-[var(--text-secondary)]">{t('manager.noResourcesSpreadsheet')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead><tr className="bg-[#F9FAFB] border-b border-[#E5E5E5]">
-                      {[t('manager.name'), t('manager.role'), t('manager.color'), t('manager.capacity')].map(c => <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>)}
+                    <thead><tr className="bg-[var(--bg-card-alt)] border-b border-[var(--border-subtle)]">
+                      {[t('manager.name'), t('manager.role'), t('manager.color'), t('manager.capacity')].map(c => <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{c}</th>)}
                     </tr></thead>
-                    <tbody className="divide-y divide-[#F3F4F6]">
+                    <tbody className="divide-y divide-[var(--border-subtle)]">
                       {resources.map(r => {
                         const role = r.roleId ? roleById.get(r.roleId) : null;
                         return (
-                          <tr key={r.id} className="hover:bg-[#FAFAFA]">
-                            <td className="py-2.5 px-4 font-medium text-[#171717] whitespace-nowrap">
+                          <tr key={r.id} className="hover:bg-[var(--bg-card-hover)]">
+                            <td className="py-2.5 px-4 font-semibold text-[var(--text-primary)] whitespace-nowrap">
                               {viewMode === 'visual'
                                 ? <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full flex-shrink-0 inline-block" style={{ background: r.color }} />{r.name}</span>
                                 : <span>{r.name}</span>}
                             </td>
-                            <td className="py-2.5 px-4 text-[#737373] whitespace-nowrap">{role?.name ?? r.role ?? '—'}</td>
+                            <td className="py-2.5 px-4 text-[var(--text-secondary)] whitespace-nowrap">{role?.name ?? r.role ?? '—'}</td>
                             <td className="py-2.5 px-4 whitespace-nowrap">
                               {viewMode === 'visual'
-                                ? <span className="inline-flex items-center gap-1.5 font-mono text-xs text-[#737373]"><span className="w-4 h-4 rounded" style={{ background: r.color }} />{r.color}</span>
-                                : <span className="font-mono text-xs text-[#737373]">{r.color}</span>}
+                                ? <span className="inline-flex items-center gap-1.5 font-mono text-xs text-[var(--text-secondary)]"><span className="w-4 h-4 rounded" style={{ background: r.color }} />{r.color}</span>
+                                : <span className="font-mono text-xs text-[var(--text-secondary)]">{r.color}</span>}
                             </td>
                             <td className="py-2.5 px-4 whitespace-nowrap">
                               {viewMode === 'visual'
                                 ? <div className="flex items-center gap-2">
-                                    <div className="w-16 h-1.5 bg-[#E5E5E5] rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${r.capacityPercent}%`, background: r.color }} /></div>
-                                    <span className="text-xs text-[#737373]">{formatNumber(r.capacityPercent)}%</span>
+                                    <div className="w-16 h-1.5 bg-[var(--bg-pill)] rounded-full overflow-hidden border border-[var(--border-subtle)]"><div className="h-full rounded-full" style={{ width: `${r.capacityPercent}%`, background: r.color }} /></div>
+                                    <span className="text-xs text-[var(--text-secondary)]">{formatNumber(r.capacityPercent)}%</span>
                                   </div>
-                                : <span className="text-xs text-[#737373]">{formatNumber(r.capacityPercent)}%</span>}
+                                : <span className="text-xs text-[var(--text-secondary)]">{formatNumber(r.capacityPercent)}%</span>}
                             </td>
                           </tr>
                         );
@@ -1183,25 +1183,25 @@ export function SpreadsheetView() {
               return roles.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-center gap-2 py-8">
                   <span className="text-4xl">🎭</span>
-                  <p className="text-sm text-[#737373]">{t('manager.noRolesSpreadsheet')}</p>
+                  <p className="text-sm text-[var(--text-secondary)]">{t('manager.noRolesSpreadsheet')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead><tr className="bg-[#F9FAFB] border-b border-[#E5E5E5]">
-                      {[t('manager.name'), t('manager.budget'), t('manager.paidBy'), t('manager.currency')].map(c => <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider whitespace-nowrap">{c}</th>)}
+                    <thead><tr className="bg-[var(--bg-card-alt)] border-b border-[var(--border-subtle)]">
+                      {[t('manager.name'), t('manager.budget'), t('manager.paidBy'), t('manager.currency')].map(c => <th key={c} className="text-left py-2.5 px-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{c}</th>)}
                     </tr></thead>
-                    <tbody className="divide-y divide-[#F3F4F6]">
+                    <tbody className="divide-y divide-[var(--border-subtle)]">
                       {roles.map(rl => (
-                        <tr key={rl.id} className="hover:bg-[#FAFAFA]">
-                          <td className="py-2.5 px-4 font-medium text-[#171717] whitespace-nowrap">{rl.name}</td>
-                          <td className="py-2.5 px-4 text-[#737373] whitespace-nowrap font-mono">{formatNumber(rl.budget)} {rl.currency}</td>
+                        <tr key={rl.id} className="hover:bg-[var(--bg-card-hover)]">
+                          <td className="py-2.5 px-4 font-semibold text-[var(--text-primary)] whitespace-nowrap">{rl.name}</td>
+                          <td className="py-2.5 px-4 text-[var(--text-secondary)] whitespace-nowrap font-mono">{formatNumber(rl.budget)} {rl.currency}</td>
                           <td className="py-2.5 px-4 whitespace-nowrap">
                             {viewMode === 'visual'
-                              ? <span className="text-xs px-2 py-0.5 rounded-full bg-[#F3F4F6] text-[#737373] font-medium capitalize">{rl.paidBy}</span>
-                              : <span className="text-xs text-[#737373] capitalize">{rl.paidBy}</span>}
+                              ? <span className="text-xs px-2.5 py-0.5 rounded-full bg-[var(--bg-pill)] text-[var(--text-secondary)] font-medium capitalize border border-[var(--border-subtle)]">{rl.paidBy}</span>
+                              : <span className="text-xs text-[var(--text-secondary)] capitalize">{rl.paidBy}</span>}
                           </td>
-                          <td className="py-2.5 px-4 text-[#737373] whitespace-nowrap">{rl.currency}</td>
+                          <td className="py-2.5 px-4 text-[var(--text-secondary)] whitespace-nowrap">{rl.currency}</td>
                         </tr>
                       ))}
                     </tbody>

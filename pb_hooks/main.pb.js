@@ -6,6 +6,10 @@ cronAdd('newsletterDigestScheduler', '* * * * *', function () {
 var apiManager = require(__hooks + '/lib/api-manager.js');
 apiManager.registerApiManager(routerAdd, $apis);
 
+onRecordUpdateRequest(function (e) {
+  return require(__hooks + '/lib/api-manager.js').handleNewsletterRecordUpdateRequest(e);
+}, 'newsletters');
+
 routerAdd('POST', '/api/newsletter/subscribe', function (e) {
   var helpers = require(__hooks + '/lib/newsletter-mail.js');
   var body = e.requestInfo().body || {};

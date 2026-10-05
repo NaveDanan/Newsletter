@@ -33,7 +33,7 @@ interface CommunityFeedListProps {
 
 function PostSkeleton() {
   return (
-    <div className="flex gap-3 border-b border-[#E5E5E5] px-4 py-4">
+    <div className="flex gap-3 border-b border-[var(--border-subtle)] px-4 py-4">
       <Skeleton className="size-10 shrink-0 rounded-full" />
       <div className="flex-1 space-y-2">
         <Skeleton className="h-3 w-40" />
@@ -102,9 +102,9 @@ export function CommunityFeedList({
   if (error && posts.length === 0) {
     return (
       <div className={cn('flex flex-col items-center gap-3 px-6 py-16 text-center', className)}>
-        <HugeiconsIcon icon={Alert01Icon} className="size-8 text-[#D93A3A]" />
-        <p className="text-[15px] text-[#737373]">{error}</p>
-        <Button variant="outline" size="sm" onClick={onRetry}>
+        <HugeiconsIcon icon={Alert01Icon} className="size-8 text-[var(--primary-accent)]" />
+        <p className="text-[15px] text-[var(--text-secondary)]">{error}</p>
+        <Button variant="outline" size="sm" onClick={onRetry} className="rounded-full border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)]">
           {t('community.feed.retry')}
         </Button>
       </div>
@@ -116,14 +116,14 @@ export function CommunityFeedList({
       return <div className={className}>{emptyContent}</div>;
     }
     return (
-      <div className={cn('px-6 py-16 text-center text-[15px] text-[#737373]', className)}>
+      <div className={cn('px-6 py-16 text-center text-[15px] text-[var(--text-secondary)]', className)}>
         {emptyMessage}
       </div>
     );
   }
 
   return (
-    <div className={className}>
+    <div className={cn('flex flex-col gap-4 px-4 py-4', className)}>
       {posts.map((post) => {
         const postRepostedBy = typeof repostedBy === 'function' ? repostedBy(post) : repostedBy;
         return (

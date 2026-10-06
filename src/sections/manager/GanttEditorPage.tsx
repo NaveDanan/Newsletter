@@ -454,7 +454,7 @@ const gridDividerWidth = 32;
 const minimumTimelineViewportWidth = 120;
 const minTaskGridWidth = 380;
 const maxTaskGridWidth = 920;
-const taskGridColumns = '56px minmax(136px, 1fr) 132px 84px 148px';
+const taskGridColumns = '40px minmax(208px, 1fr) 132px 72px 104px';
 const taskDetailColumns = 'minmax(0, 1.05fr) minmax(0, 1.15fr) 108px 112px 48px';
 
 const currencyIcons = {
@@ -2539,7 +2539,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                   >
                     <div dir={isRTL ? 'rtl' : 'ltr'} className="min-h-full pb-5" style={{ minHeight: timelineGridMinHeight, minWidth: taskGridContentWidth }}>
                       <div
-                        className="sticky top-0 z-20 grid h-14 border-b border-[var(--border-subtle)] bg-[var(--bg-card-alt)] text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]"
+                        className={`sticky top-0 z-20 grid h-14 border-b border-[var(--border-subtle)] bg-[var(--bg-card-alt)] text-[11px] font-semibold uppercase text-[var(--text-secondary)] ${isRTL ? 'tracking-normal' : 'tracking-wide'}`}
                         style={{ gridTemplateColumns: taskGridColumns }}
                       >
                         {[
@@ -2548,8 +2548,8 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                           t('manager.startDate'),
                           t('ganttEditor.days'),
                           t('manager.endDate'),
-                        ].map((label) => (
-                          <div key={label} className="flex items-center border-r border-[var(--border-subtle)] px-2 last:border-r-0">
+                        ].map((label, column) => (
+                          <div key={label} className={`flex min-w-0 items-center border-r border-[var(--border-subtle)] px-1.5 last:border-r-0 ${column === 1 ? 'text-start' : 'justify-center text-center'}`}>
                             {label}
                           </div>
                         ))}
@@ -2615,13 +2615,14 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                                       ) : null}
                                     </div>
                                   ) : null}
-                                  <div className="flex items-center justify-center border-r border-[var(--border-subtle)] px-2 text-xs font-semibold text-[var(--text-secondary)]">
-                                    {hierarchyItem?.label ?? ''}
+                                  <div className="flex min-w-0 items-center justify-center border-r border-[var(--border-subtle)] px-1 text-[11px] font-semibold tabular-nums text-[var(--text-secondary)]">
+                                    <span className="truncate" title={hierarchyItem?.label}>{hierarchyItem?.label ?? ''}</span>
                                   </div>
-                                  <div className="border-r border-[var(--border-subtle)] px-2 py-2">
+                                  <div className="min-w-0 border-r border-[var(--border-subtle)] px-1.5 py-2">
                                     <div
-                                      className="flex h-full items-center gap-2"
-                                      style={{ paddingInlineStart: `${8 + (task.indentLevel * 24)}px` }}
+                                      className="flex h-full min-w-0 items-center gap-1"
+                                      // Preserve text space in deep trees; the row number still shows the full hierarchy.
+                                      style={{ paddingInlineStart: `${4 + (Math.min(task.indentLevel, 3) * 12)}px` }}
                                     >
                                       <div
                                         role="button"
@@ -2652,7 +2653,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                                             event.stopPropagation();
                                             handleToggleTaskCollapse(task.id);
                                           }}
-                                          className="rounded-md p-1 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)]"
+                                          className="shrink-0 rounded-md p-1 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)]"
                                           aria-label={isCollapsed ? t('ganttEditor.expandSubtasks') : t('ganttEditor.collapseSubtasks')}
                                         >
                                           <HugeiconsIcon
@@ -2661,16 +2662,17 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                                           />
                                         </button>
                                       ) : (
-                                        <span className="h-6 w-6 shrink-0" />
+                                        <span className="h-6 w-6 shrink-0" aria-hidden="true" />
                                       )}
                                       <input
                                         type="text"
                                         data-gantt-task-name-input="true"
                                         dir="auto"
                                         value={task.name}
+                                        title={task.name}
                                         onChange={(event) => updateTask(task.id, { name: event.target.value })}
                                         onKeyDownCapture={(event) => event.stopPropagation()}
-                                        className={`h-full w-full border-transparent bg-transparent px-0 py-1 text-sm focus:border-[var(--primary-accent)] ${
+                                        className={`h-full min-w-0 flex-1 border-transparent bg-transparent px-0 py-1 text-start text-[13px] leading-5 focus:border-[var(--primary-accent)] ${
                                           hierarchyItem?.hasChildren
                                             ? 'font-bold text-[var(--text-primary)]'
                                             : 'font-medium text-[var(--text-primary)]'
@@ -2678,17 +2680,19 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                                       />
                                     </div>
                                   </div>
-                                  <div className="border-r border-[var(--border-subtle)] px-2 py-2">
+                                  <div className="min-w-0 border-r border-[var(--border-subtle)] px-1.5 py-2">
                                     <input
                                       type="date"
+                                      dir="ltr"
                                       value={task.startDate}
                                       onChange={(event) => updateTask(task.id, { startDate: event.target.value })}
-                                      className="h-full w-full px-2 py-1 text-sm bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)]"
+                                      className="h-full min-w-0 w-full px-1.5 py-1 text-xs tabular-nums bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)]"
                                     />
                                   </div>
-                                  <div className="border-r border-[var(--border-subtle)] px-2 py-2">
+                                  <div className="min-w-0 border-r border-[var(--border-subtle)] px-1.5 py-2">
                                     <input
                                       type="number"
+                                      dir="ltr"
                                       min={task.milestone ? 0 : 1}
                                       value={task.durationDays}
                                       disabled={task.milestone}
@@ -2697,10 +2701,10 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                                           ? 0
                                           : Math.max(1, Number.parseInt(event.target.value, 10) || 1),
                                       })}
-                                      className="h-full w-full px-2 py-1 text-sm bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] disabled:opacity-40"
+                                      className="h-full min-w-0 w-full px-1 py-1 text-xs text-center tabular-nums bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] disabled:opacity-40"
                                     />
                                   </div>
-                                  <div className="flex items-center border-r border-[var(--border-subtle)] px-3 text-sm text-[var(--text-secondary)] font-mono">
+                                  <div dir="ltr" className="flex min-w-0 items-center justify-center border-r border-[var(--border-subtle)] px-1.5 text-xs text-center tabular-nums text-[var(--text-secondary)] font-mono">
                                     {task.endDate}
                                   </div>
                                 </div>

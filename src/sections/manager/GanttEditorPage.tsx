@@ -621,6 +621,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
   const draftGanttRef = useRef<ProjectGantt>(draftGantt);
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const taskGridScrollRef = useRef<HTMLDivElement | null>(null);
+  const taskGridHorizontalPositionRef = useRef<{ width: number; scrollWidth: number; scrollLeft: number } | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const selectedTaskBarRef = useRef<HTMLDivElement | null>(null);
   const taskBubbleAnchor = useRef({
@@ -910,7 +911,20 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
     const updateViewportWidth = () => {
       setTimelineViewportWidth(scrollContainer.clientWidth);
       setGridViewportWidth(gridRef.current?.clientWidth ?? window.innerWidth);
-      setTaskGridViewportWidth(taskGridScrollRef.current?.clientWidth ?? 0);
+      const taskGrid = taskGridScrollRef.current;
+      const width = taskGrid?.clientWidth ?? 0;
+      const previous = taskGridHorizontalPositionRef.current;
+      if (taskGrid && width > 0) {
+        if (isRTL && previous && (previous.width !== width || previous.scrollWidth !== taskGrid.scrollWidth)) {
+          const offsetFromRight = Math.max(0, previous.scrollWidth - previous.width - previous.scrollLeft);
+          const maxScroll = Math.max(0, taskGrid.scrollWidth - width);
+          taskGrid.scrollLeft = Math.max(0, maxScroll - offsetFromRight);
+        }
+        taskGridHorizontalPositionRef.current = { width, scrollWidth: taskGrid.scrollWidth, scrollLeft: taskGrid.scrollLeft };
+      } else {
+        taskGridHorizontalPositionRef.current = null;
+      }
+      setTaskGridViewportWidth(width);
       updateVisibleTimelineDate();
     };
 
@@ -923,7 +937,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
     return () => {
       resizeObserver.disconnect();
     };
-  }, [updateVisibleTimelineDate, hasTasks]);
+  }, [updateVisibleTimelineDate, hasTasks, isRTL]);
 
   useEffect(() => {
     if (!timelineScrollRef.current) {
@@ -960,6 +974,12 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
   const handleTaskGridScroll = useCallback(() => {
     const taskGrid = taskGridScrollRef.current;
     const timeline = timelineScrollRef.current;
+    const previous = taskGridHorizontalPositionRef.current;
+    // Resize can clamp scrollLeft before its observer runs. Keep the old
+    // position until the viewport geometry has been reconciled.
+    if (taskGrid && previous && previous.width === taskGrid.clientWidth && previous.scrollWidth === taskGrid.scrollWidth) {
+      previous.scrollLeft = taskGrid.scrollLeft;
+    }
     if (taskGrid && timeline && taskGrid.scrollTop !== timeline.scrollTop) {
       timeline.scrollTop = taskGrid.scrollTop;
     }
@@ -969,6 +989,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
     const grid = taskGridScrollRef.current;
     if (grid && !isTaskGridCollapsed) {
       grid.scrollLeft = isRTL ? grid.scrollWidth - grid.clientWidth : 0;
+      taskGridHorizontalPositionRef.current = { width: grid.clientWidth, scrollWidth: grid.scrollWidth, scrollLeft: grid.scrollLeft };
     }
   }, [hasTasks, isRTL, isTaskGridCollapsed]);
 

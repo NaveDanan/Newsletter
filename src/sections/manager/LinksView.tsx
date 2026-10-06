@@ -511,7 +511,7 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
 
       {/* ==== Link Dialog ==== */}
       <Dialog open={isLinkDialogOpen} onOpenChange={(open) => { if (!open) { setIsLinkDialogOpen(false); setEditingLink(null); setLinkDraft(emptyLinkForm); setIsSaving(false); } }}>
-        <DialogContent className="max-w-2xl border-[#E5E5E5] bg-white max-h-[90vh] overflow-y-auto">
+        <DialogContent className="manager-dashboard max-w-2xl border-[#E5E5E5] bg-white max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#171717]">
               {editingLink ? t('managerLinks.editLink') : t('managerLinks.addLink')}
@@ -599,7 +599,7 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
 
       {/* ==== Dropdown Dialog ==== */}
       <Dialog open={isDropdownDialogOpen} onOpenChange={(open) => { if (!open) { setIsDropdownDialogOpen(false); setEditingDropdown(null); } }}>
-        <DialogContent className="max-w-md border-[#E5E5E5] bg-white">
+        <DialogContent className="manager-dashboard max-w-md border-[#E5E5E5] bg-white">
           <DialogHeader>
             <DialogTitle className="text-[#171717]">
               {editingDropdown ? t('linksPage.editDropdown') : t('linksPage.addDropdown')}

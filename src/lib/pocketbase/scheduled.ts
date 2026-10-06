@@ -80,6 +80,7 @@ export async function runNewsletterDigestNow(): Promise<NewsletterDigestSchedule
 
 export interface NewsletterImportSchedule {
   enabled: boolean;
+  autoPublish: boolean;
   repositoryUrl: string;
   username: string;
   hasToken: boolean;
@@ -100,6 +101,7 @@ export interface NewsletterImportSchedule {
 
 export interface NewsletterImportPatch {
   enabled?: boolean;
+  autoPublish?: boolean;
   repositoryUrl?: string;
   username?: string;
   token?: string;

@@ -324,7 +324,7 @@ export function ManagerDashboard({
   };
 
   const dashboard = (
-    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+    <div className="manager-dashboard min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
       <AlertDialog
         open={showUnsavedDialog}
         onOpenChange={(open) => {

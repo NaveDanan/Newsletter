@@ -68,7 +68,9 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { TimelineScrollbar } from '@/components/gantt/TimelineScrollbar';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface GanttEditorPageProps {
   projectId: string;
@@ -446,10 +448,10 @@ const currencyOptions: GanttCurrency[] = ['ILS', 'USD', 'EUR', 'GBP'];
 const timelineHeaderHeight = 56;
 const taskMainRowHeight = 56;
 const taskDetailRowHeight = 84;
-const taskBubbleWidth = 296;
-const taskBubbleHeight = 332;
 const minimumVisibleRows = 10;
 const defaultTaskGridWidth = 556;
+const gridDividerWidth = 32;
+const minimumTimelineViewportWidth = 120;
 const minTaskGridWidth = 380;
 const maxTaskGridWidth = 920;
 const taskGridColumns = '56px minmax(136px, 1fr) 132px 84px 148px';
@@ -586,7 +588,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
   const [managedTaskId, setManagedTaskId] = useState<string | null>(null);
   const [collapsedTaskIds, setCollapsedTaskIds] = useState<Set<string>>(() => getDefaultCollapsedTaskIds(initialGantt.tasks));
   const [taskGridWidth, setTaskGridWidth] = useState(defaultTaskGridWidth);
-  const [isTaskGridCollapsed, setIsTaskGridCollapsed] = useState(false);
+  const [isTaskGridCollapsed, setIsTaskGridCollapsed] = useState(() => window.innerWidth < 768);
   const [taskGridResizeState, setTaskGridResizeState] = useState<TaskGridResizeState | null>(null);
   const [taskClipboard, setTaskClipboard] = useState<TaskClipboard | null>(null);
   const [predecessorDrafts, setPredecessorDrafts] = useState<Record<string, string>>(() => buildPredecessorDrafts(initialGantt.tasks));
@@ -618,10 +620,20 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
   const lastExpandedTaskGridWidthRef = useRef(defaultTaskGridWidth);
   const draftGanttRef = useRef<ProjectGantt>(draftGantt);
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
-  const timelineScrollbarRef = useRef<HTMLDivElement | null>(null);
-  const isSyncingTimelineScrollRef = useRef(false);
+  const taskGridScrollRef = useRef<HTMLDivElement | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const selectedTaskBarRef = useRef<HTMLDivElement | null>(null);
+  const taskBubbleAnchor = useRef({
+    getBoundingClientRect: () => selectedTaskBarRef.current?.getBoundingClientRect() ?? new DOMRect(),
+    get contextElement() { return selectedTaskBarRef.current ?? undefined; },
+  });
   const hasScrolledToTodayRef = useRef(false);
   const [timelineViewportWidth, setTimelineViewportWidth] = useState(0);
+  const [gridViewportWidth, setGridViewportWidth] = useState(() => window.innerWidth);
+  const [taskGridViewportWidth, setTaskGridViewportWidth] = useState(0);
+  // Keep the divider and a useful part of the timeline visible on small screens.
+  const renderedTaskGridWidth = Math.min(taskGridWidth, Math.max(0, gridViewportWidth - gridDividerWidth - minimumTimelineViewportWidth));
+  const taskGridContentWidth = Math.max(defaultTaskGridWidth, renderedTaskGridWidth);
 
   useEffect(() => {
     draftGanttRef.current = draftGantt;
@@ -647,6 +659,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
   }, [isDirty]);
 
   const orderedTasks = draftGantt.tasks;
+  const hasTasks = orderedTasks.length > 0;
   const taskHierarchy = useMemo(() => buildTaskHierarchy(orderedTasks), [orderedTasks]);
   const visibleTasks = useMemo(
     () => buildVisibleTasks(orderedTasks, collapsedTaskIds),
@@ -654,7 +667,6 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
   );
   const selectedTask = orderedTasks.find((task) => task.id === timelineSelectedTaskId) ?? null;
   const selectedTaskIndex = selectedTask ? visibleTasks.findIndex((task) => task.id === selectedTask.id) : -1;
-  const managedTaskIndex = managedTaskId ? visibleTasks.findIndex((task) => task.id === managedTaskId) : -1;
   const selectedTaskResource = selectedTask
     ? draftGantt.resources.find((resource) => resource.id === selectedTask.resourceId) ?? null
     : null;
@@ -808,41 +820,6 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
 
     return { barLeft, barWidth };
   }, [isRTL, timelineCellWidth, timelineStart, timelineWidth]);
-  const selectedTaskBubble = useMemo(() => {
-    if (!selectedTask || selectedTaskIndex < 0) {
-      return null;
-    }
-
-    const { barLeft, barWidth } = getTaskTimelineLayout(selectedTask);
-    const anchorCenter = barLeft + (barWidth / 2);
-    const bubbleLeft = clamp(anchorCenter - (taskBubbleWidth / 2), 8, Math.max(timelineWidth - taskBubbleWidth - 8, 8));
-    const pointerLeft = clamp(anchorCenter - bubbleLeft, 18, taskBubbleWidth - 18);
-    const rowTop = timelineHeaderHeight
-      + (selectedTaskIndex * taskMainRowHeight)
-      + (managedTaskIndex >= 0 && managedTaskIndex < selectedTaskIndex ? taskDetailRowHeight : 0);
-    const belowTop = rowTop + taskMainRowHeight + (timelineSelectedTaskId === managedTaskId ? taskDetailRowHeight : 0) + 8;
-    const aboveTop = rowTop - 8;
-    const gridBottom = timelineHeaderHeight + (visibleRowCount * taskMainRowHeight) + (managedTaskId ? taskDetailRowHeight : 0);
-    const placeAbove = belowTop + taskBubbleHeight > gridBottom;
-
-    return {
-      barColor: selectedTaskResource?.color ?? '#D93A3A',
-      bubbleLeft,
-      pointerLeft,
-      top: placeAbove ? aboveTop : belowTop,
-      placeAbove,
-    };
-  }, [
-    getTaskTimelineLayout,
-    managedTaskId,
-    managedTaskIndex,
-    selectedTask,
-    timelineSelectedTaskId,
-    selectedTaskIndex,
-    selectedTaskResource,
-    timelineWidth,
-    visibleRowCount,
-  ]);
   const updateVisibleTimelineDate = useCallback(() => {
     if (!timelineScrollRef.current || timelineDays.length === 0) {
       return;
@@ -932,17 +909,21 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
     const scrollContainer = timelineScrollRef.current;
     const updateViewportWidth = () => {
       setTimelineViewportWidth(scrollContainer.clientWidth);
+      setGridViewportWidth(gridRef.current?.clientWidth ?? window.innerWidth);
+      setTaskGridViewportWidth(taskGridScrollRef.current?.clientWidth ?? 0);
       updateVisibleTimelineDate();
     };
 
     updateViewportWidth();
     const resizeObserver = new ResizeObserver(updateViewportWidth);
     resizeObserver.observe(scrollContainer);
+    if (gridRef.current) resizeObserver.observe(gridRef.current);
+    if (taskGridScrollRef.current) resizeObserver.observe(taskGridScrollRef.current);
 
     return () => {
       resizeObserver.disconnect();
     };
-  }, [updateVisibleTimelineDate]);
+  }, [updateVisibleTimelineDate, hasTasks]);
 
   useEffect(() => {
     if (!timelineScrollRef.current) {
@@ -953,13 +934,9 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
     const handleScroll = () => {
       updateVisibleTimelineDate();
 
-      const scrollbar = timelineScrollbarRef.current;
-      if (scrollbar && !isSyncingTimelineScrollRef.current) {
-        isSyncingTimelineScrollRef.current = true;
-        scrollbar.scrollLeft = scrollContainer.scrollLeft;
-        window.requestAnimationFrame(() => {
-          isSyncingTimelineScrollRef.current = false;
-        });
+      const taskGrid = taskGridScrollRef.current;
+      if (taskGrid && taskGrid.scrollTop !== scrollContainer.scrollTop) {
+        taskGrid.scrollTop = scrollContainer.scrollTop;
       }
     };
 
@@ -969,7 +946,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
     return () => {
       scrollContainer.removeEventListener('scroll', handleScroll);
     };
-  }, [updateVisibleTimelineDate]);
+  }, [updateVisibleTimelineDate, hasTasks]);
 
   useEffect(() => {
     if (hasScrolledToTodayRef.current || timelineViewportWidth === 0 || timelineDays.length === 0) {
@@ -980,19 +957,20 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
     scrollTimelineToIndex(todayTimelineIndex, 'auto');
   }, [scrollTimelineToIndex, timelineDays.length, timelineViewportWidth, todayTimelineIndex]);
 
-  const handleTimelineScrollbarScroll = useCallback(() => {
-    const scrollContainer = timelineScrollRef.current;
-    const scrollbar = timelineScrollbarRef.current;
-    if (!scrollContainer || !scrollbar || isSyncingTimelineScrollRef.current) {
-      return;
+  const handleTaskGridScroll = useCallback(() => {
+    const taskGrid = taskGridScrollRef.current;
+    const timeline = timelineScrollRef.current;
+    if (taskGrid && timeline && taskGrid.scrollTop !== timeline.scrollTop) {
+      timeline.scrollTop = taskGrid.scrollTop;
     }
-
-    isSyncingTimelineScrollRef.current = true;
-    scrollContainer.scrollTo({ left: scrollbar.scrollLeft, behavior: 'auto' });
-    window.requestAnimationFrame(() => {
-      isSyncingTimelineScrollRef.current = false;
-    });
   }, []);
+
+  useEffect(() => {
+    const grid = taskGridScrollRef.current;
+    if (grid && !isTaskGridCollapsed) {
+      grid.scrollLeft = isRTL ? grid.scrollWidth - grid.clientWidth : 0;
+    }
+  }, [hasTasks, isRTL, isTaskGridCollapsed]);
 
   useEffect(() => {
     if (!selectedTask || dragState || !timelineScrollRef.current) {
@@ -1695,22 +1673,24 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
     };
   }, [isRTL, isTaskGridCollapsed, taskGridResizeState]);
 
-  const handleTimelineWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-    if (!timelineScrollRef.current) {
-      return;
-    }
-
-    if (!event.shiftKey) {
-      return;
-    }
-
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
-      return;
-    }
-
-    event.preventDefault();
-    timelineScrollRef.current.scrollLeft += event.deltaY * (isRTL ? -1 : 1);
-  }, [isRTL]);
+  // React delegates wheel events passively. A native listener lets Shift +
+  // wheel move the timeline from either pane without also scrolling vertically.
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const handleWheel = (event: WheelEvent) => {
+      const timeline = timelineScrollRef.current;
+      if (!timeline || !event.shiftKey || event.ctrlKey || event.metaKey) return;
+      event.preventDefault();
+      const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX
+        : event.deltaY * (isRTL ? -1 : 1);
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? timeline.clientWidth : 1;
+      timeline.scrollBy({ left: delta * unit, behavior: 'instant' });
+    };
+    grid.addEventListener('wheel', handleWheel, { passive: false });
+    return () => grid.removeEventListener('wheel', handleWheel);
+  }, [isRTL, hasTasks]);
 
   const getRowDropPosition = useCallback((event: React.DragEvent<HTMLDivElement>): Exclude<TaskDropPosition, 'root'> => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -1843,7 +1823,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !event.defaultPrevented) {
         setIsTimelineFullscreen(false);
       }
     };
@@ -1867,14 +1847,15 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
 
   const editor = (
     <div
-      className="flex h-screen min-h-0 flex-col overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)]"
+      className="gantt-editor flex h-full w-full min-h-0 flex-col overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)]"
       onClick={() => setTimelineSelectedTaskId(null)}
       dir={isRTL ? 'rtl' : 'ltr'}
     >
       <Dialog open={Boolean(restDayReview)}>
         <DialogContent
+          overlayClassName="z-[105]"
           showCloseButton={false}
-          className="overflow-hidden border-[#F4D9D9] bg-white p-0 shadow-[0_28px_80px_rgba(23,23,23,0.18)] sm:max-w-2xl"
+          className="z-[110] overflow-hidden border-[#F4D9D9] bg-white p-0 shadow-[0_28px_80px_rgba(23,23,23,0.18)] sm:max-w-2xl"
         >
           <div className="border-b border-[#F7DEDE] bg-[linear-gradient(180deg,#FFF9F0_0%,#FFFFFF_100%)] px-6 py-5">
             <div className="inline-flex rounded-full bg-yellow-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-yellow-700">
@@ -1961,8 +1942,9 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
         if (!open) pendingLeaveActionRef.current = null;
       }}>
         <DialogContent
+          overlayClassName="z-[105]"
           showCloseButton={false}
-          className="overflow-hidden border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] p-0 shadow-2xl sm:max-w-md"
+          className="z-[110] overflow-hidden border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] p-0 shadow-2xl sm:max-w-md"
         >
           <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-card-alt)] px-6 py-5">
             <div className="inline-flex rounded-full bg-[var(--primary-accent)]/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--primary-accent)]">
@@ -2024,8 +2006,9 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
         }}
       >
         <DialogContent
+          overlayClassName="z-[105]"
           showCloseButton={false}
-          className="overflow-hidden border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] p-0 shadow-2xl sm:max-w-md"
+          className="z-[110] overflow-hidden border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] p-0 shadow-2xl sm:max-w-md"
         >
           <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-card-alt)] px-6 py-5">
             <div className="inline-flex rounded-full bg-[var(--primary-accent)]/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--primary-accent)]">
@@ -2074,7 +2057,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
       </Dialog>
 
       <Dialog open={showResourcesDialog} onOpenChange={setShowResourcesDialog}>
-        <DialogContent className="sm:max-w-5xl bg-[var(--bg-card)] border-[var(--border-subtle)] text-[var(--text-primary)]">
+        <DialogContent overlayClassName="z-[105]" className="z-[110] sm:max-w-5xl bg-[var(--bg-card)] border-[var(--border-subtle)] text-[var(--text-primary)]">
           <DialogHeader>
             <DialogTitle className="text-[var(--text-primary)]">{t('ganttEditor.manageResources')}</DialogTitle>
             <DialogDescription className="text-[var(--text-secondary)]">
@@ -2191,7 +2174,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
       </Dialog>
 
       <Dialog open={showRolesDialog} onOpenChange={setShowRolesDialog}>
-        <DialogContent className="sm:max-w-4xl bg-[var(--bg-card)] border-[var(--border-subtle)] text-[var(--text-primary)]">
+        <DialogContent overlayClassName="z-[105]" className="z-[110] sm:max-w-4xl bg-[var(--bg-card)] border-[var(--border-subtle)] text-[var(--text-primary)]">
           <DialogHeader>
             <DialogTitle className="text-[var(--text-primary)]">{t('ganttEditor.manageRoles')}</DialogTitle>
             <DialogDescription className="text-[var(--text-secondary)]">
@@ -2294,8 +2277,8 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
         </DialogContent>
       </Dialog>
 
-      <header className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/90 backdrop-blur-md">
-        <div className="flex w-full items-center justify-between gap-4 px-4 py-4 lg:px-6">
+      <header className="sticky top-0 z-40 shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/90 backdrop-blur-md">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 lg:px-6">
           <div className="min-w-0">
             <button
               type="button"
@@ -2314,7 +2297,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                 {t('manager.tasksCount', { count: formatNumber(orderedTasks.length) })}
               </span>
             </div>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            <p className="mt-1 hidden text-sm text-[var(--text-secondary)] sm:block">
               {t('ganttEditor.buildScheduleDescription')}
             </p>
           </div>
@@ -2338,53 +2321,54 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col py-6">
-        <section className="flex min-h-0 flex-1 flex-col space-y-6">
+      <div className="flex min-h-0 flex-1 flex-col py-3 sm:py-4">
+        <section className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-4">
           {/* Stats card */}
-          <div className="dashboard-card mx-auto flex w-fit min-w-[340px] flex-col items-center justify-center px-4 py-2">
-              <div className="grid h-5 w-full grid-cols-4 gap-4">
+          <div className="dashboard-card mx-auto flex w-[min(100%,1100px)] shrink-0 flex-col items-center justify-center px-3 py-2 sm:px-4">
+              <div className="grid w-full grid-cols-4 gap-2">
                 <p className="text-sm text-[#737373] mb-1 text-center">{t('manager.progress')}</p>
                 <p className="text-sm text-[#737373] mb-1 text-center">{t('ganttEditor.dependencies')}</p>
                 <div className="group flex items-center justify-center gap-1">
                   <p className="mb-1 text-center text-sm text-[#737373]">{t('manager.roles')}</p>
-                  <div className="relative mb-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowResourcesDialog(true)}
-                      className="peer rounded-full p-1 text-[#A3A3A3] opacity-0 transition-all hover:bg-[#F3F4F6] hover:text-[#171717] group-hover:opacity-100 focus-visible:opacity-100"
-                      aria-label={t('ganttEditor.manageResources')}
-                      title={t('ganttEditor.manageResources')}
-                    >
-                      <HugeiconsIcon icon={ResourcesAddIcon} className="h-3.5 w-3.5" />
-                    </button>
-                    <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded-md bg-[#171717] px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-xs transition-opacity peer-hover:opacity-100 peer-focus-visible:opacity-100">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setShowResourcesDialog(true)}
+                        className="rounded-full p-1 text-[#A3A3A3] transition-colors hover:bg-[#F3F4F6] hover:text-[#171717]"
+                        aria-label={t('ganttEditor.manageResources')}
+                      >
+                        <HugeiconsIcon icon={ResourcesAddIcon} className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent sideOffset={8} className="z-[100]">
                       {t('ganttEditor.manageResources')}
-                    </div>
-                  </div>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 <p className="text-sm text-[#737373] mb-1 text-center">{t('ganttEditor.lastSavedLabel')}</p>
               </div>
-              <div className="grid h-5 w-full grid-cols-4 gap-4">
+              <div className="grid w-full grid-cols-4 gap-2">
                 <p className="text-lg font-bold text-[#171717] text-center">{formatNumber(completion)}%</p>
                 <p className="text-lg font-bold text-green-600 text-center">{formatNumber(orderedTasks.filter((task) => task.predecessorIds.length > 0).length)}</p>
                 <p className="text-lg font-bold text-[#D93A3A] text-center">{formatNumber(draftGantt.resources.length)}</p>
-                <p className="text-lg font-bold text-[#A3A3A3] text-center">{draftGantt.lastEditedAt ? formatDate(parseISO(draftGantt.lastEditedAt), { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : t('ganttEditor.notSavedYet')}</p>
+                <p className="text-xs font-bold text-[#A3A3A3] text-center sm:text-sm">{draftGantt.lastEditedAt ? formatDate(parseISO(draftGantt.lastEditedAt), { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : t('ganttEditor.notSavedYet')}</p>
               </div>
-              <div className="grid w-full grid-cols-4 gap-4">
-                <p className="text-xs text-[#737373] text-center py-2">{t('ganttEditor.weightedProgress')}</p>
-                <p className="text-xs text-[#737373] text-center py-2">{t('ganttEditor.dependenciesDescription')}</p>
-                <p className="text-xs text-[#737373] text-center py-2">{t('ganttEditor.tasksUnassigned', { count: formatNumber(unassignedTasks) })}</p>
-                <p className="text-xs text-[#737373] text-center py-2">{t('ganttEditor.storedLocally')}</p>
+              <div className="grid w-full grid-cols-4 gap-2">
+                <p className="hidden text-xs text-[#737373] text-center py-1 sm:block">{t('ganttEditor.weightedProgress')}</p>
+                <p className="hidden text-xs text-[#737373] text-center py-1 sm:block">{t('ganttEditor.dependenciesDescription')}</p>
+                <p className="hidden text-xs text-[#737373] text-center py-1 sm:block">{t('ganttEditor.tasksUnassigned', { count: formatNumber(unassignedTasks) })}</p>
+                <p className="hidden text-xs text-[#737373] text-center py-1 sm:block">{t('ganttEditor.storedLocally')}</p>
               </div>
           </div>
           <div
             className={`flex min-h-0 flex-col bg-[var(--bg-app)] ${
               isTimelineFullscreen
-                ? 'fixed inset-0 z-[90] h-screen w-screen border-0 shadow-2xl'
+                ? 'fixed inset-0 z-[90] h-dvh w-screen border-0 shadow-2xl'
                 : 'flex-1 border-y border-[var(--border-subtle)]'
             }`}
           >
-            <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-3 lg:gap-4 lg:px-6">
               <div>
                 <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('ganttEditor.taskGridTimeline')}</h2>
                 <p className="text-sm text-[var(--text-secondary)]">
@@ -2405,7 +2389,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                     {t('ganttEditor.calendar')}
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align={isRTL ? 'start' : 'end'} className="w-auto min-w-[23rem] p-0 bg-[var(--bg-card)] border-[var(--border-subtle)] text-[var(--text-primary)]">
+                <PopoverContent align={isRTL ? 'start' : 'end'} className="z-[100] w-[min(23rem,calc(100vw-24px))] min-w-0 max-h-[var(--radix-popover-content-available-height)] overflow-y-auto p-0 bg-[var(--bg-card)] border-[var(--border-subtle)] text-[var(--text-primary)]">
                   <div className="border-b border-[var(--border-subtle)] px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -2449,7 +2433,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                   <div className="flex justify-center p-4">
                     <Calendar
                       mode="single"
-                      className="w-full [--cell-size:--spacing(12)]"
+                      className="w-full [--cell-size:calc((min(23rem,100vw-24px)-36px)/7)] sm:[--cell-size:calc((min(23rem,100vw-24px)-36px)/7)]"
                       locale={calendarLocale}
                       month={timelineCalendarMonth}
                       onMonthChange={setTimelineCalendarMonth}
@@ -2531,13 +2515,19 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                 </button>
               </div>
             ) : (
-              <div className="flex min-h-0 flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
+              <div ref={gridRef} className="gantt-grid group/gantt flex min-h-0 flex-1 overflow-hidden" style={{ minHeight: 0 }}>
                 <div
-                  className="grid min-h-0 flex-1"
-                  style={{ gridTemplateColumns: `${isTaskGridCollapsed ? 0 : taskGridWidth}px 16px minmax(0, 1fr)` }}
+                  className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)]"
+                  style={{ gridTemplateColumns: `${isTaskGridCollapsed ? 0 : renderedTaskGridWidth}px ${gridDividerWidth}px minmax(0, 1fr)` }}
                 >
+                  <div className="relative flex min-h-0 min-w-0 flex-col">
                   <div
-                    className={`overflow-visible ${isTaskGridCollapsed ? 'pointer-events-none opacity-0' : 'border-r border-[var(--border-subtle)] opacity-100'}`}
+                    ref={taskGridScrollRef}
+                    onScroll={handleTaskGridScroll}
+                    data-testid="gantt-task-grid"
+                    id="gantt-task-grid"
+                    dir="ltr"
+                    className={`min-h-0 min-w-0 flex-1 overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${isTaskGridCollapsed ? 'pointer-events-none opacity-0' : 'border-r border-[var(--border-subtle)] opacity-100'}`}
                     onClick={() => {
                       if (suppressNextGridDismissRef.current) {
                         suppressNextGridDismissRef.current = false;
@@ -2547,9 +2537,9 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                       setManagedTaskId(null);
                     }}
                   >
-                    <div className="min-h-full" style={{ minHeight: timelineGridMinHeight, minWidth: taskGridWidth }}>
+                    <div dir={isRTL ? 'rtl' : 'ltr'} className="min-h-full pb-5" style={{ minHeight: timelineGridMinHeight, minWidth: taskGridContentWidth }}>
                       <div
-                        className="grid h-14 border-b border-[var(--border-subtle)] bg-[var(--bg-card-alt)] text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]"
+                        className="sticky top-0 z-20 grid h-14 border-b border-[var(--border-subtle)] bg-[var(--bg-card-alt)] text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]"
                         style={{ gridTemplateColumns: taskGridColumns }}
                       >
                         {[
@@ -2788,7 +2778,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                                 ) : null}
                               </div>
                             </ContextMenuTrigger>
-                            <ContextMenuContent className="min-w-[10rem] rounded-2xl border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] p-1.5 shadow-xl">
+                            <ContextMenuContent className="z-[100] min-w-[10rem] rounded-2xl border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] p-1.5 shadow-xl">
                               <ContextMenuItem onSelect={() => handleCopyTask(task.id)}>
                                 <HugeiconsIcon icon={Copy01Icon} className="h-4 w-4" />
                                 {t('ganttEditor.copy')}
@@ -2810,7 +2800,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                                   <HugeiconsIcon icon={Add01Icon} className="h-4 w-4" />
                                   {t('ganttEditor.insert')}
                                 </ContextMenuSubTrigger>
-                                <ContextMenuSubContent className="min-w-[9rem] rounded-xl border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] p-1.5 shadow-xl">
+                                <ContextMenuSubContent className="z-[100] min-w-[9rem] rounded-xl border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] p-1.5 shadow-xl">
                                   <ContextMenuItem onSelect={() => handleInsertTask(task.id, 'subtask')}>
                                     {t('ganttEditor.subTask')}
                                   </ContextMenuItem>
@@ -2873,6 +2863,16 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                       </div>
                     </div>
                   </div>
+                    {!isTaskGridCollapsed ? (
+                      <TimelineScrollbar
+                        viewportWidth={taskGridViewportWidth}
+                        contentWidth={taskGridContentWidth}
+                        scrollElementRef={taskGridScrollRef}
+                        controls="gantt-task-grid"
+                        label={t('ganttEditor.taskGridTimeline')}
+                      />
+                    ) : null}
+                  </div>
 
                   <div className="relative flex items-stretch justify-center bg-[var(--bg-card)] border-x border-[var(--border-subtle)]">
                     <button
@@ -2906,19 +2906,19 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                     </div>
                   </div>
 
-                  <div className="relative flex min-h-0 flex-col">
+                  <div className="relative flex min-h-0 min-w-0 flex-col">
                     <div
                       ref={timelineScrollRef}
-                      className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scroll-smooth overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                      onWheel={handleTimelineWheel}
+                      id="gantt-timeline"
+                      className="min-h-0 flex-1 overflow-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                       dir="ltr"
                     >
                     <div
-                      className="relative min-h-full"
+                      className="relative min-h-full pb-5"
                       dir={isRTL ? 'rtl' : 'ltr'}
                       style={{ width: `max(100%, ${timelineWidth}px)`, minHeight: timelineGridMinHeight }}
                     >
-                      <div className="sticky top-0 z-10 grid h-14 border-b border-[var(--border-subtle)] bg-[var(--bg-card-alt)]" style={{ gridTemplateColumns: timelineGridColumns }}>
+                      <div className="sticky top-0 z-20 grid h-14 border-b border-[var(--border-subtle)] bg-[var(--bg-card-alt)]" style={{ gridTemplateColumns: timelineGridColumns }}>
                         {timelineHeaderCells.map((cell) => (
                           <div
                             key={cell.key}
@@ -2969,6 +2969,8 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                               </div>
 
                               <div
+                                ref={task.id === timelineSelectedTaskId ? selectedTaskBarRef : undefined}
+                                data-task-bar={task.id}
                                 className={`absolute top-1/2 flex -translate-y-1/2 items-center ${task.milestone ? 'justify-center' : 'rounded-full px-3'
                                   } ${dragState?.taskId === task.id ? 'shadow-lg' : 'shadow-xs'} cursor-pointer`}
                                 style={{
@@ -3078,16 +3080,22 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                         </div>
                       ))}
 
-                      {selectedTask && selectedTaskBubble ? (
-                        <div
-                          className="pointer-events-none absolute z-[80]"
-                          style={{
-                            left: selectedTaskBubble.bubbleLeft,
-                            top: selectedTaskBubble.top,
-                            width: taskBubbleWidth,
-                            transform: selectedTaskBubble.placeAbove ? 'translateY(-100%)' : undefined,
-                          }}
-                        >
+                      <div className="h-3 bg-[var(--bg-card)]" />
+                      {selectedTask && selectedTaskIndex >= 0 ? (
+                        <Popover open={!dragState} onOpenChange={(open) => { if (!open) setTimelineSelectedTaskId(null); }}>
+                          <PopoverAnchor virtualRef={taskBubbleAnchor} />
+                          <PopoverContent
+                            side="bottom"
+                            sideOffset={8}
+                            collisionPadding={12}
+                            updatePositionStrategy="always"
+                            onOpenAutoFocus={(event) => event.preventDefault()}
+                            onCloseAutoFocus={(event) => event.preventDefault()}
+                            onInteractOutside={(event) => {
+                              if ((event.target as HTMLElement)?.closest('[data-task-bar]')) event.preventDefault();
+                            }}
+                            className="z-[100] w-[296px] max-w-[calc(100vw-24px)] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto border-0 bg-transparent p-0 shadow-none"
+                          >
                           <div
                             className="pointer-events-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]/95 text-[var(--text-primary)] p-4 shadow-2xl backdrop-blur-xl"
                             onClick={(event) => event.stopPropagation()}
@@ -3172,38 +3180,23 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                               <span>{selectedTaskResource?.name ?? t('manager.unassigned')}</span>
                               <span
                                 className="rounded-full px-2 py-1 text-[11px] font-semibold"
-                                style={{ backgroundColor: `${selectedTaskBubble.barColor}1A`, color: selectedTaskBubble.barColor }}
+                                style={{ backgroundColor: `${selectedTaskResource?.color ?? '#D93A3A'}1A`, color: selectedTaskResource?.color ?? '#D93A3A' }}
                               >
                                 {taskHierarchy.get(selectedTask.id)?.label ?? formatNumber(selectedTaskIndex + 1)}
                               </span>
                             </div>
                           </div>
-                          <div
-                            className="absolute h-3 w-3 rotate-45 border-[var(--border-subtle)] bg-[var(--bg-card)]"
-                            style={{
-                              left: selectedTaskBubble.pointerLeft - 6,
-                              top: selectedTaskBubble.placeAbove ? undefined : -6,
-                              bottom: selectedTaskBubble.placeAbove ? -6 : undefined,
-                              borderStyle: 'solid',
-                              borderLeftWidth: 1,
-                              borderTopWidth: 1,
-                              borderRightWidth: selectedTaskBubble.placeAbove ? 1 : 0,
-                              borderBottomWidth: selectedTaskBubble.placeAbove ? 0 : 1,
-                            }}
-                          />
-                        </div>
+                          </PopoverContent>
+                        </Popover>
                       ) : null}
 
                     </div>
-                    <div
-                      ref={timelineScrollbarRef}
-                      onScroll={handleTimelineScrollbarScroll}
-                      dir="ltr"
-                      aria-hidden="true"
-                      className="gantt-timeline-scrollbar sticky bottom-0 z-30 shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-app)]/95"
-                    >
-                      <div style={{ width: `max(100%, ${timelineWidth}px)`, height: 1 }} />
-                    </div>
+                    <TimelineScrollbar
+                      viewportWidth={timelineViewportWidth}
+                      contentWidth={timelineWidth}
+                      scrollElementRef={timelineScrollRef}
+                      label={t('ganttEditor.timelineWindow')}
+                    />
                   </div>
                   </div>
                 </div>

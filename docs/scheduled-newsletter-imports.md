@@ -1,6 +1,6 @@
 # Scheduled newsletter updates
 
-The Scheduled page has independent newsletter import and publishing sections. Imports create drafts. The existing digest job continues to email published newsletters.
+The Scheduled page has independent newsletter import and publishing sections. Imports create drafts by default. **Publish imported articles automatically**, below **Enable scheduled updates**, publishes newly imported articles after a successful import. It applies to both scheduled and manual fetches, and must be saved before fetching. Existing articles keep their workflow state. The existing digest job continues to email published newsletters according to its separate settings.
 
 An admin enters an HTTPS repository URL, username, token and interval in hours. The URL includes the repository name and optional folder, such as `https://host/artifactory/generic-local/newsletters`. The server uses Basic authentication with the username and token. The token is omitted from responses, hidden in the schema and held in a collection whose standard record APIs are locked. Temporary worker input files have owner-only permissions and are removed after execution.
 
@@ -26,21 +26,23 @@ The PocketBase cron checks each minute. A new job is disabled by default and che
 
 Each fetch processes all pending files in bounded batches. It saves progress after each batch and automatically resumes through the minutely cron when a request reaches its time budget, even if the page closes or the recurring schedule is disabled. The current run remembers attempted files so failures do not block or repeatedly retry ahead of later files. Failed files can retry on the next fetch. File downloads are limited to 20 MB, expanded DOCX content to 80 MB, and conversion output to 25 MB per document. Network requests time out after 15 seconds; each worker subprocess has a two-minute watchdog. The nginx API timeout is three minutes.
 
-A unique checkpoint combines the artifact URL and content checksum. Article creation and its checkpoint commit in one transaction per file. Repeat checks skip imported file versions. A changed file creates new drafts; existing articles and editorial changes are preserved. Successful files remain imported even when another file fails. A database lease prevents overlapping manual and scheduled runs, and expires after five minutes if the process stops unexpectedly.
+A unique checkpoint combines the artifact URL and content checksum. Article creation and its checkpoint commit in one transaction per file. Auto publish changes the status on that saved content inside the same transaction; a failed file cannot leave published articles or a checkpoint behind. Empty or unparseable documents fail before saving. Repeat checks skip imported file versions. A changed file creates new articles using the saved auto-publish setting; existing articles and editorial changes are preserved. Successful files remain imported even when another file fails. A database lease prevents overlapping manual and scheduled runs, and expires after five minutes if the process stops unexpectedly.
 
-Admins can expand **Tracked DOCX files** below import settings. The paginated list shows the URL, import date and number of articles created. Admins may edit a file URL and SHA-1 checksum or remove its tracking record. Removing tracking keeps existing articles and permits that file version to create new drafts on the next fetch. Tracking changes and settings changes are blocked during a running or queued fetch. These APIs are admin-only; the underlying collections remain locked.
+Admins can expand **Tracked DOCX files** below import settings. The paginated list shows the URL, import date and number of articles created. Admins may edit a file URL and SHA-1 checksum or remove its tracking record. Removing tracking keeps existing articles and permits that file version to create new articles on the next fetch, using the saved auto-publish setting. Tracking changes and settings changes are blocked during a running or queued fetch. These APIs are admin-only; the underlying collections remain locked.
 
 ## Runtime and verification
 
 Startup also runs `scripts/repair-imported-newsletter-dates.mjs` on articles referenced by import checkpoints. It corrects leading publication-date metadata, fixes the old importer’s RTL/left-alignment pattern and moves a leading summary before byline/source metadata into an empty subtitle field. Existing subtitles, other prose and workflow state are preserved. Repairs are idempotent.
 
-The normal container startup schema sync creates `newsletter_import_jobs` and `newsletter_imports`. Existing deployments need the updated app image, including hooks, scripts and dependencies. For a standalone PocketBase deployment, run `pnpm pb:sync-app-schema`, install production dependencies and set `APP_ROOT` to the project directory so the hook can locate `scripts/pocketbase/artifactory-import.mjs` (it defaults to the parent of the hooks directory). Node must be available on PATH, or through `NODE_BINARY`.
+The normal container startup schema sync creates `newsletter_import_jobs` and `newsletter_imports` and adds the optional `autoPublish` boolean to existing jobs, defaulting to false. Existing deployments need the updated app image, including hooks, scripts and dependencies. For a standalone PocketBase deployment, run `pnpm pb:sync-app-schema`, install production dependencies and set `APP_ROOT` to the project directory so the hook can locate `scripts/pocketbase/artifactory-import.mjs` (it defaults to the parent of the hooks directory). Node must be available on PATH, or through `NODE_BINARY`.
 
 Run the parser and Artifactory client tests with:
 
 ```sh
 node --test tests/scripts/scheduled-import.test.mjs tests/scripts/import-image.test.mjs
 ```
+
+`IMPORT_TEST_PB_BINARY=/path/to/pocketbase node tests/scripts/scheduled-import-auto-publish.mjs` starts and removes an isolated local database with synthetic DOCX files. It verifies the default for existing jobs, setting persistence, access control, draft and published imports, failure rollback, skipped files and preservation of existing articles. It never contacts Artifactory or sends mail.
 
 For conversion tests, run with ImageMagick installed and `REQUIRE_IMAGE_CONVERTER=1`. The container bundles ImageMagick; standalone installations need it on PATH. See [ImageMagick's format list](https://imagemagick.org/formats/) and [security policy documentation](https://imagemagick.org/security-policy/).
 

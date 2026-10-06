@@ -131,18 +131,13 @@ export function LatestArticles({ newsletters, currentUserId, onArticleClick }: L
                 </p>
               </div>
 
-              {/* Media Frame with Shatter Effect Overlay */}
+              {/* Newsletter cover */}
               <div className="post-media-frame relative h-48 md:h-auto md:aspect-video rounded-2xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-app)]">
                 <img
                   src={article.coverImage}
                   alt={article.title}
                   className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500"
                 />
-                <svg className="shatter-glass-overlay" viewBox="0 0 900 460" preserveAspectRatio="none">
-                  <line x1="0" y1="120" x2="900" y2="340" stroke="#fff" strokeWidth="2" opacity="0.4" />
-                  <line x1="280" y1="0" x2="620" y2="460" stroke="#fff" strokeWidth="2" opacity="0.4" />
-                  <line x1="290" y1="10" x2="630" y2="450" stroke="var(--primary-accent)" strokeWidth="1.2" opacity="0.6" />
-                </svg>
 
                 {article.hasAudio && (
                   <div className={cn('absolute bottom-3 flex items-center gap-2 bg-black/80 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full border border-white/10 shadow-lg', isRTL ? 'right-3' : 'left-3')}>

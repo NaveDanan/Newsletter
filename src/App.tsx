@@ -709,6 +709,7 @@ function App() {
             onBack={() => navigateTo('/manager/gantt')}
             renderShell={(content, onNavigate) => (
               <AppStageShell
+                fullViewport
                 activeTab="manager"
                 onHomeClick={handleHomeClick}
                 onCommunityClick={handleCommunityClick}

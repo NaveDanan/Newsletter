@@ -96,13 +96,6 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
               />
               <div className="absolute inset-0 bg-linear-to-t/srgb from-black/70 via-black/20 to-transparent pointer-events-none" />
 
-              {/* Decorative Glass Shatter Overlay from Reference */}
-              <svg className="shatter-glass-overlay" viewBox="0 0 900 460" preserveAspectRatio="none">
-                <line x1="0" y1="120" x2="900" y2="340" stroke="#fff" strokeWidth="2" opacity="0.4" />
-                <line x1="280" y1="0" x2="620" y2="460" stroke="#fff" strokeWidth="2.5" opacity="0.5" />
-                <line x1="290" y1="10" x2="630" y2="450" stroke="var(--primary-accent)" strokeWidth="1.5" opacity="0.7" />
-              </svg>
-
               <div className="absolute bottom-3 inset-x-3">
                 <div className="bg-[var(--bg-card)]/90 backdrop-blur-md rounded-xl p-2.5 border border-[var(--border-subtle)] flex items-center justify-between">
                   <div className="flex items-center gap-2.5">

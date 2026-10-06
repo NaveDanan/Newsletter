@@ -395,6 +395,38 @@
    App.css and EditorStyles.css use the same layer for the same reason.
    (Left unindented to keep the rules diffable against v3.)
    ========================================================================== */
+/* Shared manager defaults live below utilities so explicit compact editor
+   sizes and icon insets retain precedence. */
+@layer components {
+  .dashboard-card {
+    min-width: 0;
+    padding: 1.25rem;
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-card);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  :where(.manager-dashboard input:not([type]),
+    .manager-dashboard input:is([type="text"], [type="url"], [type="email"], [type="password"], [type="number"], [type="date"], [type="time"], [type="datetime-local"]),
+    .manager-dashboard textarea,
+    .manager-dashboard select) {
+    min-width: 0;
+    max-width: 100%;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-squircle);
+    background: var(--bg-input);
+    color: var(--text-primary);
+  }
+
+  :where(.manager-dashboard input, .manager-dashboard textarea, .manager-dashboard select):focus-visible {
+    outline: 2px solid var(--primary-accent);
+    outline-offset: 2px;
+  }
+}
+
 @layer utilities {
 
 [data-theme="light"] body {
@@ -588,6 +620,49 @@
   .mode-mobile .app-inner-scroll {
     padding-bottom: 100px !important;
   }
+}
+
+/* Gantt owns its scroll panes; the surrounding device stage must not add a
+   second scroll area or constrain it to the newsletter content width. */
+.app-stage-full {
+  height: 100dvh;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.app-stage-full .device-stage,
+.app-stage-full .app-window {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+}
+
+.app-stage-full .app-window {
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  gap: 0;
+}
+
+.app-stage-full .app-inner-scroll {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.app-stage-full .mobile-top-bezel,
+.app-stage-full .mobile-home-indicator {
+  display: none !important;
+}
+
+.app-stage-full .mode-mobile .app-inner-scroll {
+  margin-bottom: var(--mobile-shell-bar-height);
 }
 
 /* Mobile top bezel & dynamic island */
@@ -1737,24 +1812,6 @@
   border: 1px solid var(--border-subtle);
 }
 
-/* Gantt editor scrollbar */
-.gantt-timeline-scrollbar {
-  overflow-x: scroll;
-  overflow-y: hidden;
-  height: 14px;
-  scrollbar-width: thin;
-}
-
-.gantt-timeline-scrollbar::-webkit-scrollbar-track {
-  background: var(--bg-card);
-  border-radius: 999px;
-}
-
-.gantt-timeline-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--bg-pill-hover);
-  border-radius: 999px;
-}
-
 /* RTL Helpers */
 [dir='rtl'] .article-meta,
 [dir='rtl'] .engagement-stat {
@@ -1800,15 +1857,6 @@
 
 .animate-float {
   animation: float 4s ease-in-out infinite;
-}
-
-/* Glass shatter overlay for art / media cards */
-.shatter-glass-overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  mix-blend-mode: overlay;
-  opacity: 0.7;
 }
 
 /* Responsive adjustments */

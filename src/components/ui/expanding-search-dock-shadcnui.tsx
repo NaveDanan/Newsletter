@@ -98,7 +98,7 @@ export function ExpandingSearchDock({
                 autoFocus
                 dir={isRTL ? 'rtl' : 'ltr'}
                 className={cn(
-                  'h-10 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:ring-0',
+                  'h-10 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm outline-hidden ring-0 placeholder:text-muted-foreground focus:border-0 focus:ring-0',
                   isRTL ? 'pl-4 text-right' : 'pr-4 text-left',
                 )}
               />

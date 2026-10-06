@@ -659,7 +659,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                           {bars.map((task) => (
                               <div
                                 key={task.id}
-                                className="absolute h-5 mx-1 rounded-full cursor-pointer group shadow-sm transition-transform hover:scale-[1.02]"
+                                className="absolute h-5 mx-1 rounded-full cursor-pointer group shadow-xs transition-transform hover:scale-[1.02]"
                                 style={{
                                   left: task.left,
                                   width: task.width,
@@ -696,19 +696,19 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
               {/* Legend */}
               <div className="flex flex-wrap items-center gap-6">
                 <div className="flex items-center gap-2">
-                  <div className="w-3.5 h-3.5 rounded-full bg-green-500 shadow-sm" />
+                  <div className="w-3.5 h-3.5 rounded-full bg-green-500 shadow-xs" />
                   <span className="text-xs sm:text-sm font-medium text-[var(--text-secondary)]">{t('manager.completed')}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3.5 h-3.5 rounded-full bg-yellow-500 shadow-sm" />
+                  <div className="w-3.5 h-3.5 rounded-full bg-yellow-500 shadow-xs" />
                   <span className="text-xs sm:text-sm font-medium text-[var(--text-secondary)]">{t('manager.inProgress')}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3.5 h-3.5 rounded-full bg-neutral-400 shadow-sm" />
+                  <div className="w-3.5 h-3.5 rounded-full bg-neutral-400 shadow-xs" />
                   <span className="text-xs sm:text-sm font-medium text-[var(--text-secondary)]">{t('manager.pending')}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3.5 h-3.5 rounded-full bg-[var(--primary-accent)] shadow-sm" />
+                  <div className="w-3.5 h-3.5 rounded-full bg-[var(--primary-accent)] shadow-xs" />
                   <span className="text-xs sm:text-sm font-medium text-[var(--text-secondary)]">{t('manager.delayed')}</span>
                 </div>
               </div>
@@ -779,7 +779,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                                   <select
                                     value={task.status}
                                     onChange={(event) => handleTaskStatusChange(task.id, event.target.value as GanttTask['status'])}
-                                    className={`w-full rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-[11px] font-semibold bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary-accent)]`}
+                                    className={`w-full rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-[11px] font-semibold bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-hidden focus:ring-1 focus:ring-[var(--primary-accent)]`}
                                   >
                                     {statusOrder.map((status) => (
                                       <option key={status} value={status} className="bg-[var(--bg-card)] text-[var(--text-primary)]">{getStatusLabel(status)}</option>
@@ -824,7 +824,7 @@ export function GanttView({ onEditProjectGantt }: GanttViewProps) {
                                   </div>
                                   <div
                                     className={`absolute top-1/2 -translate-y-1/2 ${
-                                      task.milestone ? '' : 'rounded-full shadow-sm'
+                                      task.milestone ? '' : 'rounded-full shadow-xs'
                                     }`}
                                     style={{
                                       left,

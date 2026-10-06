@@ -128,7 +128,7 @@ export function CommunityNotificationsScreen({ onUnreadChange }: CommunityNotifi
             <button
               type="button"
               className={cn(
-                'flex w-full items-start gap-3 border-b border-[var(--border-subtle)] px-4 py-4 text-start transition-colors hover:bg-[var(--bg-card-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary-accent)]',
+                'flex w-full items-start gap-3 border-b border-[var(--border-subtle)] px-4 py-4 text-start transition-colors hover:bg-[var(--bg-card-hover)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary-accent)]',
                 notification.isRead ? 'bg-[var(--bg-app)]' : 'bg-[var(--primary-accent)]/8',
               )}
               onClick={() => open(notification)}

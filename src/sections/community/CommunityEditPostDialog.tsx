@@ -107,7 +107,7 @@ export function CommunityEditPostDialog({
     onUpdate: ({ editor: current }) => setBody(htmlToCommentMarkup(current.getHTML())),
     editorProps: {
       attributes: {
-        class: 'composer-textarea min-h-[100px] p-0 text-[16px] leading-relaxed focus:outline-none',
+        class: 'composer-textarea min-h-[100px] p-0 text-[16px] leading-relaxed focus:outline-hidden',
         dir: 'auto',
         role: 'textbox',
         'aria-label': t('community.composer.placeholder'),

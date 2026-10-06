@@ -78,7 +78,7 @@ export function CommunityFollowButton({
         'rounded-full px-4 font-bold transition-all',
         isFollowing
           ? 'border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--primary-accent)] hover:text-[var(--primary-accent)]'
-          : 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] hover:bg-[var(--primary-accent-hover)] shadow-sm',
+          : 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] hover:bg-[var(--primary-accent-hover)] shadow-xs',
         className,
       )}
       onClick={(event) => {

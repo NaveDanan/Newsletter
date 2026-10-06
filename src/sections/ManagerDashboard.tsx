@@ -324,7 +324,7 @@ export function ManagerDashboard({
   };
 
   const dashboard = (
-    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+    <div className="manager-dashboard min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
       <AlertDialog
         open={showUnsavedDialog}
         onOpenChange={(open) => {
@@ -470,7 +470,7 @@ export function ManagerDashboard({
         {/* Overlay for mobile */}
         {showMobileMenu && (
           <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-30 lg:hidden"
             onClick={() => setShowMobileMenu(false)}
           />
         )}

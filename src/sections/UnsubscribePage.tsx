@@ -115,7 +115,7 @@ export function UnsubscribePage({ onBack }: UnsubscribePageProps) {
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
 
         <Card className="overflow-hidden border-[#E5E5E5] bg-white shadow-[0_24px_80px_rgba(23,23,23,0.08)]">
-          <div className={cn('h-3 w-full bg-gradient-to-r', content.accentClass)} />
+          <div className={cn('h-3 w-full bg-linear-to-r/srgb', content.accentClass)} />
           <CardHeader className="gap-4 pb-4 pt-8">
             <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-[#e0dcd5] shadow-[0_18px_40px_rgba(23,23,23,0.12)]">
               <img src="/logo.gif" alt="AI-BREAK" className="h-14 w-14 object-contain" />

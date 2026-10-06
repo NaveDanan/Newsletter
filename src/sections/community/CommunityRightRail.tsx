@@ -79,7 +79,7 @@ export function CommunityRightRail({ initialQuery = '' }: CommunityRightRailProp
           onChange={(event) => setTerm(event.target.value)}
           placeholder={t('community.search.placeholder')}
           aria-label={t('community.search.placeholder')}
-          className="w-full rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] py-2.5 pe-4 ps-11 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none transition-colors focus:border-[var(--primary-accent)] focus:ring-1 focus:ring-[var(--primary-accent)]"
+          className="w-full rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] py-2.5 pe-4 ps-11 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-hidden transition-colors focus:border-[var(--primary-accent)] focus:ring-1 focus:ring-[var(--primary-accent)]"
         />
       </form>
 

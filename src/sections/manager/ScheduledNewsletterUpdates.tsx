@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLocale } from '@/contexts/LocaleContext';
 import { fetchNewsletterImportSchedule, updateNewsletterImportSchedule, runNewsletterImportNow, type NewsletterImportSchedule } from '@/lib/pocketbase/scheduled';
 import { TrackedNewsletterFiles } from './TrackedNewsletterFiles';
 
 export function ScheduledNewsletterUpdates() {
-  const { t, formatDate, formatNumber } = useLocale();
+  const { t, dir, formatDate, formatNumber } = useLocale();
   const [schedule, setSchedule] = useState<NewsletterImportSchedule | null>(null);
   const [loadError, setLoadError] = useState('');
   const [repositoryUrl, setRepositoryUrl] = useState('');
@@ -14,6 +15,7 @@ export function ScheduledNewsletterUpdates() {
   const [token, setToken] = useState('');
   const [hours, setHours] = useState('24');
   const [enabled, setEnabled] = useState(false);
+  const [autoPublish, setAutoPublish] = useState(false);
   const [busy, setBusy] = useState<'save' | 'run' | null>(null);
   const [reload, setReload] = useState(0);
   const applySettings = useCallback((data: NewsletterImportSchedule) => {
@@ -22,6 +24,7 @@ export function ScheduledNewsletterUpdates() {
     setUsername(data.username);
     setHours(String(data.intervalMinutes / 60));
     setEnabled(data.enabled);
+    setAutoPublish(data.autoPublish ?? false);
     setToken('');
   }, []);
 
@@ -43,14 +46,14 @@ export function ScheduledNewsletterUpdates() {
     return () => window.clearInterval(timer);
   }, [schedule?.isRunning]);
 
-  const dirty = Boolean(schedule && (repositoryUrl !== schedule.repositoryUrl || username !== schedule.username || token || Number(hours) * 60 !== schedule.intervalMinutes || enabled !== schedule.enabled));
+  const dirty = Boolean(schedule && (repositoryUrl !== schedule.repositoryUrl || username !== schedule.username || token || Number(hours) * 60 !== schedule.intervalMinutes || enabled !== schedule.enabled || autoPublish !== (schedule.autoPublish ?? false)));
   const disabled = Boolean(busy || schedule?.isRunning);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy('save');
     try {
-      applySettings(await updateNewsletterImportSchedule({ repositoryUrl, username, token, intervalMinutes: Number(hours) * 60, enabled }));
+      applySettings(await updateNewsletterImportSchedule({ repositoryUrl, username, token, intervalMinutes: Number(hours) * 60, enabled, autoPublish }));
       toast.success(t('scheduled.saved'));
     } catch (error) { toast.error(error instanceof Error ? error.message : t('scheduled.saveFailed')); }
     finally { setBusy(null); }
@@ -107,10 +110,26 @@ export function ScheduledNewsletterUpdates() {
                   <label htmlFor="import-hours" className="mb-2 block text-sm font-medium text-[#171717]">{t('scheduled.import.interval')}</label>
                   <input id="import-hours" type="number" min="1" max="8760" step="1" required value={hours} onChange={(e) => setHours(e.target.value)} className="w-full" />
                 </div>
-                <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-[#171717]">
-                  <Switch checked={enabled} onCheckedChange={setEnabled} disabled={disabled} className="data-[state=checked]:bg-[#D93A3A]" />
-                  {t('scheduled.import.enable')}
-                </label>
+                <div className="space-y-2 sm:max-w-sm">
+                  <div className="flex min-h-11 items-center gap-3 text-sm font-medium text-[#171717]">
+                    <Switch id="import-enabled" checked={enabled} onCheckedChange={setEnabled} disabled={disabled} className="data-[state=checked]:bg-[#D93A3A]" />
+                    <label htmlFor="import-enabled">{t('scheduled.import.enable')}</label>
+                  </div>
+                  <div className="flex min-h-11 items-center gap-3 text-sm font-medium text-[#171717]">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Switch id="import-auto-publish" checked={autoPublish} onCheckedChange={setAutoPublish} disabled={disabled} aria-describedby="import-auto-publish-hint" className="data-[state=checked]:bg-[#D93A3A]" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" sideOffset={8} collisionPadding={16} dir={dir} className="max-w-[min(24rem,calc(100vw-2rem))] text-start leading-relaxed">
+                        {t('scheduled.import.autoPublishHint')}
+                      </TooltipContent>
+                    </Tooltip>
+                    <label htmlFor="import-auto-publish">{t('scheduled.import.autoPublish')}</label>
+                  </div>
+                  <p id="import-auto-publish-hint" className="sr-only">{t('scheduled.import.autoPublishHint')}</p>
+                </div>
               </div>
             </fieldset>
             <div className="flex flex-wrap items-center gap-3">

@@ -62,7 +62,7 @@ export function OurWriters({ newsletters, onArticleClick, onNavigate }: OurWrite
             <button
               key={writer.id}
               type="button"
-              className={`story-item rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)] disabled:cursor-default ${index === 0 ? 'active-story' : ''}`}
+              className={`story-item rounded-2xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)] disabled:cursor-default ${index === 0 ? 'active-story' : ''}`}
               disabled={!latestArticle && !writer.handle}
               title={label}
               aria-label={label}

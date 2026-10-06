@@ -19,7 +19,7 @@ interface CommunityBodyProps {
   maxLength?: number;
 }
 
-const ENTITY_CLASS = 'text-[var(--primary-accent)] hover:underline focus-visible:underline focus-visible:outline-none';
+const ENTITY_CLASS = 'text-[var(--primary-accent)] hover:underline focus-visible:underline focus-visible:outline-hidden';
 
 // Formatting is paired before entity splitting, so it can cross text and
 // interactive elements. React escapes the content instead of building HTML.

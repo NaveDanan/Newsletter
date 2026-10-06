@@ -1,5 +1,10 @@
 /* TipTap Editor Styles */
 
+/* Same cascade layer as the utilities (and after them), as in v3; see the
+   note above `@layer utilities` in src/index.css. Left unindented to keep
+   the rules diffable. */
+@layer utilities {
+
 .ProseMirror {
   outline: none;
   min-height: 400px;
@@ -965,3 +970,5 @@
   padding-left: 0;
   padding-right: 1.5rem;
 }
+
+} /* @layer utilities */

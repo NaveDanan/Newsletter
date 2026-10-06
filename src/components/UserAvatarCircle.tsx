@@ -31,7 +31,7 @@ export function UserAvatarCircle({
       className={cn('shrink-0 border border-[var(--border-subtle)] bg-[var(--bg-card-alt)]', className)}
     >
       <AvatarImage src={src ?? undefined} alt={label ?? ''} className="object-cover" />
-      <AvatarFallback className="bg-gradient-to-br from-[var(--primary-accent)] to-[var(--primary-accent-hover)] font-bold leading-none text-[var(--accent-contrast)]">
+      <AvatarFallback className="bg-linear-to-br/srgb from-[var(--primary-accent)] to-[var(--primary-accent-hover)] font-bold leading-none text-[var(--accent-contrast)]">
         <span style={{ fontSize: Math.max(9, Math.round(size * 0.4)) }}>{initials(label)}</span>
       </AvatarFallback>
     </Avatar>

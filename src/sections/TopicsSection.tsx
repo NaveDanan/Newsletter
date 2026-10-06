@@ -128,7 +128,7 @@ export function TopicsSection() {
                 >
                   <div className="accent-line w-12 mb-4" />
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-[#00b4d8]/10 dark:bg-[#00F0FF]/10 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-[#00b4d8]/10 dark:bg-[#00F0FF]/10 flex items-center justify-center shrink-0">
                       <HugeiconsIcon icon={card.icon} className="w-5 h-5 text-[#00b4d8] dark:text-[#00F0FF]" />
                     </div>
                     <div>

@@ -990,7 +990,7 @@ export function SpreadsheetView() {
                       {project.devision && <div className="text-xs text-[var(--text-muted)] mt-0.5" dir="auto">{project.devision}</div>}
                     </td>
                     <td className="py-3 px-4 text-[var(--text-secondary)] text-sm">
-                      <span className="flex items-center gap-1.5"><HugeiconsIcon icon={Building02Icon} className="w-3.5 h-3.5 flex-shrink-0" />{project.department}</span>
+                      <span className="flex items-center gap-1.5"><HugeiconsIcon icon={Building02Icon} className="w-3.5 h-3.5 shrink-0" />{project.department}</span>
                     </td>
                     <td className="py-3 px-4">
                       <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${getStatusBadgeClass(project.status)}`}>{getProjectStatusLabel(project.status)}</span>
@@ -1010,7 +1010,7 @@ export function SpreadsheetView() {
 
           {/* Header */}
           <div className="sticky top-0 z-30 flex items-center gap-3 px-4 pt-3 border-b border-[var(--border-subtle)] bg-[var(--bg-card-alt)] flex-wrap gap-y-2">
-            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0">
               <HugeiconsIcon icon={FileSpreadsheetIcon} className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -1022,7 +1022,7 @@ export function SpreadsheetView() {
             <div className="flex items-center gap-1 bg-[var(--bg-pill)] rounded-full p-1 border border-[var(--border-subtle)]">
               {(['visual', 'raw'] as ViewMode[]).map(mode => (
                 <button key={mode} onClick={() => setViewMode(mode)}
-                  className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${viewMode === mode ? 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                  className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${viewMode === mode ? 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-xs' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
                   {mode === 'visual' ? `📊 ${t('manager.visual')}` : `📄 ${t('manager.raw')}`}
                 </button>
               ))}
@@ -1099,7 +1099,7 @@ export function SpreadsheetView() {
                           <td className="py-2.5 px-4 font-semibold text-[var(--text-primary)] whitespace-nowrap">{g.projectTitle}</td>
                           <td className="py-2.5 px-4 text-[var(--text-secondary)] whitespace-nowrap">
                             {viewMode === 'visual'
-                              ? <span className="flex items-center gap-1.5"><HugeiconsIcon icon={Target01Icon} className="w-3.5 h-3.5 text-[var(--primary-accent)] flex-shrink-0" />{g.milestoneName}</span>
+                              ? <span className="flex items-center gap-1.5"><HugeiconsIcon icon={Target01Icon} className="w-3.5 h-3.5 text-[var(--primary-accent)] shrink-0" />{g.milestoneName}</span>
                               : <span className="text-[var(--text-secondary)]">{g.milestoneName}</span>}
                           </td>
                           <td className="py-2.5 px-4 text-[var(--text-muted)] font-mono text-xs whitespace-nowrap">{formatDate(g.milestoneDate, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
@@ -1151,7 +1151,7 @@ export function SpreadsheetView() {
                           <tr key={r.id} className="hover:bg-[var(--bg-card-hover)]">
                             <td className="py-2.5 px-4 font-semibold text-[var(--text-primary)] whitespace-nowrap">
                               {viewMode === 'visual'
-                                ? <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full flex-shrink-0 inline-block" style={{ background: r.color }} />{r.name}</span>
+                                ? <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full shrink-0 inline-block" style={{ background: r.color }} />{r.name}</span>
                                 : <span>{r.name}</span>}
                             </td>
                             <td className="py-2.5 px-4 text-[var(--text-secondary)] whitespace-nowrap">{role?.name ?? r.role ?? '—'}</td>

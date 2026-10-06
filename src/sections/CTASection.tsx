@@ -67,7 +67,7 @@ export function CTASection() {
         className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: 'url(/cta_city_bg.jpg)' }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-white/80 dark:from-[#0B0C10]/80 via-white/90 dark:via-[#0B0C10]/90 to-white dark:to-[#0B0C10]" />
+        <div className="absolute inset-0 bg-linear-to-b/srgb from-white/80 dark:from-[#0B0C10]/80 via-white/90 dark:via-[#0B0C10]/90 to-white dark:to-[#0B0C10]" />
       </div>
 
       <div className="relative z-10 w-full px-6 lg:px-10">

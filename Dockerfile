@@ -14,8 +14,6 @@ COPY public ./public
 COPY src ./src
 COPY components.json ./
 COPY eslint.config.js ./
-COPY postcss.config.js ./
-COPY tailwind.config.js ./
 COPY tsconfig.app.json ./
 COPY tsconfig.json ./
 COPY tsconfig.node.json ./

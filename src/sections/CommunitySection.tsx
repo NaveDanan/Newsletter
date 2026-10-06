@@ -130,7 +130,7 @@ export function CommunitySection() {
                   &ldquo;{testimonial.quote}&rdquo;
                 </p>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00b4d8]/30 to-[#00b4d8]/10 dark:from-[#00F0FF]/30 dark:to-[#00F0FF]/10 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-linear-to-br/srgb from-[#00b4d8]/30 to-[#00b4d8]/10 dark:from-[#00F0FF]/30 dark:to-[#00F0FF]/10 flex items-center justify-center">
                     <span className="text-[#00b4d8] dark:text-[#00F0FF] font-display font-semibold text-sm">
                       {testimonial.author.split(' ').map(n => n[0]).join('')}
                     </span>

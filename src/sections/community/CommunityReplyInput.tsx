@@ -164,7 +164,7 @@ export function CommunityReplyInput({
             placeholder={placeholder}
             aria-autocomplete="list"
             aria-expanded={isOpen}
-            className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-hidden"
             onChange={(event) => {
               setValue(event.target.value);
               syncQuery(event.target.value, event.target.selectionStart ?? event.target.value.length);

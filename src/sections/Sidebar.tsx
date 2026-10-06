@@ -124,7 +124,7 @@ export function Sidebar({ publishedCount, onNavigate }: SidebarProps) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder={t('sidebar.emailPlaceholder')}
-            className="w-full h-10 bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-full px-4 text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-accent)] transition-all"
+            className="w-full h-10 bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-full px-4 text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary-accent)] transition-all"
             disabled={isSubmitting}
           />
           <button

@@ -51,7 +51,7 @@ function ImageActionsMenu({ label, disabled, canEdit, onUpload, onEdit, onRemove
           type="button"
           disabled={disabled}
           aria-label={label}
-          className={`flex items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] shadow-sm transition-colors hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)] disabled:opacity-50 ${className}`}
+          className={`flex items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] shadow-xs transition-colors hover:text-[var(--text-primary)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)] disabled:opacity-50 ${className}`}
         >
           <HugeiconsIcon icon={Camera01Icon} className="size-4" />
         </button>

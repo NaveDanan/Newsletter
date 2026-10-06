@@ -24,7 +24,7 @@ export function CommunityQuotedPost({ post }: { post: CommunityPost }) {
   return (
     <button
       type="button"
-      className="mt-3 block w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card-alt)] px-4 py-3 text-start transition-colors hover:bg-[var(--bg-card-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)]"
+      className="mt-3 block w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card-alt)] px-4 py-3 text-start transition-colors hover:bg-[var(--bg-card-hover)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)]"
       onClick={(event) => {
         event.stopPropagation();
         openPost(post.id);

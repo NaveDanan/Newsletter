@@ -242,7 +242,7 @@ test('Gantt Save Schedule keeps unsaved status on failure and preserves edits ma
   app.textButton('ganttEditor.monthly').props.onClick(); app.render();
   finish({ id: 'project-one' }); await second; app.render();
   assert.ok(app.find((node) => node.props?.children === 'ganttEditor.unsavedChanges'), 'newer draft remains unsaved');
-  assert.match(app.textButton('ganttEditor.monthly').props.className, /shadow-sm/, 'newer zoom was not overwritten');
+  assert.match(app.textButton('ganttEditor.monthly').props.className, /shadow-xs/, 'newer zoom was not overwritten');
 });
 
 test('Gantt Save and Leave keeps blank-task confirmation and routes only after Save Anyway succeeds', async () => {

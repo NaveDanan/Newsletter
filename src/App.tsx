@@ -709,6 +709,7 @@ function App() {
             onBack={() => navigateTo('/manager/gantt')}
             renderShell={(content, onNavigate) => (
               <AppStageShell
+                fullViewport
                 activeTab="manager"
                 onHomeClick={handleHomeClick}
                 onCommunityClick={handleCommunityClick}
@@ -976,7 +977,7 @@ function App() {
 
           <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
             {isSearchActive ? (
-              <section className="mb-8 rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-5 shadow-sm">
+              <section className="mb-8 rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-5 shadow-xs">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--primary-accent)]">
@@ -1022,7 +1023,7 @@ function App() {
                     />
                   </>
                 ) : (
-                  <section className="rounded-3xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-12 text-center shadow-sm">
+                  <section className="rounded-3xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-12 text-center shadow-xs">
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--primary-accent)]">
                       {t('app.search.noMatchesLabel')}
                     </p>

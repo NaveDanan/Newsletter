@@ -408,7 +408,7 @@ export function MigratePage({ onBack }: { onBack: () => void }) {
           className="hidden"
         />
 
-        <div className="bg-white border border-[#E5E5E5] rounded-2xl p-8 shadow-sm space-y-8">
+        <div className="bg-white border border-[#E5E5E5] rounded-2xl p-8 shadow-xs space-y-8">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#D93A3A]/10 flex items-center justify-center text-xl">🗄️</div>
             <div>

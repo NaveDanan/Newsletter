@@ -16,7 +16,7 @@ const SIZE_CLASS: Record<'sm' | 'md' | 'lg' | 'xl' | '2xl', string> = {
   md: 'size-10',
   lg: 'size-12',
   xl: 'size-24 border-4 border-white',
-  '2xl': 'size-28 sm:size-36 border-4 border-white shadow-sm ring-1 ring-black/5',
+  '2xl': 'size-28 sm:size-36 border-4 border-white shadow-xs ring-1 ring-black/5',
 };
 
 // Falls back to the first letter of the display name, then of the handle. A
@@ -49,7 +49,7 @@ export function CommunityAvatar({
         alt={displayName || handle || 'Avatar'}
         className="object-cover"
       />
-      <AvatarFallback className={cn("bg-gradient-to-br from-[var(--primary-accent)] to-[var(--primary-accent-hover)] font-bold text-[var(--accent-contrast)]", size === '2xl' ? 'text-3xl sm:text-4xl' : size === 'xl' ? 'text-xl' : 'text-sm')}>
+      <AvatarFallback className={cn("bg-linear-to-br/srgb from-[var(--primary-accent)] to-[var(--primary-accent-hover)] font-bold text-[var(--accent-contrast)]", size === '2xl' ? 'text-3xl sm:text-4xl' : size === 'xl' ? 'text-xl' : 'text-sm')}>
         {initialsOf(displayName, handle)}
       </AvatarFallback>
     </Avatar>
@@ -62,7 +62,7 @@ export function CommunityAvatar({
   return (
     <button
       type="button"
-      className="shrink-0 rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)]"
+      className="shrink-0 rounded-full transition-opacity hover:opacity-80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)]"
       onClick={(event) => {
         event.stopPropagation();
         onClick();

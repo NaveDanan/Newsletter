@@ -337,7 +337,7 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
                 )}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: dd.dotColor }} />
+                  <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: dd.dotColor }} />
                   <h3 className="text-sm font-semibold text-[#171717] truncate flex-1">{dd.label}</h3>
                 </div>
                 <p className="text-xs text-[#737373] mb-3">
@@ -407,7 +407,7 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
                     onClick={() => setExpandedDropdownId(isExpanded ? null : dd.id)}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[#FAFAFA]"
                   >
-                    <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: dd.dotColor }} />
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: dd.dotColor }} />
                     <span className="text-sm font-semibold text-[#171717] flex-1">{dd.label}</span>
                     <span className="text-xs text-[#737373]">{ddLinks.length} {ddLinks.length === 1 ? 'item' : 'items'}</span>
                     <svg
@@ -443,7 +443,7 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
                                 link.hidden && 'opacity-50',
                               )}
                             >
-                              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[#E5E5E5] bg-[#FAFAFA] flex-shrink-0">
+                              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[#E5E5E5] bg-[#FAFAFA] shrink-0">
                                 {link.iconUrl ? (
                                   <img src={link.iconUrl} alt={link.name} className="h-8 w-8 rounded-lg object-cover" />
                                 ) : (
@@ -464,7 +464,7 @@ export function LinksView({ currentUserRole }: LinksViewProps) {
                                   {link.url}
                                 </a>
                               </div>
-                              <div className="flex items-center gap-1 flex-shrink-0">
+                              <div className="flex items-center gap-1 shrink-0">
                                 <button
                                   onClick={() => handleToggleLinkVisibility(link)}
                                   className="rounded-lg p-1.5 text-[#737373] transition-colors hover:bg-[#F3F4F6] hover:text-[#171717]"

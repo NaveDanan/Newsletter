@@ -236,7 +236,7 @@ export function CommunityPage({
             <div className="space-y-2 px-4">
               <Skeleton className="h-6 w-48" />
               <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-4 w-64 mt-3" />
+              <Skeleton className="h-4 w-64" />
             </div>
           </div>
         );

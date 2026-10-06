@@ -323,7 +323,7 @@ export function GoalsView() {
         </div>
         <div className="h-3 bg-[var(--bg-input)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
           <div
-            className="h-full bg-gradient-to-r from-[var(--primary-accent)] to-emerald-500 transition-all duration-500"
+            className="h-full bg-linear-to-r/srgb from-[var(--primary-accent)] to-emerald-500 transition-all duration-500"
             style={{ width: `${overallProgress}%` }}
           />
         </div>
@@ -380,7 +380,7 @@ export function GoalsView() {
           <div key={goal.id} className="feed-post-card group p-5">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[var(--primary-accent)]/15 border border-[var(--primary-accent)]/30 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 bg-[var(--primary-accent)]/15 border border-[var(--primary-accent)]/30 rounded-2xl flex items-center justify-center shrink-0">
                   <HugeiconsIcon icon={Target01Icon} className="w-5 h-5 text-[var(--primary-accent)]" />
                 </div>
                 <div className="min-w-0">

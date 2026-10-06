@@ -243,7 +243,7 @@ export function CommentReply({
               return (
                 <article
                   key={comment.id}
-                  className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card-alt)] p-4 shadow-sm sm:p-5"
+                  className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card-alt)] p-4 shadow-xs sm:p-5"
                 >
                   <div className="flex items-start gap-4">
                     <Avatar className="h-11 w-11 border border-[var(--border-subtle)] bg-[var(--bg-card)]">

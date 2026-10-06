@@ -61,7 +61,7 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
 
         <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-4 items-center">
           <div ref={contentRef} className="lg:col-span-6 flex flex-col items-start text-start">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--primary-accent)] text-[var(--accent-contrast)] text-xs font-bold rounded-full mb-4 shadow-sm">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--primary-accent)] text-[var(--accent-contrast)] text-xs font-bold rounded-full mb-4 shadow-xs">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               {featuredNewsletter ? t('hero.latestNewsletter') : t('hero.latest')}
             </span>
@@ -94,7 +94,7 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
                 alt={featuredNewsletter?.title ?? t('hero.imageAlt')}
                 className="w-full h-[300px] md:h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-linear-to-t/srgb from-black/70 via-black/20 to-transparent pointer-events-none" />
 
               {/* Decorative Glass Shatter Overlay from Reference */}
               <svg className="shatter-glass-overlay" viewBox="0 0 900 460" preserveAspectRatio="none">

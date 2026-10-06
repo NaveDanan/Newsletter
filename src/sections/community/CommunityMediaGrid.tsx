@@ -68,7 +68,7 @@ export function CommunityMediaGrid({ media, sensitive, onOpenImage }: CommunityM
             ) : (
               <button
                 type="button"
-                className="size-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary-accent)]"
+                className="size-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary-accent)]"
                 aria-label={item.altText || t('community.post.openImage')}
                 onClick={(event) => {
                   event.stopPropagation();

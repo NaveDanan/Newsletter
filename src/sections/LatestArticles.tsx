@@ -57,8 +57,8 @@ export function LatestArticles({ newsletters, currentUserId, onArticleClick }: L
   return (
     <section id="workflows" className="space-y-6">
       {/* Segmented Filter Tabs */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-1.5 bg-[var(--bg-card)] p-1.5 rounded-full border border-[var(--border-subtle)] shadow-sm overflow-x-auto scrollbar-hide">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 bg-[var(--bg-card)] p-1.5 rounded-full border border-[var(--border-subtle)] shadow-xs overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -91,7 +91,7 @@ export function LatestArticles({ newsletters, currentUserId, onArticleClick }: L
                     name={article.author}
                     src={article.authorAvatar}
                     size={44}
-                    className="shadow-sm"
+                    className="shadow-xs"
                   />
                   <div className="flex flex-col">
                     <div className="flex items-center gap-1.5">

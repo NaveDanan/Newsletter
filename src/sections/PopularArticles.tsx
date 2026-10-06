@@ -74,7 +74,7 @@ export function PopularArticles({ newsletters, onArticleClick }: PopularArticles
                   </span>
                 </div>
               </div>
-              <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-2xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-card-alt)]">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-2xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-card-alt)]">
                 <img
                   src={article.coverImage}
                   alt={article.title}

@@ -1,5 +1,10 @@
 /* App-specific styles */
 
+/* Same cascade layer as the utilities (and after them), as in v3; see the
+   note above `@layer utilities` in src/index.css. Left unindented to keep
+   the rules diffable. */
+@layer utilities {
+
 /* Animation utilities */
 @keyframes fade-in {
   from { opacity: 0; }
@@ -55,3 +60,5 @@
   background: var(--primary-accent-glow);
   color: var(--text-primary);
 }
+
+} /* @layer utilities */

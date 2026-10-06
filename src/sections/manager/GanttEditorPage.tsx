@@ -504,7 +504,7 @@ export function GanttEditorPage({ projectId, onBack, renderShell }: GanttEditorP
   if (!project) {
     return wrap(
       <div className="min-h-screen bg-[var(--bg-app)] px-4 py-10" dir={isRTL ? 'rtl' : 'ltr'}>
-        <div className="mx-auto max-w-3xl rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-8 shadow-sm">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-8 shadow-xs">
           <button
             type="button"
             onClick={onBack}
@@ -2126,7 +2126,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                     <div key={resource.id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card-alt)] p-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-3">
-                          <span className="h-3.5 w-3.5 rounded-full shadow-sm" style={{ backgroundColor: resource.color }} />
+                          <span className="h-3.5 w-3.5 rounded-full shadow-xs" style={{ backgroundColor: resource.color }} />
                           <div className="min-w-0">
                             <p className="truncate text-sm font-bold text-[var(--text-primary)]">{resource.name}</p>
                             <p className="truncate text-xs text-[var(--text-secondary)]">{resource.role || t('ganttEditor.noRoleSet')}</p>
@@ -2224,7 +2224,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
             ) : (
               <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
                 {draftGantt.roles.map((role) => (
-                  <div key={role.id} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 shadow-sm">
+                  <div key={role.id} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 shadow-xs">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-3">
                           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--primary-accent)]/15 text-[var(--primary-accent)] font-semibold">
@@ -2357,7 +2357,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                     >
                       <HugeiconsIcon icon={ResourcesAddIcon} className="h-3.5 w-3.5" />
                     </button>
-                    <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded-md bg-[#171717] px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-sm transition-opacity peer-hover:opacity-100 peer-focus-visible:opacity-100">
+                    <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded-md bg-[#171717] px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-xs transition-opacity peer-hover:opacity-100 peer-focus-visible:opacity-100">
                       {t('ganttEditor.manageResources')}
                     </div>
                   </div>
@@ -2417,7 +2417,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                         onClick={() => setShowTimelineYears((current) => !current)}
                         className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                           showTimelineYears
-                            ? 'border-[var(--primary-accent)] bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-sm'
+                            ? 'border-[var(--primary-accent)] bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-xs'
                             : 'border-[var(--border-subtle)] bg-[var(--bg-card-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                         }`}
                       >
@@ -2436,7 +2436,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                             }}
                             className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                               timelineCalendarMonth.getFullYear() === year
-                                ? 'border-[var(--primary-accent)] bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-sm'
+                                ? 'border-[var(--primary-accent)] bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-xs'
                                 : 'border-[var(--border-subtle)] bg-[var(--bg-card-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                             }`}
                           >
@@ -2476,7 +2476,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                       key={zoom}
                       type="button"
                       onClick={() => applyDraftGantt({ ...draftGanttRef.current, zoom })}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${draftGantt.zoom === zoom ? 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]'
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${draftGantt.zoom === zoom ? 'bg-[var(--primary-accent)] text-[var(--accent-contrast)] shadow-xs' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]'
                         }`}
                     >
                       {formatZoomLabel(zoom)}
@@ -2589,7 +2589,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                                   }}
                                   onDragOver={(event) => handleTaskRowDragOver(event, task.id)}
                                   onDrop={(event) => handleTaskDrop(event, { taskId: task.id, position: getRowDropPosition(event) })}
-                                  className={`group relative grid h-14 border-b border-[var(--border-subtle)] outline-none transition-colors ${
+                                  className={`group relative grid h-14 border-b border-[var(--border-subtle)] outline-hidden transition-colors ${
                                     isManaged
                                       ? 'border-b-transparent bg-[var(--primary-accent)]/15'
                                       : isHighlighted
@@ -2601,7 +2601,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                                   {dropPosition === 'before' ? (
                                     <div className="pointer-events-none absolute inset-x-3 top-0 z-10 h-[3px] rounded-full bg-[var(--primary-accent)]">
                                       {draggedTaskPreviewLabel ? (
-                                        <span className="absolute left-0 top-1 rounded-full bg-[var(--text-dark)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-sm">
+                                        <span className="absolute left-0 top-1 rounded-full bg-[var(--text-dark)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-xs">
                                           #{draggedTaskPreviewLabel}
                                         </span>
                                       ) : null}
@@ -2610,7 +2610,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                                   {dropPosition === 'after' ? (
                                     <div className="pointer-events-none absolute inset-x-3 bottom-0 z-10 h-[3px] rounded-full bg-[var(--primary-accent)]">
                                       {draggedTaskPreviewLabel ? (
-                                        <span className="absolute left-0 bottom-1 rounded-full bg-[var(--text-dark)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-sm">
+                                        <span className="absolute left-0 bottom-1 rounded-full bg-[var(--text-dark)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-xs">
                                           #{draggedTaskPreviewLabel}
                                         </span>
                                       ) : null}
@@ -2619,7 +2619,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                                   {dropPosition === 'inside' ? (
                                     <div className="pointer-events-none absolute inset-1 rounded-xl border-2 border-dashed border-[var(--primary-accent)] bg-[var(--primary-accent)]/15">
                                       {draggedTaskPreviewLabel ? (
-                                        <span className="absolute right-2 top-2 rounded-full bg-[var(--text-dark)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-sm">
+                                        <span className="absolute right-2 top-2 rounded-full bg-[var(--text-dark)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-xs">
                                           #{draggedTaskPreviewLabel}
                                         </span>
                                       ) : null}
@@ -2866,7 +2866,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                         onDrop={(event) => handleTaskDrop(event, { taskId: null, position: 'root' })}
                       >
                         {isRootTaskDropTarget && draggedTaskPreviewLabel ? (
-                          <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-[var(--text-dark)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-sm">
+                          <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-[var(--text-dark)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-xs">
                             #{draggedTaskPreviewLabel}
                           </div>
                         ) : null}
@@ -2878,7 +2878,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
                     <button
                       type="button"
                       onClick={handleToggleTaskGrid}
-                      className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] p-1 text-[var(--text-secondary)] shadow-sm transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]"
+                      className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] p-1 text-[var(--text-secondary)] shadow-xs transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]"
                       aria-label={isTaskGridCollapsed ? t('ganttEditor.expandTaskGrid') : t('ganttEditor.collapseTaskGrid')}
                       title={isTaskGridCollapsed ? t('ganttEditor.expandTaskGrid') : t('ganttEditor.collapseTaskGrid')}
                     >
@@ -2970,7 +2970,7 @@ function GanttEditorPageInternal({ project, updateProjectGantt, onBack, renderSh
 
                               <div
                                 className={`absolute top-1/2 flex -translate-y-1/2 items-center ${task.milestone ? 'justify-center' : 'rounded-full px-3'
-                                  } ${dragState?.taskId === task.id ? 'shadow-lg' : 'shadow-sm'} cursor-pointer`}
+                                  } ${dragState?.taskId === task.id ? 'shadow-lg' : 'shadow-xs'} cursor-pointer`}
                                 style={{
                                   left: `${barLeft}px`,
                                   width: `${barWidth}px`,

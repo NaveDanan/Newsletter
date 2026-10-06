@@ -89,6 +89,7 @@ function ImageEditor({ src, onDone, onCancel }: ImageEditorProps) {
 
   return (
     <div className="space-y-3">
+      <canvas ref={canvasRef} className="hidden" />
       <p className="text-xs text-[#737373]">Drag to pan, scroll to zoom. The visible area will be used as your icon.</p>
       <div
         ref={containerRef}
@@ -135,7 +136,6 @@ function ImageEditor({ src, onDone, onCancel }: ImageEditorProps) {
         <button type="button" onClick={onCancel} className="btn-secondary text-sm">Cancel</button>
         <button type="button" onClick={exportImage} className="btn-primary text-sm">Use this crop</button>
       </div>
-      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }
@@ -186,7 +186,7 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
           onClick={() => setTab('defaults')}
           className={cn(
             'flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-            tab === 'defaults' ? 'bg-white text-[#171717] shadow-sm' : 'text-[#737373] hover:text-[#171717]',
+            tab === 'defaults' ? 'bg-white text-[#171717] shadow-xs' : 'text-[#737373] hover:text-[#171717]',
           )}
         >
           Default Icons
@@ -196,7 +196,7 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
           onClick={() => setTab('upload')}
           className={cn(
             'flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-            tab === 'upload' ? 'bg-white text-[#171717] shadow-sm' : 'text-[#737373] hover:text-[#171717]',
+            tab === 'upload' ? 'bg-white text-[#171717] shadow-xs' : 'text-[#737373] hover:text-[#171717]',
           )}
         >
           Custom Upload

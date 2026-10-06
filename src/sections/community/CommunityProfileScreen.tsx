@@ -259,7 +259,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
         <div className="space-y-2 px-4">
           <Skeleton className="h-6 w-48" />
           <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-4 w-64 mt-3" />
+          <Skeleton className="h-4 w-64" />
         </div>
       </div>
     );
@@ -392,7 +392,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="h-full w-full bg-gradient-to-r from-[var(--bg-outer)] via-[var(--bg-card)] to-[var(--bg-outer)]" />
+          <div className="h-full w-full bg-linear-to-r/srgb from-[var(--bg-outer)] via-[var(--bg-card)] to-[var(--bg-outer)]" />
         )}
       </div>
 

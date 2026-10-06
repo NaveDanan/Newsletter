@@ -133,8 +133,8 @@ export function HeroSection({ onExploreTopics }: HeroSectionProps) {
       >
         <div className={`absolute inset-0 transition-colors duration-500 ${
           isDark 
-            ? 'bg-gradient-to-b from-[#0B0C10]/35 to-[#0B0C10]/75' 
-            : 'bg-gradient-to-b from-white/70 to-white/90'
+            ? 'bg-linear-to-b/srgb from-[#0B0C10]/35 to-[#0B0C10]/75' 
+            : 'bg-linear-to-b/srgb from-white/70 to-white/90'
         }`} />
       </div>
 

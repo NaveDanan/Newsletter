@@ -390,7 +390,7 @@ export function Navigation({
                           onSearch?.(searchQuery);
                         }
                       }}
-                      className="h-9 w-40 bg-transparent text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
+                      className="h-9 w-40 bg-transparent text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-hidden"
                     />
                   </span>
                 </span>
@@ -469,7 +469,7 @@ export function Navigation({
                   searchToggleRef.current?.focus();
                 }
               }}
-              className="h-9 min-w-0 flex-1 bg-transparent px-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
+              className="h-9 min-w-0 flex-1 bg-transparent px-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-hidden"
             />
           </div>
         </div>

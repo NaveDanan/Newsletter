@@ -470,7 +470,7 @@ export function ManagerDashboard({
         {/* Overlay for mobile */}
         {showMobileMenu && (
           <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-30 lg:hidden"
             onClick={() => setShowMobileMenu(false)}
           />
         )}

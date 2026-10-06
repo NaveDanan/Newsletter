@@ -124,7 +124,7 @@ export function AccountMenu({
             type="button"
             aria-label={t('account.menuLabel')}
             className={cn(
-              'user-top-chip outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)]',
+              'user-top-chip outline-hidden transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)]',
               foldOrder !== undefined && 'user-top-chip--folding shrink-0',
               className,
             )}

@@ -13,6 +13,18 @@
 @theme {
   --font-sans: "Plus Jakarta Sans", Heebo, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
+  /* v3 used fixed line heights through text-4xl. Keep them fixed when app
+     classes override a utility's font size, so buttons and cards keep their
+     original height. v4's default ratios otherwise scale with that override. */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
@@ -49,6 +61,24 @@
     }
   }
 }
+
+/* v3 text-size variants reset an earlier leading-* utility. v4 normally keeps
+   --tw-leading across variants; clear it for named text sizes to retain the
+   previous responsive behavior. Explicit leading utilities and text-size
+   slash modifiers still set their own line-height. */
+@utility text-xs { --tw-leading: initial; }
+@utility text-sm { --tw-leading: initial; }
+@utility text-base { --tw-leading: initial; }
+@utility text-lg { --tw-leading: initial; }
+@utility text-xl { --tw-leading: initial; }
+@utility text-2xl { --tw-leading: initial; }
+@utility text-3xl { --tw-leading: initial; }
+@utility text-4xl { --tw-leading: initial; }
+@utility text-5xl { --tw-leading: initial; }
+@utility text-6xl { --tw-leading: initial; }
+@utility text-7xl { --tw-leading: initial; }
+@utility text-8xl { --tw-leading: initial; }
+@utility text-9xl { --tw-leading: initial; }
 
 /* Tokens backed by the runtime variables below. `inline` writes the variable
    reference into each utility, so light/dark and ThemeProvider's accent
@@ -361,6 +391,7 @@
    unlayered CSS beats every layer regardless of specificity. In v3 these
    rules and the utilities shared one cascade where specificity decided, so
    they live in the same layer, after the generated utilities, to keep that.
+   The few equal-specificity responsive font overrides are restored below.
    App.css and EditorStyles.css use the same layer for the same reason.
    (Left unindented to keep the rules diffable against v3.)
    ========================================================================== */
@@ -1171,7 +1202,7 @@
   height: 18px;
 }
 
-.create-action-btn:hover {
+.create-action-btn:where(:hover) {
   background: var(--bg-pill-hover);
 }
 
@@ -2160,6 +2191,16 @@ input[type="range"] {
 [data-theme="light"] .border-\[\#E5E5E5\],
 [data-theme="light"] .border-\[\#e5e5e5\] {
   border-color: var(--border-subtle) !important;
+}
+
+/* v3 emitted responsive utilities after the app stylesheet. Preserve the
+   desktop text size at the three component classes that also set font-size. */
+@media (width >= 40rem) {
+  .nav-link.sm\:text-sm,
+  .tab-button.sm\:text-sm,
+  .btn-hire-me.sm\:text-sm {
+    font-size: var(--text-sm);
+  }
 }
 
 } /* @layer utilities */

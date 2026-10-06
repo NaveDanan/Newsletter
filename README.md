@@ -178,4 +178,6 @@ For a fresh Longhorn installation managed by ArgoCD with images and charts hoste
 - **Data Parsing:** `xlsx`, `exceljs`
 - **Editor:** Tiptap Headless Editor
 
+Tailwind CSS v4 requires Safari 16.4+, Chrome 111+, or Firefox 128+. See the [Tailwind upgrade guide](https://tailwindcss.com/docs/upgrade-guide#browser-requirements) for browser compatibility.
+
 > Designed with modern aesthetics and performance built-in.

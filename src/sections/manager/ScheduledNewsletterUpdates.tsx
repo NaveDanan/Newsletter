@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLocale } from '@/contexts/LocaleContext';
 import { fetchNewsletterImportSchedule, updateNewsletterImportSchedule, runNewsletterImportNow, type NewsletterImportSchedule } from '@/lib/pocketbase/scheduled';
 import { TrackedNewsletterFiles } from './TrackedNewsletterFiles';
 
 export function ScheduledNewsletterUpdates() {
-  const { t, formatDate, formatNumber } = useLocale();
+  const { t, dir, formatDate, formatNumber } = useLocale();
   const [schedule, setSchedule] = useState<NewsletterImportSchedule | null>(null);
   const [loadError, setLoadError] = useState('');
   const [repositoryUrl, setRepositoryUrl] = useState('');
@@ -115,10 +116,19 @@ export function ScheduledNewsletterUpdates() {
                     <label htmlFor="import-enabled">{t('scheduled.import.enable')}</label>
                   </div>
                   <div className="flex min-h-11 items-center gap-3 text-sm font-medium text-[#171717]">
-                    <Switch id="import-auto-publish" checked={autoPublish} onCheckedChange={setAutoPublish} disabled={disabled} aria-describedby="import-auto-publish-hint" className="data-[state=checked]:bg-[#D93A3A]" />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Switch id="import-auto-publish" checked={autoPublish} onCheckedChange={setAutoPublish} disabled={disabled} aria-describedby="import-auto-publish-hint" className="data-[state=checked]:bg-[#D93A3A]" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" sideOffset={8} collisionPadding={16} dir={dir} className="max-w-[min(24rem,calc(100vw-2rem))] text-start leading-relaxed">
+                        {t('scheduled.import.autoPublishHint')}
+                      </TooltipContent>
+                    </Tooltip>
                     <label htmlFor="import-auto-publish">{t('scheduled.import.autoPublish')}</label>
                   </div>
-                  <p id="import-auto-publish-hint" className="text-xs leading-relaxed text-[#737373]">{t('scheduled.import.autoPublishHint')}</p>
+                  <p id="import-auto-publish-hint" className="sr-only">{t('scheduled.import.autoPublishHint')}</p>
                 </div>
               </div>
             </fieldset>

@@ -1876,8 +1876,10 @@
   color: var(--primary-accent) !important;
 }
 
-[class*="bg-[#D93A3A]"],
-[class*="bg-[#d93a3a]"] {
+/* Switch class names include checked-only accents even while unchecked.
+   Their track colors are handled by the state variants below. */
+[class*="bg-[#D93A3A]"]:not([role="switch"]),
+[class*="bg-[#d93a3a]"]:not([role="switch"]) {
   background-color: var(--primary-accent) !important;
   color: var(--accent-contrast, #ffffff) !important;
 }

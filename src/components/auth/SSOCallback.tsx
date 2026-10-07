@@ -80,7 +80,7 @@ export function SSOCallback({ onFinish, onRetry }: SSOCallbackProps) {
         {status === 'processing' && (
           <>
             <HugeiconsIcon icon={Loading02Icon} className="w-16 h-16 animate-spin text-[#D93A3A] mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-[#171717] mb-2">{t('sso.processingTitle')}</h2>
+            <h2 className="text-2xl font-bold text-[#171717]">{t('sso.processingTitle')}</h2>
             <p className="text-gray-600">{t('sso.processingDescription')}</p>
           </>
         )}
@@ -88,7 +88,7 @@ export function SSOCallback({ onFinish, onRetry }: SSOCallbackProps) {
         {status === 'success' && (
           <>
             <HugeiconsIcon icon={CheckmarkCircle02Icon} className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-[#171717] mb-2">{t('sso.successTitle')}</h2>
+            <h2 className="text-2xl font-bold text-[#171717]">{t('sso.successTitle')}</h2>
             <p className="text-gray-600">{t('sso.successDescription')}</p>
           </>
         )}
@@ -96,8 +96,8 @@ export function SSOCallback({ onFinish, onRetry }: SSOCallbackProps) {
         {status === 'error' && (
           <>
             <HugeiconsIcon icon={CancelCircleIcon} className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-[#171717] mb-2">{t('sso.errorTitle')}</h2>
-            <p className="text-gray-600 mb-6">{errorMessage || t('sso.errorFallback')}</p>
+            <h2 className="text-2xl font-bold text-[#171717]">{t('sso.errorTitle')}</h2>
+            <p className="text-gray-600">{errorMessage || t('sso.errorFallback')}</p>
             <button onClick={onRetry} className="text-[#D93A3A] hover:underline font-medium">
               {t('sso.backToSignIn')}
             </button>

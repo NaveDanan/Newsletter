@@ -181,7 +181,7 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
                 onChange={(e) => setFindText(e.target.value)}
                 dir={isRTL ? 'rtl' : 'ltr'}
                 placeholder={t('editor.searchForPlaceholder')}
-                className={cn('w-full py-2 border border-[#E5E5E5] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D93A3A]/20 focus:border-[#D93A3A]', isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4')}
+                className={cn('w-full py-2 border border-[#E5E5E5] rounded-lg focus:outline-hidden focus:ring-2 focus:ring-[#D93A3A]/20 focus:border-[#D93A3A]', isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4')}
                 autoFocus
               />
             </div>
@@ -200,7 +200,7 @@ export function FindReplaceDialog({ editor, isOpen, onClose }: FindReplaceDialog
                 onChange={(e) => setReplaceText(e.target.value)}
                 dir={isRTL ? 'rtl' : 'ltr'}
                 placeholder={t('editor.replaceWithPlaceholder')}
-                className={cn('w-full py-2 border border-[#E5E5E5] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D93A3A]/20 focus:border-[#D93A3A]', isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4')}
+                className={cn('w-full py-2 border border-[#E5E5E5] rounded-lg focus:outline-hidden focus:ring-2 focus:ring-[#D93A3A]/20 focus:border-[#D93A3A]', isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4')}
               />
             </div>
           </div>

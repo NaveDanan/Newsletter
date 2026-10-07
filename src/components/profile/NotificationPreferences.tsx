@@ -79,7 +79,7 @@ export function NotificationPreferences() {
         <div aria-live="polite" className="mt-2 min-h-5 text-sm text-[#737373]">
           {error ? <div role="alert" className="flex flex-wrap items-center gap-2 text-[#B91C1C]">{t('notifications.settings.failed')}{!preferences ? <Button variant="outline" size="sm" onClick={() => setAttempt((value) => value + 1)}>{t('notifications.retry')}</Button> : null}</div> : saving ? t('profile.saving') : saved ? t('profile.saved') : null}
         </div>
-        <a href="/community/notifications" className="mt-3 inline-block text-sm font-medium text-[#D93A3A] underline underline-offset-4 focus-visible:outline focus-visible:outline-2">{t('notifications.open')}</a>
+        <a href="/community/notifications" className="mt-3 inline-block text-sm font-medium text-[#D93A3A] underline underline-offset-4 focus-visible:outline-solid focus-visible:outline-2">{t('notifications.open')}</a>
       </CardContent>
     </Card>
   );

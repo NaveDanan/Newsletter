@@ -70,7 +70,7 @@ export function HeadingSelector({ editor }: HeadingSelectorProps) {
                 fontSize: heading.level === 0 ? '1em' : `${1.5 - heading.level * 0.1}em`
               }}
             >
-              <HugeiconsIcon icon={HeadingIcon} className="w-4 h-4 flex-shrink-0" />
+              <HugeiconsIcon icon={HeadingIcon} className="w-4 h-4 shrink-0" />
               <span>{heading.name}</span>
             </button>
           );

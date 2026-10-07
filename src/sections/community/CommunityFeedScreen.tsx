@@ -114,7 +114,7 @@ export function CommunityFeedScreen({
                   {t('community.tab.' + value)}
                 </span>
                 {isActive ? (
-                  <span className="absolute inset-x-0 bottom-0 mx-auto h-1 w-14 rounded-full bg-[var(--primary-accent)] shadow-sm" />
+                  <span className="absolute inset-x-0 bottom-0 mx-auto h-1 w-14 rounded-full bg-[var(--primary-accent)] shadow-xs" />
                 ) : null}
               </button>
             );

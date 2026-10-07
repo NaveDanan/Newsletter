@@ -127,7 +127,7 @@ export function NewsletterEventCard({
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 shadow-sm sm:p-6',
+        'overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 shadow-xs sm:p-6',
         className
       )}
     >
@@ -268,7 +268,7 @@ export function NewsletterEventCard({
         {/* Attendees preview */}
         <div className="flex items-center gap-2">
           {attendeeCount > 0 ? (
-            <div className="flex items-center -space-x-2 rtl:space-x-reverse">
+            <div className="flex items-center -space-x-2">
               {event.attendees.slice(0, 4).map((attendee, idx) => (
                 <div
                   key={attendee.userId || idx}

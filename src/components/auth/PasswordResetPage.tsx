@@ -60,7 +60,7 @@ export function PasswordResetPage({ token, onBack, onSuccess }: PasswordResetPag
         </div>
         <Card className="w-full">
           <CardHeader className="space-y-1">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-5">
               <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                 <HugeiconsIcon icon={ArrowLeft01Icon} className={cn('w-4 h-4', isRTL && 'rtl-rotate-180')} />
               </button>

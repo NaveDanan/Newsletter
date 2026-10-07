@@ -13,7 +13,7 @@ const THEME_OPTIONS: { value: Theme; Icon: typeof Monitor }[] = [
 const ACCENT_KEYS = Object.keys(ACCENT_PRESETS) as Exclude<AccentKey, 'custom'>[];
 
 const PILL_FOCUS =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-card)]';
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-card)]';
 
 /**
  * Theme and accent pickers for the profile page. ThemeContext applies each

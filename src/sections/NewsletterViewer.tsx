@@ -174,7 +174,7 @@ export function NewsletterViewer({
               alt={newsletter.title}
               className="h-full w-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-linear-to-t/srgb from-black/50 via-transparent to-transparent pointer-events-none" />
           </div>
         )}
 
@@ -200,7 +200,7 @@ export function NewsletterViewer({
 
         <div className="mb-8 flex items-center justify-between border-y border-[var(--border-subtle)] py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--primary-accent)]/15 border border-[var(--primary-accent)]/20 shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--primary-accent)]/15 border border-[var(--primary-accent)]/20 shadow-xs">
               <span className="text-base font-bold text-[var(--primary-accent)]">
                 {getInitials(newsletter.author)}
               </span>
@@ -232,7 +232,7 @@ export function NewsletterViewer({
         </div>
 
         {newsletter.hasAudio && (
-          <div className="mb-8 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] p-4 shadow-sm">
+          <div className="mb-8 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] p-4 shadow-xs">
             <div className="flex items-center gap-4">
               <button className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--primary-accent)] text-[var(--accent-contrast)] transition-transform hover:scale-105 shadow-md">
                 <HugeiconsIcon icon={PlayIcon} className="ml-0.5 h-5 w-5 fill-white text-white" />

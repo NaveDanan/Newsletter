@@ -121,7 +121,7 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
           </div>
           <Card className="w-full bg-[var(--bg-card)] border-[var(--border-subtle)] rounded-3xl shadow-[var(--shadow-card)]">
           <CardHeader className="space-y-1">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-5">
               <button onClick={() => setShowForgotPassword(false)} className="p-2 hover:bg-[var(--bg-pill-hover)] rounded-full transition-colors text-[var(--text-secondary)]">
                 <HugeiconsIcon icon={ArrowLeft01Icon} className={cn('w-4 h-4', isRTL && 'rtl-rotate-180')} />
               </button>
@@ -309,7 +309,7 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
               )}
 
               {isSignUp && (
-                <div className={cn('flex items-start', isRTL ? 'space-x-reverse space-x-2' : 'space-x-2')}>
+                <div className="flex items-start space-x-2">
                   <Checkbox
                     id="terms"
                     checked={agreeTerms}

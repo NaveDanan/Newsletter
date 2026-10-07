@@ -1,6 +1,7 @@
 import path from "path"
 import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
+import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig, type Plugin } from "vite"
 
@@ -31,7 +32,7 @@ function directIconImports(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   base: "/",
-  plugins: [directIconImports(), react()],
+  plugins: [directIconImports(), react(), tailwindcss()],
   optimizeDeps: { exclude: ['@hugeicons/core-free-icons'] },
   build: {
     rollupOptions: {

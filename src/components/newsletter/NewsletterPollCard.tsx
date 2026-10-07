@@ -65,7 +65,7 @@ export function NewsletterPollCard({
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 shadow-sm sm:p-6',
+        'overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 shadow-xs sm:p-6',
         className
       )}
     >

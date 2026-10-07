@@ -207,7 +207,7 @@ export function NewsletterList({
             onChange={(e) => setSearchTerm(e.target.value)}
             dir={isRTL ? 'rtl' : 'ltr'}
             placeholder={t('manager.searchNewsletters')}
-            className={cn('w-full h-10 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] px-4 text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-accent)] transition-all', isRTL ? 'pr-10' : 'pl-10')}
+            className={cn('w-full h-10 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] px-4 text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary-accent)] transition-all', isRTL ? 'pr-10' : 'pl-10')}
           />
         </div>
       </div>
@@ -262,7 +262,7 @@ export function NewsletterList({
                           {newsletter.subtitle || t('manager.noSubtitleYet')}
                         </p>
                       </div>
-                      <span className={`flex-shrink-0 text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+                      <span className={`shrink-0 text-xs px-2.5 py-0.5 rounded-full font-semibold ${
                         newsletter.status === 'published'
                           ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                           : 'bg-[var(--bg-pill)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
@@ -280,13 +280,13 @@ export function NewsletterList({
                         )}
                       </span>
                       {newsletter.event && (
-                        <span className="flex-shrink-0 flex items-center gap-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 px-2 py-0.5 text-xs font-medium">
+                        <span className="shrink-0 flex items-center gap-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 px-2 py-0.5 text-xs font-medium">
                           <HugeiconsIcon icon={Calendar03Icon} className="w-3 h-3" />
                           {t('viewer.event')}
                         </span>
                       )}
                       {newsletter.poll && (
-                        <span className="flex-shrink-0 flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 text-xs font-medium">
+                        <span className="shrink-0 flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 text-xs font-medium">
                           <HugeiconsIcon icon={BarChartIcon} className="w-3 h-3 -scale-y-100" />
                           {t('viewer.poll')}
                         </span>

@@ -1,6 +1,230 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ThemeProvider toggles the `dark` class on <html> (v3: darkMode: ["class"]). */
+@custom-variant dark (&:is(.dark *));
+
+/* v4 wraps `hover:` in @media (hover: hover). Keep the v3 behaviour so
+   hover-revealed controls stay reachable with a tap on touch screens. */
+@custom-variant hover (&:hover);
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", Heebo, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* v3 used fixed line heights through text-4xl. Keep them fixed when app
+     classes override a utility's font size, so buttons and cards keep their
+     original height. v4's default ratios otherwise scale with that override. */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-caret-blink: caret-blink 1.25s ease-out infinite;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+
+  @keyframes caret-blink {
+    0%,
+    70%,
+    100% {
+      opacity: 1;
+    }
+    20%,
+    50% {
+      opacity: 0;
+    }
+  }
+}
+
+/* v3 text-size variants reset an earlier leading-* utility. v4 normally keeps
+   --tw-leading across variants; clear it for named text sizes to retain the
+   previous responsive behavior. Explicit leading utilities and text-size
+   slash modifiers still set their own line-height. */
+@utility text-xs { --tw-leading: initial; }
+@utility text-sm { --tw-leading: initial; }
+@utility text-base { --tw-leading: initial; }
+@utility text-lg { --tw-leading: initial; }
+@utility text-xl { --tw-leading: initial; }
+@utility text-2xl { --tw-leading: initial; }
+@utility text-3xl { --tw-leading: initial; }
+@utility text-4xl { --tw-leading: initial; }
+@utility text-5xl { --tw-leading: initial; }
+@utility text-6xl { --tw-leading: initial; }
+@utility text-7xl { --tw-leading: initial; }
+@utility text-8xl { --tw-leading: initial; }
+@utility text-9xl { --tw-leading: initial; }
+
+/* Tokens backed by the runtime variables below. `inline` writes the variable
+   reference into each utility, so light/dark and ThemeProvider's accent
+   overrides on <html> apply exactly as they did in v3. `reference` keeps
+   Tailwind from emitting :root copies, which would shadow the --radius-app,
+   --radius-card, --radius-squircle and --radius-pill tokens defined below. */
+@theme inline reference {
+  --color-theme-outer: var(--bg-outer);
+  --color-theme-app: var(--bg-app);
+  --color-theme-card: var(--bg-card);
+  --color-theme-cardHover: var(--bg-card-hover);
+  --color-theme-cardAlt: var(--bg-card-alt);
+  --color-theme-input: var(--bg-input);
+  --color-theme-pill: var(--bg-pill);
+  --color-theme-pillHover: var(--bg-pill-hover);
+  --color-theme-tag: var(--bg-tag);
+  --color-theme-borderSubtle: var(--border-subtle);
+  --color-theme-borderCard: var(--border-card);
+  --color-theme-borderHighlight: var(--border-highlight);
+  --color-theme-primaryAccent: var(--primary-accent);
+  --color-theme-accentYellow: var(--primary-yellow);
+  --color-theme-accentRed: var(--accent-red);
+  --color-theme-accentGreen: var(--accent-green);
+  --color-theme-accentBlue: var(--accent-blue);
+  --color-theme-accentOrange: var(--accent-orange);
+  --color-theme-textPrimary: var(--text-primary);
+  --color-theme-textSecondary: var(--text-secondary);
+  --color-theme-textMuted: var(--text-muted);
+  --color-theme-textDark: var(--text-dark);
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --radius-app: var(--radius-app);
+  --radius-card: var(--radius-card);
+  --radius-squircle: var(--radius-squircle);
+  --radius-pill: var(--radius-pill);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-xs: calc(var(--radius) - 6px);
+}
+
+/* Preflight defaults that changed in v4, restored to their v3 values. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: #e5e7eb;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af;
+  }
+
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  :disabled {
+    cursor: default;
+  }
+
+  [type="search"] {
+    -webkit-appearance: textfield;
+    outline-offset: -2px;
+  }
+
+  /* v3 left these to the browser and v4 resets them; `revert-layer` skips
+     Preflight's declarations so the browser defaults apply again. */
+  th,
+  td,
+  option {
+    padding: revert-layer;
+  }
+
+  button,
+  input,
+  select,
+  optgroup,
+  textarea {
+    border-radius: revert-layer;
+    opacity: revert-layer;
+  }
+
+  input:where(:not([type="button"], [type="reset"], [type="submit"])),
+  select,
+  optgroup,
+  textarea {
+    background-color: revert-layer;
+  }
+
+  ::-webkit-date-and-time-value {
+    min-height: revert-layer;
+    text-align: revert-layer;
+  }
+
+  ::-webkit-datetime-edit {
+    display: revert-layer;
+  }
+
+  ::-webkit-datetime-edit,
+  ::-webkit-datetime-edit-fields-wrapper,
+  ::-webkit-datetime-edit-year-field,
+  ::-webkit-datetime-edit-month-field,
+  ::-webkit-datetime-edit-day-field,
+  ::-webkit-datetime-edit-hour-field,
+  ::-webkit-datetime-edit-minute-field,
+  ::-webkit-datetime-edit-second-field,
+  ::-webkit-datetime-edit-millisecond-field,
+  ::-webkit-datetime-edit-meridiem-field {
+    padding: revert-layer;
+  }
+
+  ::-webkit-calendar-picker-indicator {
+    line-height: revert-layer;
+  }
+}
 
 @layer base {
   :root {
@@ -159,6 +383,16 @@
   }
 }
 
+/* ==========================================================================
+   CASCADE LAYER FOR THE APP STYLESHEET
+   Tailwind v4 emits utilities into the native `utilities` cascade layer, and
+   unlayered CSS beats every layer regardless of specificity. In v3 these
+   rules and the utilities shared one cascade where specificity decided, so
+   they live in the same layer, after the generated utilities, to keep that.
+   The few equal-specificity responsive font overrides are restored below.
+   App.css and EditorStyles.css use the same layer for the same reason.
+   (Left unindented to keep the rules diffable against v3.)
+   ========================================================================== */
 /* Shared manager defaults live below utilities so explicit compact editor
    sizes and icon insets retain precedence. */
 @layer components {
@@ -172,10 +406,10 @@
     overflow-wrap: anywhere;
   }
 
-  .manager-dashboard :where(input:not([type]),
-    input:is([type="text"], [type="url"], [type="email"], [type="password"], [type="number"], [type="date"], [type="time"], [type="datetime-local"]),
-    textarea,
-    select) {
+  :where(.manager-dashboard input:not([type]),
+    .manager-dashboard input:is([type="text"], [type="url"], [type="email"], [type="password"], [type="number"], [type="date"], [type="time"], [type="datetime-local"]),
+    .manager-dashboard textarea,
+    .manager-dashboard select) {
     min-width: 0;
     max-width: 100%;
     padding: 0.625rem 0.875rem;
@@ -185,11 +419,13 @@
     color: var(--text-primary);
   }
 
-  .manager-dashboard :where(input, textarea, select):focus-visible {
+  :where(.manager-dashboard input, .manager-dashboard textarea, .manager-dashboard select):focus-visible {
     outline: 2px solid var(--primary-accent);
     outline-offset: 2px;
   }
 }
+
+@layer utilities {
 
 [data-theme="light"] body {
   background-color: var(--bg-outer);
@@ -1039,7 +1275,7 @@
   height: 18px;
 }
 
-.create-action-btn:hover {
+.create-action-btn:where(:hover) {
   background: var(--bg-pill-hover);
 }
 
@@ -1905,7 +2141,9 @@ input[type="range"] {
   color: var(--text-muted) !important;
 }
 
-/* Dark theme borders & dividers */
+/* Dark theme borders & dividers. v4's divide-* borders sit on every child but
+   the last (border-bottom), so the divide selectors target those children
+   rather than v3's later siblings. */
 [data-theme="dark"] .border-\[\#E5E5E5\],
 :root:not([data-theme="light"]) .border-\[\#E5E5E5\],
 [data-theme="dark"] .border-\[\#e5e5e5\],
@@ -1930,10 +2168,10 @@ input[type="range"] {
 :root:not([data-theme="light"]) .border-\[\#E9E3D7\],
 [data-theme="dark"] .border-\[\#DADFE7\],
 :root:not([data-theme="light"]) .border-\[\#DADFE7\],
-[data-theme="dark"] .divide-\[\#E5E5E5\] > :not([hidden]) ~ :not([hidden]),
-:root:not([data-theme="light"]) .divide-\[\#E5E5E5\] > :not([hidden]) ~ :not([hidden]),
-[data-theme="dark"] .divide-\[\#F0F0F0\] > :not([hidden]) ~ :not([hidden]),
-:root:not([data-theme="light"]) .divide-\[\#F0F0F0\] > :not([hidden]) ~ :not([hidden]) {
+[data-theme="dark"] .divide-\[\#E5E5E5\] > :not(:last-child),
+:root:not([data-theme="light"]) .divide-\[\#E5E5E5\] > :not(:last-child),
+[data-theme="dark"] .divide-\[\#F0F0F0\] > :not(:last-child),
+:root:not([data-theme="light"]) .divide-\[\#F0F0F0\] > :not(:last-child) {
   border-color: var(--border-subtle) !important;
 }
 
@@ -2002,3 +2240,15 @@ input[type="range"] {
 [data-theme="light"] .border-\[\#e5e5e5\] {
   border-color: var(--border-subtle) !important;
 }
+
+/* v3 emitted responsive utilities after the app stylesheet. Preserve the
+   desktop text size at the three component classes that also set font-size. */
+@media (width >= 40rem) {
+  .nav-link.sm\:text-sm,
+  .tab-button.sm\:text-sm,
+  .btn-hire-me.sm\:text-sm {
+    font-size: var(--text-sm);
+  }
+}
+
+} /* @layer utilities */

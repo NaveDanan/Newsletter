@@ -740,9 +740,21 @@
   font-size: inherit;
 }
 
-/* Color Support */
-.ProseMirror [style*="color"] {
-  color: inherit;
+/* Imported black/gray text overrides inherited theme colors. Adapt only
+   neutral text in dark mode; preserve authored colors, highlights and embeds. */
+.dark :is(.ProseMirror, .newsletter-article) [data-theme-text="neutral"]:not(:where(mark, mark *, [data-media-embed="true"], [data-media-embed="true"] *, .media-embed-wrapper *)) {
+  color: var(--text-primary) !important;
+}
+
+.dark :is(.ProseMirror, .newsletter-article) a[data-theme-text="neutral"],
+.dark :is(.ProseMirror, .newsletter-article) a [data-theme-text="neutral"]:not(:where(mark *)) {
+  color: var(--primary-accent) !important;
+}
+
+/* TipTap places highlight marks inside text-style spans. Keep their original
+   foreground readable on the authored highlight background. */
+.dark :is(.ProseMirror, .newsletter-article) [data-theme-text="neutral"] mark {
+  color: var(--newsletter-original-text-color) !important;
 }
 
 /* Highlight Support */

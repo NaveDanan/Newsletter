@@ -17,6 +17,19 @@ export interface ComposeRequest {
 }
 
 let lastComposeRequestId = 0;
+let queuedRequest: ComposeRequest | null = null;
+
+/** Retain home-page intent while the community's lazy chunk is loading. */
+export function queueComposeRequest(files?: File[]): void {
+  queuedRequest = createComposeRequest(files);
+  window.dispatchEvent(new CustomEvent('community:compose', { detail: { files } }));
+}
+
+export function takeQueuedComposeRequest(): ComposeRequest | null {
+  const request = queuedRequest;
+  queuedRequest = null;
+  return request;
+}
 
 export function createComposeRequest(files?: File[]): ComposeRequest {
   lastComposeRequestId += 1;

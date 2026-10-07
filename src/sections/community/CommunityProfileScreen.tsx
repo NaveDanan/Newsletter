@@ -199,7 +199,8 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
   );
 
   const list = useCommunityPosts(source, {
-    enabled: Boolean(profile) && !profile?.isSuspended,
+    enabled: Boolean(handle) && !profile?.isSuspended,
+    cacheKey: `profile:${handle}:${tab}`,
     errorMessage: t('community.profile.failed'),
   });
 

@@ -8,7 +8,7 @@ import { enUS } from 'date-fns/locale/en-US';
 
 // Execute the actual App -> dashboard -> shell callbacks with deterministic hooks.
 // Unrelated views and the editor are boundary doubles; routing and guards are real.
-function appHarness({ navigationOnly = false, realEditor = false, gantt = false, ganttTasks = [], update } = {}) {
+function appHarness({ navigationOnly = false, realEditor = false, gantt = false, authLoading = false, ganttTasks = [], update } = {}) {
   const hooks = new Map(), modules = new Map(), stubs = new Map();
   let current, cursor, nodes = [], mounted = new Set();
   const newsletter = { id: 'published-one', title: 'Published', subtitle: '', content: '<p>Published content</p>', author: 'Admin', coverImage: '', status: 'published', tags: [], ownerId: 'admin' };
@@ -47,7 +47,7 @@ function appHarness({ navigationOnly = false, realEditor = false, gantt = false,
   }
   const locale = { t: (key) => key, isRTL: false, locale: 'en', formatNumber: String, formatDate: (date) => String(date) };
   const data = {
-    newsletters: [newsletter], isLoaded: true, refreshNewsletters() {},
+    newsletters: [newsletter], hasNewsletterList: true, isLoaded: true, refreshNewsletters() {},
     updateNewsletter: update ?? (() => Promise.resolve(newsletter)),
   };
   const managed = { id: 'managed', dropdownId: 'resources', name: 'Managed resource', description: 'Resource description', url: 'https://resource.example/guide', iconUrl: '', order: 0, hidden: false };
@@ -58,7 +58,21 @@ function appHarness({ navigationOnly = false, realEditor = false, gantt = false,
     const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
     const require = (name) => {
       if (name === 'react') return react;
+      if (name.endsWith('navigation-warmup')) return { warmHomeNavigation: () => () => {} };
+      if (name.endsWith('pocketbase/client')) return { getPocketBase: () => ({ authStore: { isValid: false } }) };
+      if (name.endsWith('preload-route')) return load('src/lib/preload-route.ts');
+      if (name.endsWith('route-components')) return load('src/lib/route-components.tsx');
       if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'fragment' };
+      if (name.endsWith('lazy-component')) return { lazyComponent(factory) {
+        const componentName = factory.toString().match(/default:\s*module\.(\w+)/)?.[1];
+        const component = componentName === 'ManagerDashboard' ? load('src/sections/ManagerDashboard.tsx').ManagerDashboard
+          : componentName === 'GanttEditorPage' ? load('src/sections/manager/GanttEditorPage.tsx').GanttEditorPage
+          : componentName === 'NewsletterEditor' && realEditor ? load('src/sections/manager/NewsletterEditor.tsx').NewsletterEditor
+          : stub(componentName);
+        const deferred = (props) => jsx(component, props);
+        deferred.displayName = componentName; deferred.preload = () => {};
+        return deferred;
+      } };
       if (name === 'date-fns') return dateFns;
       if (name === 'date-fns/locale') return { enUS, he: enUS };
       if (name === '@fortawesome/free-solid-svg-icons') return new Proxy({}, { get: () => ({ icon: [1, 1, null, null, ''] }) });
@@ -69,13 +83,13 @@ function appHarness({ navigationOnly = false, realEditor = false, gantt = false,
       if (realEditor && name.endsWith('NewsletterEditor')) return load('src/sections/manager/NewsletterEditor.tsx');
       if (name.endsWith('/Navigation')) return load('src/components/Navigation.tsx');
       if (name.endsWith('/navigation-link')) return load('src/types/navigation-link.ts');
-      if (name.endsWith('AuthContext')) return { useAuth: () => ({ isAuthenticated: true, isLoading: false, user, logout() {} }) };
+      if (name.endsWith('AuthContext')) return { useAuth: () => ({ isAuthenticated: true, isLoading: authLoading, user, logout() {} }) };
       if (name.endsWith('LocaleContext')) return { useLocale: () => locale };
       if (name.endsWith('ThemeContext')) return { useTheme: () => ({ deviceMode: 'mobile' }) };
       if (name.endsWith('NavigationDataContext')) return { useNavigationData: () => ({ dropdowns: [], links: [managed] }) };
       if (name.endsWith('useNewsletters')) return { useNewsletters: () => data };
       if (name.endsWith('useProjects')) return { useProjects: () => ({ isLoading: false, projects: [{ id: 'project-one', title: 'Project', department: '', gantt: { tasks: ganttTasks, resources: [], roles: [], zoom: 'day', lastEditedAt: null } }], updateProjectGantt: update ?? (() => Promise.resolve({ id: 'project-one' })) }) };
-      if (name.endsWith('useSubscriberCount')) return { useSubscriberCount: () => ({ subscriberCount: 0 }) };
+      if (name.endsWith('useSubscriberCount')) return { useSubscriberCount: () => ({ subscriberCount: 0, publishedNewsletterCount: 1 }) };
       if (name.endsWith('useCollapsingLabels')) return { useCollapsingLabels() {} };
       if (name.endsWith('permissions')) return new Proxy({}, { get: () => () => true });
       if (name.endsWith('community-routes')) return { parseCommunityRoute: (path) => path.startsWith('/community') ? { pathname: path } : null };
@@ -114,7 +128,7 @@ function appHarness({ navigationOnly = false, realEditor = false, gantt = false,
   const text = (node) => typeof node === 'string' ? node : Array.isArray(node) ? node.map(text).join(' ') : text(node?.props?.children ?? '');
   const textButton = (label) => find((node) => node.type === 'button' && text(node).trim() === label);
   render();
-  return { render, find, named, button, textButton, nodes: () => nodes, location, editor, openEditor() { named('NewsletterList').props.onEdit(newsletter); render(); render(); assert.ok(named('NewsletterEditor')); }, editGantt() { textButton('ganttEditor.weekly').props.onClick(); render(); } };
+  return { render, find, named, button, textButton, nodes: () => nodes, location, editor, data, openEditor() { named('NewsletterList').props.onEdit(newsletter); render(); render(); assert.ok(named('NewsletterEditor')); }, editGantt() { textButton('ganttEditor.weekly').props.onClick(); render(); } };
 }
 
 for (const [title, target, hash] of [['Feed', '/', ''], ['Explore Topics', '/', '#topics'], ['Community', '/community', ''], ['Profile', '/profile', '']]) {
@@ -255,4 +269,28 @@ test('Gantt Save and Leave keeps blank-task confirmation and routes only after S
   assert.equal(app.location.pathname, '/gantt-editor/project-one');
   await app.textButton('ganttEditor.saveAnyway').props.onClick(); app.render();
   assert.equal(calls, 1); assert.equal(app.location.pathname, '/community');
+});
+
+
+test('restored authenticated manager and Gantt screens render while the session validates', () => {
+  const manager = appHarness({ authLoading: true });
+  assert.ok(manager.named('ManagerDashboard'));
+  const gantt = appHarness({ authLoading: true, gantt: true });
+  assert.ok(gantt.named('GanttEditorPage'));
+});
+
+test('publishing a newsletter keeps the updated count when leaving the newsletter tab', () => {
+  const app = appHarness();
+  app.data.newsletters.push({ ...app.data.newsletters[0], id: 'newly-published' }); app.render();
+  app.textButton('manager.projects').props.onClick(); app.render();
+  const counters = app.nodes().filter(node => node.type === 'span' && node.props.className === 'font-bold text-sm text-[var(--text-primary)]');
+  assert.equal(counters[0].props.children, '2', 'an older stats response cannot hide the new publication');
+});
+
+test('the Gantt route fills its viewport without the surrounding newsletter gutters', () => {
+  const app = appHarness({ gantt: true });
+  assert.equal(app.find((node) => node.type?.name === 'AppStageShell').props.fullViewport, true);
+  const frame = app.find((node) => typeof node.props?.className === 'string' && node.props.className.split(/\s+/).includes('app-stage-full'));
+  assert.ok(frame, 'The editor owns the full viewport frame');
+  assert.doesNotMatch(frame.props.className, /(?:^|\s)(?:\w+:)*(?:px|py)-\d/, 'Responsive newsletter gutters must not constrain the editor');
 });

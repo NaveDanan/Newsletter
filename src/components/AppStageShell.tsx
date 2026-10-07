@@ -2,6 +2,7 @@ import { type ReactNode, useState, useEffect } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { Home, Compass, Plus, Bell, User, Wifi, Battery, Signal } from 'lucide-react';
 import { UserAvatarCircle } from '@/components/UserAvatarCircle';
+import { preloadRoute } from '@/lib/preload-route';
 
 interface AppStageShellProps {
   children: ReactNode;
@@ -14,6 +15,8 @@ interface AppStageShellProps {
   /** Defers the complete route action while an editor asks to save or discard. */
   onNavigate?: (action: () => void) => void;
   user?: { name?: string; email?: string; avatar?: string } | null;
+  /** Editors that manage their own scrolling fill the available viewport. */
+  fullViewport?: boolean;
 }
 
 export function AppStageShell({
@@ -25,6 +28,7 @@ export function AppStageShell({
   onProfileClick,
   onNavigate,
   user,
+  fullViewport = false,
 }: AppStageShellProps) {
   const { deviceMode } = useTheme();
   const [currentTime, setCurrentTime] = useState('9:41');
@@ -46,7 +50,7 @@ export function AppStageShell({
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start py-4 px-2 sm:px-4 md:py-6 max-md:!p-0 transition-colors">
+    <div className={`${fullViewport ? 'app-stage-full' : 'py-4 px-2 sm:px-4 md:py-6 max-md:!p-0'} min-h-screen flex flex-col items-center justify-start transition-colors`}>
       {/* Main Stage */}
       <div className={`device-stage mode-${deviceMode} w-full`}>
         <div className="app-window" id="app-window">
@@ -114,6 +118,8 @@ export function AppStageShell({
               type="button"
               className={`mobile-nav-btn ${activeTab === 'community' ? 'active' : ''}`}
               title="Community"
+              onPointerEnter={() => preloadRoute('/community')}
+              onFocus={() => preloadRoute('/community')}
               onClick={() => navigate(() => {
                 onCommunityClick?.();
               })}
@@ -126,6 +132,8 @@ export function AppStageShell({
               type="button"
               className={`mobile-nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
               title="Profile"
+              onPointerEnter={() => preloadRoute(user ? '/profile' : '/sign-in')}
+              onFocus={() => preloadRoute(user ? '/profile' : '/sign-in')}
               onClick={() => navigate(() => {
                 onProfileClick?.();
               })}

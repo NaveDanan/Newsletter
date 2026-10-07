@@ -1,3 +1,4 @@
+import { preloadRoute } from '@/lib/preload-route';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useRecentActivity } from '@/hooks/useRecentActivity';
@@ -87,6 +88,8 @@ export function RecentActivity({ onNavigate }: RecentActivityProps) {
                     <button
                       type="button"
                       className="btn-pill-action btn-thanks-yellow shrink-0 px-3 py-1 text-[11px]"
+                      onPointerEnter={() => preloadRoute(path)}
+                      onFocus={() => preloadRoute(path)}
                       onClick={() => onNavigate(path)}
                     >
                       {t('activity.view')}

@@ -1,16 +1,22 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type SetStateAction } from 'react';
 import { toast } from 'sonner';
 import { canCreateNewsletter, canDeleteNewsletter, canEditNewsletter } from '@/lib/auth/permissions';
 import { bootLogger } from '@/lib/bootLogger';
 import { stripCommentFormatting } from '@/lib/comment-formatting';
 import {
   fetchNewsletters,
+  fetchNewsletter,
+  getCachedNewsletters,
+  getCachedNewsletter,
+  getStoredNewsletter,
+  rememberNewsletters,
   createNewsletter,
   patchNewsletter,
   removeNewsletter,
   sendNewsletterUpdateEmail,
   uploadNewsletterPresentation,
 } from '@/lib/pocketbase/newsletters';
+import { readScope } from '@/lib/pocketbase/read-cache';
 import type { PocketBaseUser, UserRole } from '@/lib/pocketbase/client';
 import type { Newsletter, NewsletterComment, NewsletterFormData } from '../types/newsletter';
 
@@ -18,27 +24,39 @@ interface UseNewslettersOptions {
   currentUser: PocketBaseUser | null;
   currentUserRole: UserRole | null;
   enabled?: boolean;
+  articleId?: string;
 }
 
 function createClientId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function useNewsletters({ currentUser, currentUserRole, enabled = true }: UseNewslettersOptions) {
-  const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
-  const [isLoading, setIsLoading] = useState(enabled);
+export function useNewsletters({ currentUser, currentUserRole, enabled = true, articleId }: UseNewslettersOptions) {
+  const scope = readScope();
+  const [newsletters, commitNewsletters] = useState<Newsletter[]>(() => {
+    const list = getCachedNewsletters() ?? [];
+    const article = articleId ? getCachedNewsletter(articleId) : undefined;
+    return article ? [article, ...list.filter((item) => item.id !== article.id)] : list;
+  });
+  const setNewsletters = useCallback((next: SetStateAction<Newsletter[]>) => {
+    if (scope === readScope()) commitNewsletters(next);
+  }, [scope]);
+  const [isLoading, setIsLoading] = useState(enabled && newsletters.length === 0);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [hasList, setHasList] = useState(() => Boolean(getCachedNewsletters()));
   const [error, setError] = useState<string | null>(null);
   const currentUserId = currentUser?.id;
 
-  // Flipping `enabled` drops the cached list and restarts (or stops) loading.
-  // That reset is applied while rendering the change rather than one commit later.
-  const [lastEnabled, setLastEnabled] = useState(enabled);
-  if (lastEnabled !== enabled) {
-    setLastEnabled(enabled);
+  // Clear private rows on account changes, while preserving the feed on Back.
+  const [lastScope, setLastScope] = useState(scope);
+  if (lastScope !== scope) {
+    setLastScope(scope);
     setHasLoaded(false);
+    setLoadedFor(null);
+    setHasList(Boolean(getCachedNewsletters()));
     setError(null);
-    setNewsletters([]);
+    setNewsletters(getCachedNewsletters() ?? []);
     setIsLoading(enabled);
   }
 
@@ -51,25 +69,39 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
     }
 
     let cancelled = false;
+    let networkFinished = false;
+    if (articleId) void getStoredNewsletter(articleId).then((article) => {
+      if (article && !cancelled && !networkFinished) setNewsletters((current) => [article, ...current.filter((item) => item.id !== articleId)]);
+    });
 
     bootLogger.once('newsletters:initial-fetch-start', () => {
       bootLogger.step('newsletters', 'Initial newsletter fetch started');
     });
-    fetchNewsletters()
+    const request = articleId ? fetchNewsletter(articleId).then((article) => [article]) : fetchNewsletters({ summary: true, force: true });
+    request
       .then((data) => {
+        networkFinished = true;
         if (!cancelled) {
-          setNewsletters(data);
+          setNewsletters((current) => articleId
+            ? [...data, ...current.filter((item) => item.id !== articleId)]
+            : data.map((item) => {
+              const full = current.find((cached) => cached.id === item.id && cached.contentLoaded !== false && cached.updatedAt === item.updatedAt);
+              return full ? { ...full, ...item, content: full.content, contentLoaded: true, commentItems: full.commentItems, presentationFiles: full.presentationFiles, presentationPreviews: full.presentationPreviews } : item;
+            }));
           setError(null);
+          if (!articleId) setHasList(true);
           bootLogger.success('newsletters', 'Initial newsletter fetch succeeded', {
             count: data.length,
           });
         }
       })
       .catch((err: unknown) => {
+        networkFinished = true;
         if (!cancelled) {
           const message = err instanceof Error ? err.message : 'Failed to load newsletters';
           console.error('useNewsletters fetch error:', err);
           setError(message);
+          if (articleId && err && typeof err === 'object' && 'status' in err && (err.status === 403 || err.status === 404)) setNewsletters((current) => current.filter((item) => item.id !== articleId));
           toast.error(`Newsletters: ${message}`);
           bootLogger.error('newsletters', 'Initial newsletter fetch failed', normalizeBootError(err));
         }
@@ -77,6 +109,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       .finally(() => {
         if (!cancelled) {
           setHasLoaded(true);
+          setLoadedFor(articleId ?? 'list');
           setIsLoading(false);
           bootLogger.step('newsletters', 'Initial newsletter fetch finished');
         }
@@ -85,19 +118,43 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [articleId, enabled, scope, setNewsletters]);
+
+  useEffect(() => {
+    if (hasList && lastScope === scope) rememberNewsletters(newsletters);
+  }, [hasList, lastScope, newsletters, scope]);
+
+  const loadNewsletter = useCallback(async (id: string): Promise<Newsletter | null> => {
+    const requestedScope = readScope();
+    try {
+      const article = await fetchNewsletter(id);
+      if (readScope() !== requestedScope) return null;
+      setNewsletters((current) => [article, ...current.filter((item) => item.id !== id)]);
+      return article;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load newsletter');
+      return null;
+    }
+  }, [setNewsletters]);
 
   const refreshNewsletters = useCallback(async () => {
     if (!enabled) return;
+    const requestedScope = readScope();
     try {
-      setNewsletters(await fetchNewsletters());
+      const items = await fetchNewsletters({ summary: true, force: true });
+      if (requestedScope !== readScope()) return;
+      setNewsletters((current) => items.map((item) => {
+        const full = current.find((cached) => cached.id === item.id && cached.contentLoaded !== false && cached.updatedAt === item.updatedAt);
+        return full ? { ...full, ...item, content: full.content, contentLoaded: true, commentItems: full.commentItems, presentationFiles: full.presentationFiles, presentationPreviews: full.presentationPreviews } : item;
+      }));
       setError(null);
     } catch (err) {
+      if (requestedScope !== readScope()) return;
       const message = err instanceof Error ? err.message : 'Failed to refresh newsletters';
       setError(message);
       toast.error(message);
     }
-  }, [enabled]);
+  }, [enabled, setNewsletters]);
 
   // ---------------------------------------------------------------------------
   // Add (publish immediately)
@@ -118,7 +175,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       toast.error(message);
       return null;
     }
-  }, [currentUser, currentUserRole]);
+  }, [currentUser, currentUserRole, setNewsletters]);
 
   // ---------------------------------------------------------------------------
   // Upsert draft (auto-save while editing)
@@ -175,7 +232,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       console.error('upsertDraftNewsletter create error:', err);
       return null;
     }
-  }, [currentUser, currentUserRole, newsletters]);
+  }, [currentUser, currentUserRole, newsletters, setNewsletters]);
 
   // ---------------------------------------------------------------------------
   // Update newsletter
@@ -194,7 +251,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       toast.error(message);
       return null;
     }
-  }, [currentUser?.id, currentUserRole, newsletters]);
+  }, [currentUser?.id, currentUserRole, newsletters, setNewsletters]);
 
   // ---------------------------------------------------------------------------
   // Delete
@@ -212,7 +269,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       toast.error(message);
       return false;
     }
-  }, [currentUserRole]);
+  }, [currentUserRole, setNewsletters]);
 
   const sendNewsletterUpdate = useCallback(async (id: string): Promise<number | null> => {
     if (currentUserRole !== 'admin') {
@@ -277,7 +334,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       console.error('toggleNewsletterLike error:', err);
       return null;
     }
-  }, [currentUserId, newsletters]);
+  }, [currentUserId, newsletters, setNewsletters]);
 
   // ---------------------------------------------------------------------------
   // Add comment (optimistic)
@@ -320,7 +377,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       console.error('addNewsletterComment error:', err);
       return null;
     }
-  }, [currentUser, newsletters]);
+  }, [currentUser, newsletters, setNewsletters]);
 
   // ---------------------------------------------------------------------------
   // Toggle comment like (optimistic)
@@ -362,7 +419,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       console.error('toggleCommentLike error:', err);
       return null;
     }
-  }, [currentUserId, newsletters]);
+  }, [currentUserId, newsletters, setNewsletters]);
 
   const uploadPresentation = useCallback(async (id: string, file: File) => {
     const existing = newsletters.find((newsletter) => newsletter.id === id);
@@ -388,7 +445,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       toast.error(message);
       return null;
     }
-  }, [currentUser?.id, currentUserRole, newsletters]);
+  }, [currentUser?.id, currentUserRole, newsletters, setNewsletters]);
 
   // ---------------------------------------------------------------------------
   // Bookmark toggle (optimistic)
@@ -418,7 +475,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       console.error('toggleBookmark error:', err);
       return null;
     }
-  }, [currentUserId, newsletters]);
+  }, [currentUserId, newsletters, setNewsletters]);
 
   // ---------------------------------------------------------------------------
   // Poll vote (optimistic)
@@ -468,7 +525,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       console.error('voteNewsletterPoll error:', err);
       return null;
     }
-  }, [currentUserId, newsletters]);
+  }, [currentUserId, newsletters, setNewsletters]);
 
   // ---------------------------------------------------------------------------
   // Event RSVP (optimistic)
@@ -513,13 +570,15 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true }:
       console.error('rsvpNewsletterEvent error:', err);
       return null;
     }
-  }, [currentUser, newsletters]);
+  }, [currentUser, newsletters, setNewsletters]);
 
   return {
     newsletters,
+    hasNewsletterList: hasList,
+    loadNewsletter,
     isLoading,
     refreshNewsletters,
-    isLoaded: enabled && hasLoaded && !isLoading,
+    isLoaded: enabled && hasLoaded && loadedFor === (articleId ?? 'list') && !isLoading,
     error,
     addNewsletter,
     upsertDraftNewsletter,

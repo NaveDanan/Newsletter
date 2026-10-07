@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -157,8 +156,7 @@ export function DropdownNavigation({ navItems, className, align = 'start' }: Dro
                   )}
                 />
                 {(hoveredItem === navItem.id || isOpen) ? (
-                  <motion.span
-                    layoutId="dropdown-navigation-hover"
+                  <span
                     className="absolute inset-0 -z-10 rounded-full bg-primary/10"
                   />
                 ) : null}
@@ -174,8 +172,7 @@ export function DropdownNavigation({ navItems, className, align = 'start' }: Dro
                 ) : null}
                 <span>{navItem.label}</span>
                 {hoveredItem === navItem.id ? (
-                  <motion.span
-                    layoutId="dropdown-navigation-hover"
+                  <span
                     className="absolute inset-0 -z-10 rounded-full bg-primary/10"
                   />
                 ) : null}
@@ -188,21 +185,15 @@ export function DropdownNavigation({ navItems, className, align = 'start' }: Dro
               >
                 <span>{navItem.label}</span>
                 {hoveredItem === navItem.id ? (
-                  <motion.span
-                    layoutId="dropdown-navigation-hover"
+                  <span
                     className="absolute inset-0 -z-10 rounded-full bg-primary/10"
                   />
                 ) : null}
               </button>
             )}
 
-            <AnimatePresence>
               {isOpen && navItem.subMenus ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  transition={{ duration: 0.16, ease: 'easeOut' }}
+                <div
                   className="absolute top-full z-50 pt-3"
                   style={align === 'end' ? { insetInlineEnd: 0 } : { insetInlineStart: 0 }}
                 >
@@ -255,9 +246,8 @@ export function DropdownNavigation({ navItems, className, align = 'start' }: Dro
                       ))}
                     </div>
                   </DropdownPanel>
-                </motion.div>
+                </div>
               ) : null}
-            </AnimatePresence>
           </li>
         );
       })}

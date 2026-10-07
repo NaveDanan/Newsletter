@@ -1,6 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, Search01Icon } from "@hugeicons/core-free-icons";
-import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -50,36 +49,23 @@ export function ExpandingSearchDock({
 
   return (
     <div className="relative">
-      <AnimatePresence mode="wait" initial={false}>
         {!isExpanded ? (
-          <motion.button
+          <button
             key="icon"
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
             onClick={handleExpand}
             aria-label={t('nav.openSearch')}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card transition-colors hover:bg-muted"
           >
             <HugeiconsIcon icon={Search01Icon} className="h-5 w-5" />
-          </motion.button>
+          </button>
         ) : (
-          <motion.form
+          <form
             key="input"
-            initial={{ width: 48, opacity: 0 }}
-            animate={{ width: expandedWidth, opacity: 1 }}
-            exit={{ width: 48, opacity: 0 }}
-            transition={{
-              type: 'spring',
-              stiffness: 300,
-              damping: 30,
-            }}
+            style={{ width: expandedWidth }}
             onSubmit={handleSubmit}
             className="relative max-w-full"
           >
-            <motion.div
-              initial={{ backdropFilter: 'blur(0px)' }}
-              animate={{ backdropFilter: 'blur(12px)' }}
+            <div
               className="relative flex items-center gap-2 overflow-hidden rounded-full border border-border bg-card/90 backdrop-blur-md"
             >
               <div className={cn('shrink-0', isRTL ? 'mr-4' : 'ml-4')}>
@@ -102,25 +88,20 @@ export function ExpandingSearchDock({
                   isRTL ? 'pl-4 text-right' : 'pr-4 text-left',
                 )}
               />
-              <motion.button
+              <button
                 type="button"
                 onClick={handleCollapse}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                whileHover={{ scale: 1.08 }}
-                whileTap={{ scale: 0.92 }}
                 aria-label={t('nav.closeSearch')}
                 className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-muted',
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105 hover:bg-muted active:scale-95',
                   isRTL ? 'ml-2' : 'mr-2',
                 )}
               >
                 <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" />
-              </motion.button>
-            </motion.div>
-          </motion.form>
+              </button>
+            </div>
+          </form>
         )}
-      </AnimatePresence>
     </div>
   );
 }

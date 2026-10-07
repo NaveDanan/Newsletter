@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSiteWriters } from '@/hooks/useSiteWriters';
 import { initials } from '@/lib/avatar';
+import { preloadRoute } from '@/lib/preload-route';
 import { communityProfilePath } from '@/lib/community-routes';
 import type { Newsletter } from '@/types/newsletter';
 
@@ -66,6 +67,8 @@ export function OurWriters({ newsletters, onArticleClick, onNavigate }: OurWrite
               disabled={!latestArticle && !writer.handle}
               title={label}
               aria-label={label}
+              onPointerEnter={() => preloadRoute(latestArticle ? `/article/${encodeURIComponent(latestArticle.id)}` : communityProfilePath(writer.handle))}
+              onFocus={() => preloadRoute(latestArticle ? `/article/${encodeURIComponent(latestArticle.id)}` : communityProfilePath(writer.handle))}
               onClick={() => {
                 if (latestArticle) {
                   onArticleClick(latestArticle);

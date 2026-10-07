@@ -1,50 +1,75 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react';
 import { toast } from 'sonner';
 import {
   fetchProjects,
+  getCachedProjects,
+  rememberProjects,
   createProject,
   updateProject,
   deleteProject,
   updateProjectStatusOnly,
 } from '../lib/pocketbase/projects';
+import { readScope } from '@/lib/pocketbase/read-cache';
 import { normalizeProjectGantt } from '../lib/gantt';
 import type { Project, ProjectFormData, ProjectStatus } from '../types/project';
 import type { ProjectGantt } from '../types/gantt';
 
 export function useProjects() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const scope = readScope();
+  const [projects, commitProjects] = useState<Project[]>(() => getCachedProjects() ?? []);
+  const [isLoading, setIsLoading] = useState(() => !getCachedProjects());
+  const [hasLoaded, setHasLoaded] = useState(() => Boolean(getCachedProjects()));
   const [error, setError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const setProjects = useCallback((next: SetStateAction<Project[]>) => {
+    if (scope !== readScope()) return;
+    generation.current++;
+    commitProjects(next);
+  }, [scope]);
+  const [lastScope, setLastScope] = useState(scope);
+  if (lastScope !== scope) {
+    const cached = getCachedProjects();
+    setLastScope(scope);
+    commitProjects(cached ?? []); setIsLoading(!cached);
+    setHasLoaded(Boolean(cached)); setError(null);
+  }
 
   // -------------------------------------------------------------------------
   // Initial fetch
   // -------------------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
+    const version = generation.current;
 
-    fetchProjects()
+    fetchProjects({ force: true })
       .then((data) => {
-        if (!cancelled) {
+        if (!cancelled && scope === readScope() && version === generation.current) {
           setProjects(data);
+          setHasLoaded(true);
           setError(null);
         }
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
+        if (!cancelled && scope === readScope() && version === generation.current) {
           const message = err instanceof Error ? err.message : 'Failed to load projects';
+          if (err && typeof err === 'object' && 'status' in err && [401, 403, 404].includes(Number(err.status))) { setProjects([]); setHasLoaded(false); }
           console.error('useProjects fetch error:', err);
           setError(message);
           toast.error(`Projects: ${message}`);
         }
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled && scope === readScope()) setIsLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [scope, setProjects]);
+
+  useEffect(() => {
+    if (hasLoaded && lastScope === scope) rememberProjects(projects);
+  }, [hasLoaded, lastScope, projects, scope]);
 
   // -------------------------------------------------------------------------
   // Add
@@ -60,7 +85,7 @@ export function useProjects() {
       toast.error(message);
       return null;
     }
-  }, []);
+  }, [setProjects]);
 
   // -------------------------------------------------------------------------
   // Update metadata
@@ -76,7 +101,7 @@ export function useProjects() {
       toast.error(message);
       return null;
     }
-  }, []);
+  }, [setProjects]);
 
   // -------------------------------------------------------------------------
   // Delete
@@ -92,7 +117,7 @@ export function useProjects() {
       toast.error(message);
       return false;
     }
-  }, []);
+  }, [setProjects]);
 
   // -------------------------------------------------------------------------
   // Gantt visibility
@@ -115,7 +140,7 @@ export function useProjects() {
       toast.error(message);
       return null;
     }
-  }, []);
+  }, [setProjects]);
 
   // -------------------------------------------------------------------------
   // Status
@@ -134,7 +159,7 @@ export function useProjects() {
       toast.error(message);
       return null;
     }
-  }, []);
+  }, [setProjects]);
 
   // -------------------------------------------------------------------------
   // Gantt data
@@ -154,7 +179,7 @@ export function useProjects() {
       toast.error(message);
       return null;
     }
-  }, []);
+  }, [setProjects]);
 
   return {
     projects,

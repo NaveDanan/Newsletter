@@ -11,10 +11,12 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useCommunityEngagement } from '@/hooks/useCommunityEngagement';
-import { fetchCommunityThread, getPocketBaseErrorMessage } from '@/lib/pocketbase/community';
+import { fetchCommunityThread, getPocketBaseErrorMessage, peekCommunityPost, peekCommunityThread } from '@/lib/pocketbase/community';
 import { buildCommentTree, type CommentSort } from '@/lib/community-comments';
 import { CommunityCommentItem } from './CommunityCommentItem';
-import { CommunityComposer } from './CommunityComposer';
+import { lazyComponent } from '@/lib/lazy-component';
+import { DeferredContent } from '@/components/DeferredContent';
+import { readScope } from '@/lib/pocketbase/read-cache';
 import { useCommunity } from './CommunityContext';
 import { CommunityPostCard } from './CommunityPostCard';
 import type { CommunityPost, CommunityThread } from '@/types/community';
@@ -26,6 +28,8 @@ import type { CommunityPost, CommunityThread } from '@/types/community';
 interface CommunityThreadScreenProps {
   postId: string;
 }
+
+const CommunityComposer = lazyComponent(() => import('./CommunityComposer').then((module) => ({ default: module.CommunityComposer })));
 
 function patchIn(posts: CommunityPost[], postId: string, patch: Partial<CommunityPost>): CommunityPost[] {
   return posts.map((post) => {
@@ -39,19 +43,30 @@ function patchIn(posts: CommunityPost[], postId: string, patch: Partial<Communit
   });
 }
 
+function initialThread(postId: string): CommunityThread | null {
+  const thread = peekCommunityThread(postId);
+  if (thread) return thread;
+  const post = peekCommunityPost(postId);
+  return post ? { post, ancestors: [], replies: [], hasMore: false, cursor: '' } : null;
+}
+
 export function CommunityThreadScreen({ postId }: CommunityThreadScreenProps) {
   const { t } = useLocale();
   const { isAuthenticated, navigate, requireAuth } = useCommunity();
-  const [thread, setThread] = useState<CommunityThread | null>(null);
+  const [thread, setThread] = useState<CommunityThread | null>(() => initialThread(postId));
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<CommentSort>('most-relevant');
   const requestRef = useRef(0);
+  const pendingChangesRef = useRef<((thread: CommunityThread | null) => CommunityThread | null)[] | undefined>(undefined);
+  const scope = readScope();
   const composerRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async (cursor: string) => {
     const requestId = requestRef.current + 1;
+    const changes: ((thread: CommunityThread | null) => CommunityThread | null)[] = [];
+    pendingChangesRef.current = changes;
     requestRef.current = requestId;
 
     if (cursor) {
@@ -62,41 +77,45 @@ export function CommunityThreadScreen({ postId }: CommunityThreadScreenProps) {
 
     try {
       const next = await fetchCommunityThread(postId, { cursor: cursor || undefined, tree: true });
-      if (requestRef.current !== requestId) {
+      if (requestRef.current !== requestId || scope !== readScope()) {
         return;
       }
       setThread((current) => {
-        if (!cursor || !current) {
-          return next;
+        const merged = changes.reduce<CommunityThread | null>((value, change) => change(value), next);
+        if (!cursor || !current || !merged) {
+          return merged;
         }
         const seen = new Set(current.replies.map((reply) => reply.id));
         return {
-          ...next,
+          ...merged,
           post: current.post,
           ancestors: current.ancestors,
-          replies: current.replies.concat(next.replies.filter((reply) => !seen.has(reply.id))),
+          replies: current.replies.concat(merged.replies.filter((reply) => !seen.has(reply.id))),
         };
       });
       setError(null);
     } catch (caught) {
-      if (requestRef.current === requestId) {
+      if (requestRef.current === requestId && scope === readScope()) {
+        if (caught && typeof caught === 'object' && 'status' in caught && (caught.status === 403 || caught.status === 404)) setThread(null);
         setError(getPocketBaseErrorMessage(caught, t('community.thread.failed')));
       }
     } finally {
-      if (requestRef.current === requestId) {
+      if (requestRef.current === requestId && scope === readScope()) {
+        pendingChangesRef.current = undefined;
         setIsLoading(false);
         setIsLoadingMore(false);
       }
     }
-  }, [postId, t]);
+  }, [postId, scope, t]);
 
   useEffect(() => {
-    setThread(null);
     void load('');
+    return () => { requestRef.current += 1; };
   }, [load]);
 
   const patchPost = useCallback((id: string, patch: Partial<CommunityPost>) => {
-    setThread((current) => {
+    if (scope !== readScope()) return;
+    const change = (current: CommunityThread | null): CommunityThread | null => {
       if (!current) {
         return current;
       }
@@ -106,22 +125,27 @@ export function CommunityThreadScreen({ postId }: CommunityThreadScreenProps) {
         ancestors: patchIn(current.ancestors, id, patch),
         replies: patchIn(current.replies, id, patch),
       };
-    });
-  }, []);
+    };
+    pendingChangesRef.current?.push(change);
+    setThread(change);
+  }, [scope]);
 
   const removePost = useCallback((id: string) => {
-    setThread((current) => {
+    if (scope !== readScope()) return;
+    if (id === postId) navigate('/community');
+    const change = (current: CommunityThread | null): CommunityThread | null => {
       if (!current) {
         return current;
       }
       if (current.post.id === id) {
         // Deleting the post you are looking at leaves nothing to read.
-        navigate('/community');
-        return current;
+        return null;
       }
       return { ...current, replies: current.replies.filter((reply) => reply.id !== id) };
-    });
-  }, [navigate]);
+    };
+    pendingChangesRef.current?.push(change);
+    setThread(change);
+  }, [navigate, postId, scope]);
 
   const actions = useCommunityEngagement({
     patchPost,
@@ -138,7 +162,8 @@ export function CommunityThreadScreen({ postId }: CommunityThreadScreenProps) {
   );
 
   const addReply = useCallback((reply: CommunityPost) => {
-    setThread((current) => {
+    if (scope !== readScope()) return;
+    const change = (current: CommunityThread | null): CommunityThread | null => {
       if (!current || current.replies.some((item) => item.id === reply.id)) {
         return current;
       }
@@ -154,8 +179,10 @@ export function CommunityThreadScreen({ postId }: CommunityThreadScreenProps) {
             : item))
           .concat(reply),
       };
-    });
-  }, []);
+    };
+    pendingChangesRef.current?.push(change);
+    setThread(change);
+  }, [scope]);
 
   const sortLabels: Record<CommentSort, string> = {
     'most-relevant': t('community.comments.mostRelevant'),
@@ -222,11 +249,13 @@ export function CommunityThreadScreen({ postId }: CommunityThreadScreenProps) {
 
           {isAuthenticated ? (
             <div ref={composerRef} className="border-b border-[var(--border-subtle)]">
+              <DeferredContent>
               <CommunityComposer
                 parent={thread.post}
                 compact
                 onPosted={addReply}
               />
+              </DeferredContent>
             </div>
           ) : null}
 

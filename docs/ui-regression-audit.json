@@ -1,0 +1,1030 @@
+{
+  "date": "2026-10-07",
+  "referenceThread": "23044de1-7e5f-497e-8f19-ec9ecc6aa6c9",
+  "referenceUiCommit": "cf6da2a",
+  "preview": "http://10.40.240.3:4184",
+  "initialJavaScriptBytes": 601538,
+  "summary": {
+    "screens": 39,
+    "checks": 124,
+    "passed": 124,
+    "failed": 0
+  },
+  "browser": "T3 collaborative browser",
+  "variants": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "locale": "en",
+      "theme": "light"
+    },
+    {
+      "width": 1440,
+      "height": 1000,
+      "locale": "he",
+      "theme": "dark"
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "locale": "he",
+      "theme": "dark"
+    },
+    {
+      "width": 320,
+      "height": 800,
+      "locale": "en",
+      "theme": "light"
+    }
+  ],
+  "checks": [
+    {
+      "route": "/",
+      "theme": "light",
+      "locale": "en",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 1440,
+            "viewport": 1440
+          }
+        },
+        {
+          "name": "cover line overlays removed",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager/community",
+      "theme": "light",
+      "locale": "en",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 1440,
+            "viewport": 1440
+          }
+        },
+        {
+          "name": "manager cards rounded and inset",
+          "pass": true,
+          "details": {
+            "count": 2
+          }
+        },
+        {
+          "name": "manager cards contain content",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager/scheduled",
+      "theme": "light",
+      "locale": "en",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 1440,
+            "viewport": 1440
+          }
+        },
+        {
+          "name": "manager cards rounded and inset",
+          "pass": true,
+          "details": {
+            "count": 5
+          }
+        },
+        {
+          "name": "manager cards contain content",
+          "pass": true
+        },
+        {
+          "name": "auto-publish appears below schedule switch",
+          "pass": true
+        },
+        {
+          "name": "switch has associated label",
+          "pass": true
+        },
+        {
+          "name": "explanation is tooltip content rather than visible prose",
+          "pass": true
+        },
+        {
+          "name": "schedule fields rounded and inset",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "theme": "dark",
+      "locale": "he",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 1440,
+            "viewport": 1440
+          }
+        },
+        {
+          "name": "cover line overlays removed",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager/community",
+      "theme": "dark",
+      "locale": "he",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 1440,
+            "viewport": 1440
+          }
+        },
+        {
+          "name": "manager cards rounded and inset",
+          "pass": true,
+          "details": {
+            "count": 2
+          }
+        },
+        {
+          "name": "manager cards contain content",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager/scheduled",
+      "theme": "dark",
+      "locale": "he",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 1440,
+            "viewport": 1440
+          }
+        },
+        {
+          "name": "manager cards rounded and inset",
+          "pass": true,
+          "details": {
+            "count": 5
+          }
+        },
+        {
+          "name": "manager cards contain content",
+          "pass": true
+        },
+        {
+          "name": "auto-publish appears below schedule switch",
+          "pass": true
+        },
+        {
+          "name": "switch has associated label",
+          "pass": true
+        },
+        {
+          "name": "explanation is tooltip content rather than visible prose",
+          "pass": true
+        },
+        {
+          "name": "schedule fields rounded and inset",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager/scheduled",
+      "theme": "dark",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "auto-publish explanation appears on hover",
+          "pass": true
+        },
+        {
+          "name": "tooltip stays within viewport",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "theme": "dark",
+      "locale": "he",
+      "width": 390,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 390,
+            "viewport": 390
+          }
+        },
+        {
+          "name": "cover line overlays removed",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager/community",
+      "theme": "dark",
+      "locale": "he",
+      "width": 390,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 390,
+            "viewport": 390
+          }
+        },
+        {
+          "name": "manager cards rounded and inset",
+          "pass": true,
+          "details": {
+            "count": 2
+          }
+        },
+        {
+          "name": "manager cards contain content",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager/scheduled",
+      "theme": "dark",
+      "locale": "he",
+      "width": 390,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 390,
+            "viewport": 390
+          }
+        },
+        {
+          "name": "manager cards rounded and inset",
+          "pass": true,
+          "details": {
+            "count": 5
+          }
+        },
+        {
+          "name": "manager cards contain content",
+          "pass": true
+        },
+        {
+          "name": "auto-publish appears below schedule switch",
+          "pass": true
+        },
+        {
+          "name": "switch has associated label",
+          "pass": true
+        },
+        {
+          "name": "explanation is tooltip content rather than visible prose",
+          "pass": true
+        },
+        {
+          "name": "schedule fields rounded and inset",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "theme": "light",
+      "locale": "en",
+      "width": 320,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 320,
+            "viewport": 320
+          }
+        },
+        {
+          "name": "cover line overlays removed",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager/community",
+      "theme": "light",
+      "locale": "en",
+      "width": 320,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 320,
+            "viewport": 320
+          }
+        },
+        {
+          "name": "manager cards rounded and inset",
+          "pass": true,
+          "details": {
+            "count": 2
+          }
+        },
+        {
+          "name": "manager cards contain content",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager/scheduled",
+      "theme": "light",
+      "locale": "en",
+      "width": 320,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 320,
+            "viewport": 320
+          }
+        },
+        {
+          "name": "manager cards rounded and inset",
+          "pass": true,
+          "details": {
+            "count": 5
+          }
+        },
+        {
+          "name": "manager cards contain content",
+          "pass": true
+        },
+        {
+          "name": "auto-publish appears below schedule switch",
+          "pass": true
+        },
+        {
+          "name": "switch has associated label",
+          "pass": true
+        },
+        {
+          "name": "explanation is tooltip content rather than visible prose",
+          "pass": true
+        },
+        {
+          "name": "schedule fields rounded and inset",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "theme": "light",
+      "locale": "en",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 1440,
+            "viewport": 1440
+          }
+        },
+        {
+          "name": "Gantt fills viewport",
+          "pass": true,
+          "details": {
+            "x": 0,
+            "y": 0,
+            "width": 1440,
+            "height": 1000
+          }
+        },
+        {
+          "name": "Gantt has independent scroll panes",
+          "pass": true
+        },
+        {
+          "name": "vertical rows stay synchronized",
+          "pass": true
+        },
+        {
+          "name": "both headings remain frozen",
+          "pass": true
+        },
+        {
+          "name": "task names get usable width",
+          "pass": true,
+          "details": [
+            135,
+            135,
+            135,
+            135,
+            135
+          ]
+        },
+        {
+          "name": "task name text fits visible field",
+          "pass": true
+        },
+        {
+          "name": "dates use compact 12px text",
+          "pass": true
+        },
+        {
+          "name": "horizontal scrollbar available",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "theme": "light",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "divider stays reachable when expanded",
+          "pass": true
+        }
+      ],
+      "bottomBar": [
+        {
+          "display": "none",
+          "top": 0
+        }
+      ],
+      "gridBottom": 983
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "theme": "dark",
+      "locale": "he",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 1440,
+            "viewport": 1440
+          }
+        },
+        {
+          "name": "Gantt fills viewport",
+          "pass": true,
+          "details": {
+            "x": 0,
+            "y": 0,
+            "width": 1440,
+            "height": 1000
+          }
+        },
+        {
+          "name": "Gantt has independent scroll panes",
+          "pass": true
+        },
+        {
+          "name": "vertical rows stay synchronized",
+          "pass": true
+        },
+        {
+          "name": "both headings remain frozen",
+          "pass": true
+        },
+        {
+          "name": "task names get usable width",
+          "pass": true,
+          "details": [
+            135,
+            135,
+            135,
+            135,
+            135
+          ]
+        },
+        {
+          "name": "task name text fits visible field",
+          "pass": true
+        },
+        {
+          "name": "dates use compact 12px text",
+          "pass": true
+        },
+        {
+          "name": "horizontal scrollbar available",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "theme": "dark",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "divider stays reachable when expanded",
+          "pass": true
+        }
+      ],
+      "bottomBar": [
+        {
+          "display": "none",
+          "top": 0
+        }
+      ],
+      "gridBottom": 983
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "theme": "dark",
+      "locale": "he",
+      "width": 390,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 390,
+            "viewport": 390
+          }
+        },
+        {
+          "name": "Gantt fills viewport",
+          "pass": true,
+          "details": {
+            "x": 0,
+            "y": 0,
+            "width": 390,
+            "height": 844
+          }
+        },
+        {
+          "name": "Gantt has independent scroll panes",
+          "pass": true
+        },
+        {
+          "name": "vertical rows stay synchronized",
+          "pass": true
+        },
+        {
+          "name": "both headings remain frozen",
+          "pass": true
+        },
+        {
+          "name": "task names get usable width",
+          "pass": true,
+          "details": [
+            135,
+            135,
+            135,
+            135,
+            135
+          ]
+        },
+        {
+          "name": "task name text fits visible field",
+          "pass": true
+        },
+        {
+          "name": "dates use compact 12px text",
+          "pass": true
+        },
+        {
+          "name": "horizontal scrollbar available",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "theme": "dark",
+      "width": 390,
+      "tests": [
+        {
+          "name": "divider stays reachable when expanded",
+          "pass": true
+        }
+      ],
+      "bottomBar": [
+        {
+          "display": "flex",
+          "top": 788
+        }
+      ],
+      "gridBottom": 775
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "theme": "light",
+      "locale": "en",
+      "width": 320,
+      "tests": [
+        {
+          "name": "document fits viewport",
+          "pass": true,
+          "details": {
+            "scrollWidth": 320,
+            "viewport": 320
+          }
+        },
+        {
+          "name": "Gantt fills viewport",
+          "pass": true,
+          "details": {
+            "x": 0,
+            "y": 0,
+            "width": 320,
+            "height": 800
+          }
+        },
+        {
+          "name": "Gantt has independent scroll panes",
+          "pass": true
+        },
+        {
+          "name": "vertical rows stay synchronized",
+          "pass": true
+        },
+        {
+          "name": "both headings remain frozen",
+          "pass": true
+        },
+        {
+          "name": "task names get usable width",
+          "pass": true,
+          "details": [
+            135,
+            135,
+            135,
+            135,
+            135
+          ]
+        },
+        {
+          "name": "task name text fits visible field",
+          "pass": true
+        },
+        {
+          "name": "dates use compact 12px text",
+          "pass": true
+        },
+        {
+          "name": "horizontal scrollbar available",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "theme": "light",
+      "width": 320,
+      "tests": [
+        {
+          "name": "divider stays reachable when expanded",
+          "pass": true
+        }
+      ],
+      "bottomBar": [
+        {
+          "display": "flex",
+          "top": 744
+        }
+      ],
+      "gridBottom": 731
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "width": 320,
+      "tests": [
+        {
+          "name": "native pointer drag scrolls task columns",
+          "pass": true,
+          "details": 196.5
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "width": 320,
+      "tests": [
+        {
+          "name": "keyboard scrollbar reaches final columns",
+          "pass": true,
+          "details": {
+            "left": 389,
+            "max": 389
+          }
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "width": 320,
+      "tests": [
+        {
+          "name": "narrow-screen calendar and all columns fit",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "calendar appears above full-screen timeline",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "task popup escapes the timeline clipping container",
+          "pass": true
+        },
+        {
+          "name": "task popup fits viewport",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "roles help appears outside the stats card without clipping",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "Hebrew pane resizing keeps its starting columns visible",
+          "pass": false,
+          "details": {
+            "scrollLeft": 177,
+            "taskLeft": 1197,
+            "paneLeft": 1060,
+            "paneWidth": 380
+          },
+          "valid": false,
+          "probeCorrection": "The starting columns are at the rightmost scroll position in RTL; expecting scrollLeft=0 tested the opposite edge."
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "Hebrew pane resizing keeps its starting columns visible",
+          "pass": true,
+          "details": {
+            "scrollLeft": 177,
+            "max": 177,
+            "taskLeft": 1197,
+            "paneLeft": 1060,
+            "paneWidth": 380
+          }
+        }
+      ]
+    },
+    {
+      "route": "/manager",
+      "screen": "newsletter editor",
+      "theme": "dark",
+      "width": 1440,
+      "tests": [
+        {
+          "name": "editor metadata fields rounded and inset",
+          "pass": true
+        },
+        {
+          "name": "editor remains populated after lazy loading",
+          "pass": true
+        },
+        {
+          "name": "editor content does not revert to black in dark mode",
+          "pass": true
+        },
+        {
+          "name": "editor page fits viewport",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager",
+      "screen": "newsletter editor",
+      "theme": "dark",
+      "width": 390,
+      "tests": [
+        {
+          "name": "editor metadata fields rounded and inset",
+          "pass": true
+        },
+        {
+          "name": "editor remains populated after lazy loading",
+          "pass": true
+        },
+        {
+          "name": "editor content does not revert to black in dark mode",
+          "pass": true
+        },
+        {
+          "name": "editor page fits viewport",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager",
+      "screen": "newsletter editor",
+      "theme": "light",
+      "width": 320,
+      "tests": [
+        {
+          "name": "editor metadata fields rounded and inset",
+          "pass": true
+        },
+        {
+          "name": "editor remains populated after lazy loading",
+          "pass": true
+        },
+        {
+          "name": "editor content does not revert to black in dark mode",
+          "pass": true
+        },
+        {
+          "name": "editor page fits viewport",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/gantt-editor/uu36fiws0ah07tb",
+      "width": 390,
+      "tests": [
+        {
+          "name": "Hebrew Shift-wheel follows reading direction",
+          "pass": true,
+          "details": 130
+        },
+        {
+          "name": "native horizontal wheel retains its direction",
+          "pass": true,
+          "details": 180
+        }
+      ]
+    },
+    {
+      "route": "/article/uvnuhns6hcoeuwc/chatgpt",
+      "theme": "dark",
+      "width": 390,
+      "tests": [
+        {
+          "name": "article cover line overlays removed",
+          "pass": true
+        },
+        {
+          "name": "article body stays readable in dark mode",
+          "pass": true
+        },
+        {
+          "name": "article fits narrow viewport",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager/scheduled",
+      "theme": "light",
+      "width": 390,
+      "tests": [
+        {
+          "name": "off track neutral and on track accented",
+          "pass": true,
+          "details": {
+            "unchecked": "rgb(229, 231, 235)",
+            "checked": "rgb(61, 255, 223)"
+          }
+        },
+        {
+          "name": "associated label toggles the switch and restores local state",
+          "pass": true
+        }
+      ],
+      "saved": false
+    },
+    {
+      "route": "/manager/scheduled",
+      "theme": "dark",
+      "width": 390,
+      "tests": [
+        {
+          "name": "off track neutral and on track accented",
+          "pass": true,
+          "details": {
+            "unchecked": "rgba(48, 48, 54, 0.8)",
+            "checked": "rgb(61, 255, 223)"
+          }
+        },
+        {
+          "name": "associated label toggles the switch and restores local state",
+          "pass": true
+        }
+      ],
+      "saved": false
+    },
+    {
+      "route": "/manager/scheduled",
+      "width": 390,
+      "tests": [
+        {
+          "name": "keyboard focus opens auto-publish explanation",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "/manager/scheduled",
+      "theme": "dark",
+      "width": 390,
+      "tests": [
+        {
+          "name": "recurring-update switch has neutral off and accent on tracks",
+          "pass": true
+        },
+        {
+          "name": "recurring-update local state restored without saving",
+          "pass": true
+        }
+      ],
+      "saved": false
+    },
+    {
+      "route": "/manager/links",
+      "theme": "dark",
+      "width": 390,
+      "tests": [
+        {
+          "name": "link dialog keeps manager field styling in its portal",
+          "pass": true
+        },
+        {
+          "name": "link dialog fits narrow viewport",
+          "pass": true
+        }
+      ]
+    }
+  ],
+  "probe": "(async()=>{const tests=[];const check=(name,pass,details)=>tests.push({name,pass:!!pass,...(details===undefined?{}:{details})});const css=e=>getComputedStyle(e);const rect=e=>e.getBoundingClientRect();const wait=ms=>new Promise(r=>setTimeout(r,ms));if(document.fonts)await document.fonts.ready;check('document fits viewport',document.documentElement.scrollWidth<=innerWidth+1,{scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth});if(location.pathname==='/'||location.pathname.startsWith('/article/'))check('cover line overlays removed',document.querySelectorAll('.post-media-frame svg line').length===0);if(location.pathname.startsWith('/manager')){const cards=[...document.querySelectorAll('.dashboard-card')];check('manager cards rounded and inset',cards.length>0&&cards.every(e=>parseFloat(css(e).borderRadius)>=20&&parseFloat(css(e).paddingInlineStart)>=16),{count:cards.length});check('manager cards contain content',cards.every(e=>e.scrollWidth<=e.clientWidth+1));if(location.pathname.endsWith('/scheduled')){const enabled=document.querySelector('#import-enabled'),auto=document.querySelector('#import-auto-publish'),hint=document.querySelector('#import-auto-publish-hint');check('auto-publish appears below schedule switch',auto&&enabled&&rect(auto).top>rect(enabled).bottom);check('switch has associated label',auto&&auto.labels.length===1);check('explanation is tooltip content rather than visible prose',hint&&css(hint).position==='absolute'&&rect(hint).width<=1);check('schedule fields rounded and inset',['#artifactory-url','#import-hours'].every(s=>{const e=document.querySelector(s);return e&&parseFloat(css(e).borderRadius)>=16&&parseFloat(css(e).paddingInlineStart)>=12}));}}if(location.pathname.startsWith('/gantt-editor/')){const frame=document.querySelector('#app-window'),a=document.querySelector('#gantt-task-grid'),b=document.querySelector('#gantt-timeline');const r=rect(frame);check('Gantt fills viewport',Math.abs(r.x)<1&&Math.abs(r.y)<1&&Math.abs(r.width-innerWidth)<1&&Math.abs(r.height-innerHeight)<1,{x:r.x,y:r.y,width:r.width,height:r.height});check('Gantt has independent scroll panes',a&&b&&css(a).overflowY==='auto'&&css(b).overflowY==='auto');if(a&&b){const original={a:a.scrollTop,b:b.scrollTop};b.scrollTop=1e5;await wait(100);check('vertical rows stay synchronized',Math.abs(a.scrollTop-b.scrollTop)<1&&Math.abs((a.scrollHeight-a.clientHeight)-(b.scrollHeight-b.clientHeight))<2);check('both headings remain frozen',Math.abs(rect(a.firstElementChild.firstElementChild).top-rect(a).top)<1&&Math.abs(rect(b.firstElementChild.firstElementChild).top-rect(b).top)<1);a.scrollTop=original.a;b.scrollTop=original.b;const names=[...a.querySelectorAll('input[type=text]')];check('task names get usable width',names.length>=5&&names.every(e=>rect(e).width>=110),names.map(e=>rect(e).width));check('task name text fits visible field',names.every(e=>{const c=document.createElement('canvas').getContext('2d');c.font=css(e).font;return c.measureText(e.value).width<=e.clientWidth-parseFloat(css(e).paddingLeft)-parseFloat(css(e).paddingRight)}));check('dates use compact 12px text',[...a.querySelectorAll('input[type=date]')].every(e=>css(e).fontSize==='12px'));check('horizontal scrollbar available',!!document.querySelector('[role=scrollbar][aria-controls=gantt-task-grid]'));}}return{route:location.pathname,theme:document.documentElement.dataset.theme,locale:document.documentElement.lang,width:innerWidth,tests};})()",
+  "screenshots": {
+    "gantt": "/home/agent/.t3/userdata/browser-artifacts/browser-screenshot-10-40-240-3-muxzuwnp-93a041e8.png",
+    "scheduled": "/home/agent/.t3/userdata/browser-artifacts/browser-screenshot-10-40-240-3-muy01e66-0f2a26f4.png"
+  }
+}

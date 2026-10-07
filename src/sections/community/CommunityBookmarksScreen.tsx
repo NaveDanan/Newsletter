@@ -18,6 +18,7 @@ export function CommunityBookmarksScreen() {
   );
 
   const list = useCommunityPosts(source, {
+    cacheKey: 'bookmarks',
     enabled: isAuthenticated,
     errorMessage: t('community.feed.failed'),
   });

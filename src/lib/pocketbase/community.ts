@@ -1,4 +1,5 @@
 import { getPocketBase, POCKETBASE_URL } from './client';
+import { cachedRead, peekRead, readCache, readScope, invalidateReads } from './read-cache';
 import { normalizeEvent, normalizePoll } from './newsletters';
 import type { NewsletterEvent, NewsletterPoll } from '@/types/newsletter';
 import {
@@ -323,20 +324,30 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 async function getJson(path: string): Promise<unknown> {
-  return getPocketBase().send(path, { method: 'GET', requestKey: null });
+  const scope = readScope();
+  return cachedRead(path, () => getPocketBase().send(path, { method: 'GET', requestKey: null }).catch((error: unknown) => {
+    if (error && typeof error === 'object' && 'status' in error && [401, 403, 404].includes(Number(error.status))) readCache.invalidate(scope);
+    throw error;
+  }), {
+    maxAge: 10_000,
+    force: path === '/api/community/me' || path.includes('/notifications') || path.includes('/moderation'),
+  });
 }
 
 async function sendJson(path: string, method: 'POST' | 'PATCH' | 'DELETE', payload?: unknown): Promise<unknown> {
-  return getPocketBase().send(path, {
+  invalidateReads();
+  try { return await getPocketBase().send(path, {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload ?? {}),
     requestKey: null,
-  });
+  }); } finally { invalidateReads(); }
 }
 
 async function sendForm(path: string, method: 'POST' | 'PATCH', payload: FormData): Promise<unknown> {
-  return getPocketBase().send(path, { method, body: payload, requestKey: null });
+  invalidateReads();
+  try { return await getPocketBase().send(path, { method, body: payload, requestKey: null }); }
+  finally { invalidateReads(); }
 }
 
 // --- Session and profiles --------------------------------------------------
@@ -437,27 +448,55 @@ export async function toggleCommunityBlock(handle: string): Promise<CommunityBlo
 export async function fetchCommunityFeed(
   options: { tab?: CommunityFeedTab; cursor?: string; perPage?: number } = {},
 ): Promise<CommunityPage<CommunityPost>> {
+  const scope = readScope();
+  const revision = readCache.revision;
   const query = buildQuery({ tab: options.tab, cursor: options.cursor, perPage: options.perPage });
-  return mapPage(await getJson(`/api/community/feed${query}`), (item) => mapCommunityPost(item));
+  const page = mapPage(await getJson(`/api/community/feed${query}`), (item) => mapCommunityPost(item));
+  if (scope === readScope() && revision === readCache.revision) page.items.forEach((post) => readCache.set(scope + `community:post:${post.id}`, post));
+  return page;
+}
+
+export function prefetchCommunityFeed(tab: CommunityFeedTab = 'for-you'): void {
+  const scope = readScope();
+  const revision = readCache.revision;
+  void fetchCommunityFeed({ tab }).then((page) => {
+    if (scope === readScope() && revision === readCache.revision) readCache.prime(scope + `community:list:feed:${tab}`, page);
+  }).catch(() => { /* The mounted feed displays failures. */ });
+}
+
+export function peekCommunityPost(postId: string): CommunityPost | undefined {
+  return peekRead(`community:post:${postId}`, 300_000);
+}
+
+export function peekCommunityThread(postId: string): CommunityThread | undefined {
+  return peekRead(`community:thread:${postId}`, 300_000);
+}
+
+export function prefetchCommunityThread(postId: string): void {
+  void fetchCommunityThread(postId, { tree: true }).catch(() => { /* The thread displays failures. */ });
 }
 
 export async function fetchCommunityThread(
   postId: string,
   options: { cursor?: string; perPage?: number; tree?: boolean } = {},
 ): Promise<CommunityThread> {
+  const scope = readScope();
+  const revision = readCache.revision;
   const query = buildQuery({
     cursor: options.cursor,
     perPage: options.perPage,
     tree: options.tree ? 'true' : undefined,
   });
   const value = record(await getJson(`/api/community/posts/${encodeURIComponent(postId)}${query}`));
-  return {
+  const thread: CommunityThread = {
     post: mapCommunityPost(value.post),
     ancestors: list(value.ancestors).map((item) => mapCommunityPost(item)),
     replies: list(value.replies).map((item) => mapCommunityPost(item)),
     hasMore: bool(value.hasMore),
     cursor: str(value.cursor),
   };
+  if (scope === readScope() && revision === readCache.revision && !options.cursor && options.tree) readCache.set(scope + `community:thread:${postId}`, thread);
+  return thread;
 }
 
 export async function createCommunityPost(draft: {

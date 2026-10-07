@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { createPptxViewer, type PptxViewerInstance } from '@/lib/pptx-viewer';
+import { isDarkNeutralTextColor } from '@/lib/newsletter-text-color';
 
 interface NewsletterContentProps {
   html: string;
@@ -45,9 +46,19 @@ export function NewsletterContent({ html, className, dir = 'auto' }: NewsletterC
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Set innerHTML imperatively so React does not overwrite it on re-renders.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (containerRef.current) {
       containerRef.current.innerHTML = html;
+      containerRef.current.querySelectorAll<HTMLImageElement>('img').forEach((element) => {
+        element.loading = 'lazy';
+        element.decoding = 'async';
+      });
+      containerRef.current.querySelectorAll<HTMLElement>('[style]').forEach((element) => {
+        if (isDarkNeutralTextColor(element.style.color)) {
+          element.dataset.themeText = 'neutral';
+          element.style.setProperty('--newsletter-original-text-color', element.style.color);
+        }
+      });
     }
   }, [html]);
 

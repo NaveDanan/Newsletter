@@ -6,7 +6,6 @@ import Placeholder from '@tiptap/extension-placeholder';
 import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
-import { Color } from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
@@ -23,6 +22,7 @@ import { toast } from 'sonner';
 import { useLocale } from '@/contexts/LocaleContext';
 import { MediaEmbed, type MediaEmbedType } from './extensions/MediaEmbed';
 import { ResizableImage } from './extensions/ResizableImage';
+import { ThemeAwareColor } from './extensions/ThemeAwareColor';
 import { FontSelector } from './toolbar/FontSelector';
 import { FontSizeSelector } from './toolbar/FontSizeSelector';
 import { ColorPicker } from './toolbar/ColorPicker';
@@ -145,7 +145,7 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
       }),
       TextStyle,
       FontFamily,
-      Color,
+      ThemeAwareColor,
       Highlight.configure({
         multicolor: true,
       }),
@@ -182,7 +182,7 @@ export const AdvancedEditor = forwardRef<AdvancedEditorHandle, AdvancedEditorPro
     }
 
     if (editor.getHTML() !== content) {
-      editor.commands.setContent(content);
+      editor.commands.setContent(content, { emitUpdate: false });
     }
   }, [content, editor]);
 

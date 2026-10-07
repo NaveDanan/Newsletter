@@ -27,13 +27,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
-import { getPocketBaseErrorMessage, moderateCommunityPost } from '@/lib/pocketbase/community';
+import { getPocketBaseErrorMessage, moderateCommunityPost, prefetchCommunityThread } from '@/lib/pocketbase/community';
 import { cn } from '@/lib/utils';
 import { CommunityAvatar } from './CommunityAvatar';
 import { CommunityBody } from './CommunityBody';
-import { CommunityComposer } from './CommunityComposer';
+import { lazyComponent } from '@/lib/lazy-component';
+import { loadCommunityThread } from './screen-loaders';
 import { useCommunity } from './CommunityContext';
-import { CommunityEditPostDialog } from './CommunityEditPostDialog';
 import { CommunityLinkPreviewCard } from './CommunityLinkPreviewCard';
 import { CommunityMediaGrid } from './CommunityMediaGrid';
 import { CommunityPostActions } from './CommunityPostActions';
@@ -42,6 +42,10 @@ import { NewsletterPollCard } from '@/components/newsletter/NewsletterPollCard';
 import { NewsletterEventCard } from '@/components/newsletter/NewsletterEventCard';
 import type { UseCommunityEngagementResult } from '@/hooks/useCommunityEngagement';
 import type { CommunityPost } from '@/types/community';
+
+
+const CommunityEditPostDialog = lazyComponent(() => import('./CommunityEditPostDialog').then((module) => ({ default: module.CommunityEditPostDialog })));
+const CommunityComposer = lazyComponent(() => import('./CommunityComposer').then((module) => ({ default: module.CommunityComposer })));
 
 interface CommunityPostCardProps {
   post: CommunityPost;
@@ -95,11 +99,15 @@ export function CommunityPostCard({
 
   return (
     <article
+      data-post-id={post.id}
+      data-post-detail={isDetail || undefined}
       className={cn(
         'feed-post-card relative transition-all',
         isDetail ? 'py-5' : 'cursor-pointer hover:border-[var(--border-highlight)]',
       )}
       onClick={isDetail ? undefined : () => openPost(post.id)}
+      onPointerEnter={isDetail ? undefined : () => { prefetchCommunityThread(post.id); void loadCommunityThread().catch(() => {}); }}
+      onFocus={isDetail ? undefined : () => { prefetchCommunityThread(post.id); void loadCommunityThread().catch(() => {}); }}
     >
       {repostedBy ? (
         <div className="flex items-center gap-2 mb-1.5 ps-6 text-xs font-semibold text-[var(--text-muted)]">
@@ -305,12 +313,12 @@ export function CommunityPostCard({
         </div>
       </div>
 
-      <CommunityEditPostDialog
+      {isEditing ? <CommunityEditPostDialog
         open={isEditing}
         post={post}
         onSave={(patch) => actions.editPost(post, patch)}
         onClose={() => setIsEditing(false)}
-      />
+      /> : null}
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent onClick={(event) => event.stopPropagation()}>

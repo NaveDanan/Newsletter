@@ -42,6 +42,7 @@ export const NEWSLETTERS_SCHEMA = {
     text('title', 10000),
     text('subtitle', 10000),
     text('content', 20000000),
+    text('searchText', 20000000, { hidden: true }),
     text('excerpt', 20000000),
     text('author'),
     text('authorAvatar', 20000000),
@@ -235,7 +236,7 @@ export const NEWSLETTER_IMPORT_JOBS_SCHEMA = {
   name: 'newsletter_import_jobs', type: 'base',
   fields: [
     autodate('created'), autodate('updated', true, true),
-    text('key', 255, { required: true }), bool('enabled'),
+    text('key', 255, { required: true }), bool('enabled'), bool('autoPublish'),
     text('repositoryUrl', 4000), text('username', 1000), text('token', 10000, { hidden: true }),
     number('intervalMinutes', 60, { onlyInt: true }), text('updatedBy', 255),
     text('lastRunAt', 255), text('lastSuccessAt', 255), text('lastError', 10000), json('lastResult'),

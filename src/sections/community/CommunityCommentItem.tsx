@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils';
 import { CommunityAvatar } from './CommunityAvatar';
 import { CommunityBody } from './CommunityBody';
 import { useCommunity } from './CommunityContext';
-import { CommunityEditPostDialog } from './CommunityEditPostDialog';
+import { lazyComponent } from '@/lib/lazy-component';
 import { CommunityMediaGrid } from './CommunityMediaGrid';
 import { CommunityLinkPreviewCard } from './CommunityLinkPreviewCard';
 import { CommunityQuotedPost } from './CommunityQuotedPost';
@@ -44,6 +44,8 @@ import { formatCompactTime, type CommentTreeNode } from '@/lib/community-comment
 import { visibleCommunityBody } from '@/lib/community-text';
 import type { UseCommunityEngagementResult } from '@/hooks/useCommunityEngagement';
 import type { CommunityPost } from '@/types/community';
+
+const CommunityEditPostDialog = lazyComponent(() => import('./CommunityEditPostDialog').then((module) => ({ default: module.CommunityEditPostDialog })));
 
 interface CommunityCommentItemProps {
   node: CommentTreeNode;
@@ -470,12 +472,12 @@ export function CommunityCommentItem({
         </div>
       </div>
 
-      <CommunityEditPostDialog
+      {isEditing ? <CommunityEditPostDialog
         open={isEditing}
         post={comment}
         onSave={(patch) => actions.editPost(comment, patch)}
         onClose={() => setIsEditing(false)}
-      />
+      /> : null}
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent onClick={(event) => event.stopPropagation()}>

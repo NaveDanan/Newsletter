@@ -1,10 +1,41 @@
-import type { RecordModel } from 'pocketbase';
+import type { RecordModel, SendOptions } from 'pocketbase';
 import { getPocketBase } from './client';
+import { cachedRead, peekRead, readCache, readScope } from './read-cache';
 import { normalizeProjectGantt } from '../gantt';
 import type { Project, ProjectFormData, ProjectStatus } from '../../types/project';
 import type { GanttTask, ProjectGantt } from '../../types/gantt';
 
 export const PROJECTS_COLLECTION = 'projects';
+const LIST_KEY = 'projects:list';
+
+export function getCachedProjects(): Project[] | undefined {
+  return peekRead<Project[]>(LIST_KEY, 300_000);
+}
+
+export function rememberProjects(projects: Project[]): void {
+  if (getCachedProjects() !== projects) readCache.set(readScope() + LIST_KEY, projects);
+}
+
+function invalidateProjects(scope: string): void {
+  readCache.invalidate(scope + 'projects:');
+}
+
+function discardDeniedReads(error: unknown, scope: string): void {
+  if (error && typeof error === 'object' && 'status' in error && [401, 403, 404].includes(Number(error.status))) invalidateProjects(scope);
+}
+
+async function projectRequest<T>(path: string, options: SendOptions): Promise<T> {
+  if (!options.method || options.method === 'GET') {
+    const scope = readScope();
+    return cachedRead('projects:' + path, () => getPocketBase().send<T>(path, options).catch((error: unknown) => {
+      discardDeniedReads(error, scope); throw error;
+    }));
+  }
+  const scope = readScope();
+  invalidateProjects(scope);
+  try { return await getPocketBase().send<T>(path, options); }
+  finally { invalidateProjects(scope); }
+}
 
 interface ApiListResponse<T> {
   items?: T[];
@@ -39,14 +70,20 @@ export function mapPBRecordToProject(record: RecordModel): Project {
 // CRUD
 // ---------------------------------------------------------------------------
 
-export async function fetchProjects(): Promise<Project[]> {
-  const pb = getPocketBase();
-  const response = await pb.send<ApiListResponse<RecordModel>>('/api/projects', {
-    method: 'GET',
-    requestKey: null,
-  });
-  const records = response.items ?? [];
-  return records.map(mapPBRecordToProject);
+export function fetchProjects({ force = false } = {}): Promise<Project[]> {
+  const scope = readScope();
+  return cachedRead(LIST_KEY, async () => {
+    try {
+      const response = await getPocketBase().send<ApiListResponse<RecordModel>>('/api/projects', {
+        method: 'GET', requestKey: null,
+      });
+      return (response.items ?? []).map(mapPBRecordToProject);
+    } catch (error) { discardDeniedReads(error, scope); throw error; }
+  }, { force });
+}
+
+export function prefetchProjects(): void {
+  void fetchProjects().catch(() => { /* The destination handles a failed read. */ });
 }
 
 export async function createProject(
@@ -54,7 +91,7 @@ export async function createProject(
   gantt?: ProjectGantt,
 ): Promise<Project> {
   const pb = getPocketBase();
-  const record = await pb.send<RecordModel>('/api/projects', {
+  const record = await projectRequest<RecordModel>('/api/projects', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -80,8 +117,7 @@ export async function updateProject(
   id: string,
   data: Partial<ProjectFormData & { status: ProjectStatus; isVisibleInGantt: boolean; gantt: ProjectGantt }>,
 ): Promise<Project> {
-  const pb = getPocketBase();
-  const record = await pb.send<RecordModel>(`/api/projects/${id}`, {
+  const record = await projectRequest<RecordModel>(`/api/projects/${id}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -93,13 +129,14 @@ export async function updateProject(
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  const pb = getPocketBase();
-  await pb.collection(PROJECTS_COLLECTION).delete(id);
+  const scope = readScope();
+  invalidateProjects(scope);
+  try { await getPocketBase().collection(PROJECTS_COLLECTION).delete(id); }
+  finally { invalidateProjects(scope); }
 }
 
 export async function updateProjectStatusOnly(id: string, status: ProjectStatus): Promise<Project> {
-  const pb = getPocketBase();
-  const record = await pb.send<RecordModel>(`/api/projects/${id}/status`, {
+  const record = await projectRequest<RecordModel>(`/api/projects/${id}/status`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -111,8 +148,7 @@ export async function updateProjectStatusOnly(id: string, status: ProjectStatus)
 }
 
 export async function fetchProjectTasks(projectId: string): Promise<GanttTask[]> {
-  const pb = getPocketBase();
-  const response = await pb.send<ApiListResponse<GanttTask>>(`/api/projects/${projectId}/tasks`, {
+  const response = await projectRequest<ApiListResponse<GanttTask>>(`/api/projects/${projectId}/tasks`, {
     method: 'GET',
     requestKey: null,
   });
@@ -120,8 +156,7 @@ export async function fetchProjectTasks(projectId: string): Promise<GanttTask[]>
 }
 
 export async function createProjectTask(projectId: string, task: Partial<GanttTask>): Promise<GanttTask> {
-  const pb = getPocketBase();
-  return pb.send<GanttTask>(`/api/projects/${projectId}/tasks`, {
+  return projectRequest<GanttTask>(`/api/projects/${projectId}/tasks`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -136,8 +171,7 @@ export async function updateProjectTask(
   taskId: string,
   task: Partial<GanttTask>,
 ): Promise<GanttTask> {
-  const pb = getPocketBase();
-  return pb.send<GanttTask>(`/api/projects/${projectId}/tasks/${taskId}`, {
+  return projectRequest<GanttTask>(`/api/projects/${projectId}/tasks/${taskId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -152,8 +186,7 @@ export async function updateProjectTaskStatus(
   taskId: string,
   status: ProjectStatus,
 ): Promise<GanttTask> {
-  const pb = getPocketBase();
-  return pb.send<GanttTask>(`/api/projects/${projectId}/tasks/${taskId}/status`, {
+  return projectRequest<GanttTask>(`/api/projects/${projectId}/tasks/${taskId}/status`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -167,16 +200,14 @@ export async function deleteProjectTask(
   projectId: string,
   taskId: string,
 ): Promise<{ status: string; deletedTaskIds: string[] }> {
-  const pb = getPocketBase();
-  return pb.send<{ status: string; deletedTaskIds: string[] }>(`/api/projects/${projectId}/tasks/${taskId}`, {
+  return projectRequest<{ status: string; deletedTaskIds: string[] }>(`/api/projects/${projectId}/tasks/${taskId}`, {
     method: 'DELETE',
     requestKey: null,
   });
 }
 
 export async function fetchProjectSubtasks(projectId: string, taskId: string): Promise<GanttTask[]> {
-  const pb = getPocketBase();
-  const response = await pb.send<ApiListResponse<GanttTask>>(`/api/projects/${projectId}/tasks/${taskId}/subtasks`, {
+  const response = await projectRequest<ApiListResponse<GanttTask>>(`/api/projects/${projectId}/tasks/${taskId}/subtasks`, {
     method: 'GET',
     requestKey: null,
   });
@@ -188,8 +219,7 @@ export async function createProjectSubtask(
   taskId: string,
   task: Partial<GanttTask>,
 ): Promise<GanttTask> {
-  const pb = getPocketBase();
-  return pb.send<GanttTask>(`/api/projects/${projectId}/tasks/${taskId}/subtasks`, {
+  return projectRequest<GanttTask>(`/api/projects/${projectId}/tasks/${taskId}/subtasks`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -200,8 +230,7 @@ export async function createProjectSubtask(
 }
 
 export async function fetchProjectMilestones(projectId: string): Promise<GanttTask[]> {
-  const pb = getPocketBase();
-  const response = await pb.send<ApiListResponse<GanttTask>>(`/api/projects/${projectId}/milestones`, {
+  const response = await projectRequest<ApiListResponse<GanttTask>>(`/api/projects/${projectId}/milestones`, {
     method: 'GET',
     requestKey: null,
   });
@@ -209,8 +238,7 @@ export async function fetchProjectMilestones(projectId: string): Promise<GanttTa
 }
 
 export async function createProjectMilestone(projectId: string, task: Partial<GanttTask>): Promise<GanttTask> {
-  const pb = getPocketBase();
-  return pb.send<GanttTask>(`/api/projects/${projectId}/milestones`, {
+  return projectRequest<GanttTask>(`/api/projects/${projectId}/milestones`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

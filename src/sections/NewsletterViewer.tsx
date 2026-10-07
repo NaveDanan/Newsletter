@@ -3,7 +3,8 @@ import { ArrowLeft01Icon, Bookmark01Icon, BookmarkCheck01Icon, Heart, Link01Icon
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
-import { CommentReply } from '@/components/ui/comment-reply';
+import { lazyComponent } from '@/lib/lazy-component';
+import { DeferredContent } from '@/components/DeferredContent';
 import { useLocale } from '@/contexts/LocaleContext';
 import { NewsletterContent } from '@/components/newsletter/NewsletterContent';
 import { stripCommentFormatting } from '@/lib/comment-formatting';
@@ -13,6 +14,8 @@ import { NewsletterEventCard } from '@/components/newsletter/NewsletterEventCard
 import type { PocketBaseUser } from '@/lib/pocketbase/client';
 import type { Newsletter, NewsletterComment } from '../types/newsletter';
 import '../components/editor/EditorStyles.css';
+
+const CommentReply = lazyComponent(() => import('@/components/ui/comment-reply').then((module) => ({ default: module.CommentReply })));
 
 interface NewsletterViewerProps {
   newsletter: Newsletter;
@@ -59,7 +62,7 @@ export function NewsletterViewer({
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [newsletter]);
+  }, [newsletter.id]);
 
   // Reset the draft when a different newsletter is shown, without an effect round-trip.
   const [draftNewsletterId, setDraftNewsletterId] = useState(newsletter.id);
@@ -172,11 +175,6 @@ export function NewsletterViewer({
               className="h-full w-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
-            <svg className="shatter-glass-overlay" viewBox="0 0 900 460" preserveAspectRatio="none">
-              <line x1="0" y1="120" x2="900" y2="340" stroke="#fff" strokeWidth="2" opacity="0.3" />
-              <line x1="280" y1="0" x2="620" y2="460" stroke="#fff" strokeWidth="2.5" opacity="0.4" />
-              <line x1="290" y1="10" x2="630" y2="450" stroke="var(--primary-accent)" strokeWidth="1.5" opacity="0.6" />
-            </svg>
           </div>
         )}
 
@@ -252,11 +250,16 @@ export function NewsletterViewer({
           </div>
         )}
 
-        <NewsletterContent
+        {newsletter.contentLoaded === false ? (
+          <div className="space-y-3 py-4" aria-busy="true" aria-label={t('app.loadingArticle')}>
+            <div className="h-4 w-full animate-pulse rounded bg-[var(--bg-pill)]" />
+            <div className="h-4 w-5/6 animate-pulse rounded bg-[var(--bg-pill)]" />
+          </div>
+        ) : <NewsletterContent
           html={newsletter.content}
           className="newsletter-article"
           dir="auto"
-        />
+        />}
 
         {/* Scheduled Event */}
         {newsletter.event && newsletter.event.title && (
@@ -287,7 +290,7 @@ export function NewsletterViewer({
         )}
 
         <section ref={discussionRef} className="mt-8 border-t border-[var(--border-subtle)] pt-6">
-          <CommentReply
+          <DeferredContent><CommentReply
             title={t('viewer.communityThreads')}
             likeCount={newsletter.likes}
             commentCount={newsletter.comments}
@@ -301,7 +304,7 @@ export function NewsletterViewer({
             onToggleCommentLike={handleCommentLike}
             onRequireAuth={onRequireAuth}
             formatCommentDate={formatRelativeTime}
-          />
+          /></DeferredContent>
         </section>
       </article>
     </div>

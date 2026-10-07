@@ -25,7 +25,9 @@
     "pb:sync-users-schema": "node scripts/sync-pocketbase-users-schema.mjs",
     "pb:sync-oidc-settings": "node scripts/sync-pocketbase-oidc-settings.mjs",
     "pb:migrate-data": "node scripts/migrate-pocketbase-data.mjs",
-    "pb:set-role": "node scripts/set-pocketbase-user-role.mjs"
+    "pb:set-role": "node scripts/set-pocketbase-user-role.mjs",
+    "test:loading": "node --test tests/scripts/compose-loading.test.mjs tests/scripts/lazy-loading.test.mjs tests/scripts/navigation-loading.test.mjs tests/scripts/spreadsheet-loading.test.mjs tests/scripts/query-cache.test.mjs tests/scripts/loading-hooks.test.mjs tests/scripts/newsletter-loading.test.mjs tests/scripts/newsletter-cover-loading.test.mjs tests/scripts/newsletter-read-cache.test.mjs tests/scripts/newsletter-read-workers.test.mjs",
+    "perf:serve": "node scripts/performance/serve.mjs"
   },
   "dependencies": {
     "@fortawesome/free-solid-svg-icons": "^7.2.0",

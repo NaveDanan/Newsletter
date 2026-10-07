@@ -15,6 +15,7 @@ function ensureJob(app) {
   job = new Record(app.findCollectionByNameOrId('newsletter_import_jobs'));
   job.set('key', JOB_KEY);
   job.set('enabled', false);
+  job.set('autoPublish', false);
   job.set('intervalMinutes', 1440);
   job.set('lastResult', {});
   app.save(job);
@@ -25,7 +26,8 @@ function serializeJob(job) {
   var result = readJson(job, 'lastResult', {});
   delete result.visited;
   return {
-    enabled: job.getBool('enabled'), repositoryUrl: job.getString('repositoryUrl'), username: job.getString('username'),
+    enabled: job.getBool('enabled'), autoPublish: job.getBool('autoPublish'),
+    repositoryUrl: job.getString('repositoryUrl'), username: job.getString('username'),
     hasToken: Boolean(job.getString('token')), intervalMinutes: job.getInt('intervalMinutes'),
     lastRunAt: job.getString('lastRunAt'), lastSuccessAt: job.getString('lastSuccessAt'),
     lastError: job.getString('lastError'), lastResult: result,
@@ -68,6 +70,10 @@ function updateJobSettings(app, auth, body) {
     if (typeof body.enabled !== 'boolean') throw new BadRequestError('Enabled must be true or false.');
     job.set('enabled', body.enabled);
   }
+  if (Object.prototype.hasOwnProperty.call(body, 'autoPublish')) {
+    if (typeof body.autoPublish !== 'boolean') throw new BadRequestError('Auto publish must be true or false.');
+    job.set('autoPublish', body.autoPublish);
+  }
   if (Object.prototype.hasOwnProperty.call(body, 'intervalMinutes')) {
     var interval = Number(body.intervalMinutes);
     if (!isFinite(interval) || Math.floor(interval) !== interval || interval < 60 || interval > 525600) throw new BadRequestError('Import interval must be between 60 and 525600 minutes.');
@@ -86,7 +92,7 @@ function updateJobSettings(app, auth, body) {
   app.runInTransaction(function (tx) {
     var current = ensureJob(tx);
     if (isRunning(current)) throw new BadRequestError('An import is running. Try saving again after it finishes.');
-    ['repositoryUrl', 'username', 'token', 'enabled', 'intervalMinutes', 'updatedBy'].forEach(function (key) { current.set(key, job.get(key)); });
+    ['repositoryUrl', 'username', 'token', 'enabled', 'autoPublish', 'intervalMinutes', 'updatedBy'].forEach(function (key) { current.set(key, job.get(key)); });
     tx.save(current);
   });
   return serializeJob(ensureJob(app));
@@ -132,7 +138,9 @@ function runJobNow(app, scheduled) {
           document.articles.forEach(function (article) {
             var record = new Record(tx.findCollectionByNameOrId('newsletters'));
             ['title', 'subtitle', 'content', 'excerpt', 'textAlignment', 'coverImage', 'readTime'].forEach(function (key) { record.set(key, article[key]); });
-            record.set('status', 'draft');
+            // Content and the import checkpoint commit together. Failed files
+            // cannot leave a published article behind, even with auto publish on.
+            record.set('status', job.getBool('autoPublish') ? 'published' : 'draft');
             record.set('author', article.author || '');
             record.set('createdById', job.getString('updatedBy'));
             record.set('publishedAt', article.publishedAt || new Date().toISOString().slice(0, 10));

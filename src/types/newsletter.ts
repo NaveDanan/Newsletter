@@ -60,6 +60,10 @@ export interface Newsletter {
   title: string;
   subtitle: string;
   content: string;
+  /** Feed summaries omit the body; viewers and editors load it by ID. */
+  contentLoaded?: boolean;
+  searchText?: string;
+  updatedAt?: string;
   excerpt: string;
   author: string;
   authorAvatar?: string;

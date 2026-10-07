@@ -30,8 +30,11 @@ function mapAuthUser(model: Record<string, unknown>, avatarUrl?: string): Pocket
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pb = getPocketBase();
-  const [user, setUser] = useState<PocketBaseUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<PocketBaseUser | null>(() => {
+    const model = pb.authStore.model as Record<string, unknown> | null;
+    return model && pb.authStore.isValid ? mapAuthUser(model, avatarUrlFor(pb, model)) : null;
+  });
+  const [isLoading, setIsLoading] = useState(pb.authStore.isValid);
 
   useEffect(() => {
     let isMounted = true;

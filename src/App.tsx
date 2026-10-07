@@ -890,7 +890,7 @@ function App() {
       >
         <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
           <Toaster position={toasterPosition} richColors />
-          <ProfilePage onBack={handleProfileBack} />
+          <ProfilePage onBack={handleProfileBack} onHomeClick={handleHomeClick} onProfileClick={handleProfileClick} onManagerClick={handleManagerClick} onSignOut={handleUserLogout} />
         </div>
       </AppStageShell>
     );

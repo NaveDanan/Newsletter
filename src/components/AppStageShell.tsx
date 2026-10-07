@@ -2,6 +2,8 @@ import { type ReactNode, useState, useEffect } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { Home, Compass, Plus, Bell, User, Wifi, Battery, Signal } from 'lucide-react';
 import { UserAvatarCircle } from '@/components/UserAvatarCircle';
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
+import { useLocale } from '@/contexts/LocaleContext';
 import { preloadRoute } from '@/lib/preload-route';
 
 interface AppStageShellProps {
@@ -31,6 +33,7 @@ export function AppStageShell({
   fullViewport = false,
 }: AppStageShellProps) {
   const { deviceMode } = useTheme();
+  const { t } = useLocale();
   const [currentTime, setCurrentTime] = useState('9:41');
   const navigate = (action: () => void) => {
     if (onNavigate) onNavigate(action);
@@ -114,19 +117,13 @@ export function AppStageShell({
               <Plus className="size-5 stroke-[2.5]" />
             </button>
 
-            <button
-              type="button"
-              className={`mobile-nav-btn ${activeTab === 'community' ? 'active' : ''}`}
-              title="Community"
-              onPointerEnter={() => preloadRoute('/community')}
-              onFocus={() => preloadRoute('/community')}
-              onClick={() => navigate(() => {
-                onCommunityClick?.();
-              })}
-            >
+            {user ? <NotificationDropdown onNavigate={onNavigate} trigger={
+              <button type="button" className="mobile-nav-btn" title={t('community.notifications.title')} aria-label={t('community.notifications.title')}>
+                <Bell className="size-5" />
+              </button>
+            } /> : <button type="button" className="mobile-nav-btn" title="Community" onClick={() => navigate(() => onCommunityClick?.())}>
               <Bell className="size-5" />
-              {activeTab === 'community' && <span className="mobile-nav-dot" />}
-            </button>
+            </button>}
 
             <button
               type="button"

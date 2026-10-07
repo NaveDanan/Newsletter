@@ -272,6 +272,7 @@ function mapNotification(raw: unknown): CommunityNotification {
     actorHandle: str(value.actorHandle),
     actorName: str(value.actorName),
     actorAvatarUrl: resolveCommunityFileUrl(str(value.actorAvatarUrl)),
+    newsletterCoverUrl: resolveCommunityFileUrl(str(value.newsletterCoverUrl)),
     postId: str(value.postId),
     rootId: str(value.rootId),
     preview: str(value.preview),
@@ -634,9 +635,9 @@ export async function fetchCommunityLinkPreview(url: string): Promise<CommunityL
 // --- Notifications ---------------------------------------------------------
 
 export async function fetchCommunityNotifications(
-  options: { kind?: CommunityNotificationKind; cursor?: string; perPage?: number } = {},
+  options: { kind?: CommunityNotificationKind; cursor?: string; perPage?: number; preview?: boolean } = {},
 ): Promise<CommunityNotificationPage> {
-  const query = buildQuery({ kind: options.kind, cursor: options.cursor, perPage: options.perPage });
+  const query = buildQuery({ kind: options.kind, cursor: options.cursor, perPage: options.perPage, preview: options.preview ? 'true' : undefined });
   const raw = await getJson(`/api/community/notifications${query}`);
   const page = mapPage(raw, mapNotification);
   return { ...page, unreadCount: num(record(raw).unreadCount) };

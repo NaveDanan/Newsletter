@@ -1324,6 +1324,15 @@ function listNotifications(e) {
   c.requireAuth(e.auth);
 
   var query = e.requestInfo().query || {};
+  if (String(query.preview || '') === 'true') {
+    var previews = require(__hooks + '/lib/notification-preview.js');
+    return {
+      items: previews.addVisuals(app, previews.list(app, viewer.id)),
+      hasMore: false,
+      cursor: '',
+      unreadCount: app.countRecords('community_notifications', $dbx.hashExp({ userId: viewer.id, isRead: false })),
+    };
+  }
   var limit = c.clampPageSize(query.perPage, c.NOTIFICATION_PAGE_SIZE, c.MAX_FEED_PAGE_SIZE);
   var cursor = c.decodeCursor(query.cursor);
   var params = { userId: viewer.id };
@@ -1351,6 +1360,7 @@ function listNotifications(e) {
   var result = pageResult(records, limit, function (page) {
     return page.map(content().serializeNotification);
   });
+  result.items = require(__hooks + '/lib/notification-preview.js').addVisuals(app, result.items);
   result.unreadCount = unread;
   return result;
 }

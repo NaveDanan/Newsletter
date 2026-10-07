@@ -8,6 +8,7 @@ import {
   Search01Icon,
   UserIcon,
 } from '@hugeicons/core-free-icons';
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -273,7 +274,7 @@ export function CommunityPage({
     }
 
     if (route.section === 'notifications') {
-      return <CommunityNotificationsScreen onUnreadChange={setUnreadNotifications} />;
+      return <CommunityNotificationsScreen key={readScope()} onUnreadChange={setUnreadNotifications} />;
     }
 
     if (route.section === 'bookmarks') {
@@ -382,7 +383,7 @@ export function CommunityPage({
                   || (item.key === 'search' && (route.section === 'search' || route.section === 'hashtag'))
                   || (item.key === 'profile' && (route.section === 'profile' || route.section === 'connections'));
 
-                return (
+                const button = (
                   <button
                     key={item.key}
                     type="button"
@@ -406,6 +407,7 @@ export function CommunityPage({
                     ) : null}
                   </button>
                 );
+                return item.key === 'notifications' ? <NotificationDropdown key={item.key} trigger={button} /> : button;
               })}
             </nav>
           </>

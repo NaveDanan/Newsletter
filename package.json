@@ -15,7 +15,7 @@
     "test:community-api": "node tests/scripts/community-api.mjs",
     "test:notifications": "node tests/scripts/notifications-api.mjs",
     "test:browser-notifications": "node --test tests/scripts/browser-notifications.test.mjs",
-    "test:regressions": "node --test tests/scripts/appearance-provider.test.mjs tests/scripts/navigation.test.mjs tests/scripts/site-cache.test.mjs tests/scripts/community-rich-text.test.cjs tests/scripts/community-mention.test.cjs tests/scripts/community-comment-addons.test.mjs",
+    "test:regressions": "node --test tests/scripts/appearance-provider.test.mjs tests/scripts/navigation.test.mjs tests/scripts/site-cache.test.mjs tests/scripts/community-rich-text.test.cjs tests/scripts/community-mention.test.cjs tests/scripts/community-comment-addons.test.mjs tests/scripts/notification-preview.test.mjs",
     "docker:build": "node scripts/build-docker-image.mjs",
     "test:docker-api": "node scripts/test-docker-api.mjs",
     "pb:setup-collections": "node scripts/setup-pocketbase-collections.mjs",

@@ -21,6 +21,11 @@ import {
 import { useLocale } from '@/contexts/LocaleContext';
 import { hasManagerAccess } from '@/lib/auth/permissions';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { lazyComponent } from '@/lib/lazy-component';
+import { readScope } from '@/lib/pocketbase/read-cache';
+
+const NotificationPreviewList = lazyComponent(() => import('./notifications/NotificationPreviewList').then(module => ({ default: module.NotificationPreviewList })));
 
 /** Overrides the stock `focus:bg-accent` */
 const ITEM_CLASS =
@@ -38,17 +43,17 @@ export function AuthenticatedAccountMenu({ onProfileClick, onManagerClick, onSig
   // Defaults to a plain pass-through, so callers without an editor guard behave identically.
   const run = onNavigate ?? ((action: () => void) => { action(); });
   const showManage = showManagerItem && hasManagerAccess(user.role);
-
-  const goToNotifications = () => {
-    run(() => {
-      window.history.pushState({}, '', '/community/notifications');
-      window.dispatchEvent(new Event('app:navigate'));
-    });
+  const [localOpen, setLocalOpen] = useState(defaultOpen ?? false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const changeOpen = (next: boolean) => {
+    setLocalOpen(next);
+    onOpenChange?.(next);
+    if (!next) setShowNotifications(false);
   };
 
   return (
     <div className="flex items-center gap-2 sm:gap-3">
-      <DropdownMenu dir={dir} defaultOpen={defaultOpen} open={open} onOpenChange={onOpenChange} modal={onOpenChange === undefined}>
+      <DropdownMenu dir={dir} open={open ?? localOpen} onOpenChange={changeOpen} modal={onOpenChange === undefined}>
         <DropdownMenuTrigger asChild>
           <AccountMenuTrigger user={user} unreadCount={unreadCount} foldOrder={foldOrder} className={className} />
         </DropdownMenuTrigger>
@@ -56,8 +61,16 @@ export function AuthenticatedAccountMenu({ onProfileClick, onManagerClick, onSig
         <DropdownMenuContent
           align={isRTL ? 'start' : 'end'}
           sideOffset={8}
-          className="z-[210] w-64 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2 shadow-[var(--shadow-card)] backdrop-blur-xl"
+          collisionPadding={12}
+          className={cn('z-[210] max-w-[calc(100vw-24px)] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2 shadow-[var(--shadow-card)] backdrop-blur-xl', showNotifications ? 'w-[380px]' : 'w-64')}
         >
+          {showNotifications ? <>
+            <DropdownMenuItem data-notification-back className={cn(ITEM_CLASS, 'min-h-11 font-semibold')} onSelect={event => { event.preventDefault(); setShowNotifications(false); }}>
+              <HugeiconsIcon icon={ArrowRight01Icon} className={cn('size-4', !isRTL && 'rotate-180')} />
+              {t('community.notifications.title')}
+            </DropdownMenuItem>
+            <NotificationPreviewList key={readScope()} menu onNavigate={run} onClose={() => changeOpen(false)} />
+          </> : <>
           <DropdownMenuItem
             className={cn(ITEM_CLASS, 'items-center gap-3 py-2.5')}
             onPointerEnter={() => preloadRoute('/profile')} onFocus={() => preloadRoute('/profile')} onSelect={() => { run(onProfileClick); }}
@@ -74,7 +87,7 @@ export function AuthenticatedAccountMenu({ onProfileClick, onManagerClick, onSig
           </DropdownMenuItem>
 
           <DropdownMenuSeparator className="my-1.5 bg-[var(--border-subtle)]" />
-          <DropdownMenuItem className={ITEM_CLASS} onSelect={goToNotifications}>
+          <DropdownMenuItem className={ITEM_CLASS} onPointerEnter={() => NotificationPreviewList.preload()} onFocus={() => NotificationPreviewList.preload()} onSelect={event => { event.preventDefault(); setShowNotifications(true); requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-notification-back]')?.focus()); }}>
             <HugeiconsIcon icon={Notification01Icon} className="size-4 text-[var(--text-secondary)]" />
             {t('community.notifications.title')}
             {unreadCount > 0 ? (
@@ -108,6 +121,7 @@ export function AuthenticatedAccountMenu({ onProfileClick, onManagerClick, onSig
             <HugeiconsIcon icon={Logout01Icon} className="size-4 text-current" />
             {t('nav.signOut')}
           </DropdownMenuItem>
+          </>}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

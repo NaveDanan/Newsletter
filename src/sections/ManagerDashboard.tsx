@@ -1,9 +1,8 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Menu01Icon, Shield01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
+import { BarChartIcon, Calendar01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Shield01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
 import { useEffect, useRef, useState } from 'react';
-import { AccountMenu } from '@/components/AccountMenu';
+import { ManagerHeader } from '@/components/ManagerHeader';
 import { AppStageShell } from '@/components/AppStageShell';
-import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSubscriberCount } from '@/hooks/useSubscriberCount';
 import { cn } from '@/lib/utils';
@@ -421,45 +420,17 @@ export function ManagerDashboard({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Top bar */}
-      <header className="sticky top-0 z-50 bg-[var(--bg-app)]/90 backdrop-blur-md border-b border-[var(--border-subtle)]">
-        <div className="flex items-center justify-between px-4 lg:px-8 h-16">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
-              aria-label={showMobileMenu ? t('nav.closeMenu') : t('nav.openMenu')}
-              className="lg:hidden p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]"
-            >
-              {showMobileMenu ? <HugeiconsIcon icon={Cancel01Icon} className="w-5 h-5" /> : <HugeiconsIcon icon={Menu01Icon} className="w-5 h-5" />}
-            </button>
-            <button
-              onClick={() => requestLeaveEditor(onHomeClick)}
-              className="flex items-center gap-3 group text-start"
-            >
-              <div className="brand-logo group-hover:scale-105 transition-transform">
-                <img 
-                  src="/logo.gif" 
-                  alt="AI-BREAK" 
-                  className="w-7 h-7 object-contain rounded-lg"
-                />
-              </div>
-              <span className="font-extrabold text-base sm:text-lg text-[var(--text-primary)] tracking-tight">AI-BREAK</span>
-            </button>
-            <span className="text-[var(--border-highlight)] hidden sm:inline">|</span>
-            <span className="text-xs font-bold text-[var(--primary-accent)] uppercase tracking-wider hidden sm:inline">{t('manager.dashboard')}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <LanguageToggleButton compact />
-            <AccountMenu
-              showManagerItem={false}
-              onProfileClick={onProfileClick}
-              onManagerClick={onHomeClick}
-              onSignOut={onLogout}
-              onNavigate={requestLeaveEditor}
-            />
-          </div>
-        </div>
-      </header>
+      <ManagerHeader
+        title={t('manager.dashboard')}
+        onHomeClick={onHomeClick}
+        onProfileClick={onProfileClick}
+        onManagerClick={onHomeClick}
+        onSignOut={onLogout}
+        onNavigate={requestLeaveEditor}
+        onToggleMenu={() => setShowMobileMenu(!showMobileMenu)}
+        menuOpen={showMobileMenu}
+        showManagerItem={false}
+      />
 
       <div className="flex">
         {/* Sidebar */}

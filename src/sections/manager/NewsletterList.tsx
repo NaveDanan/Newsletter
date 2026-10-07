@@ -236,7 +236,7 @@ export function NewsletterList({
                   data-newsletter-id={newsletter.id}
                   className="p-4 sm:p-5 hover:bg-[var(--bg-card-hover)] transition-colors group [content-visibility:auto] [contain-intrinsic-size:auto_180px]"
                 >
-                  <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 sm:gap-4 xl:grid-cols-[auto_minmax(0,1fr)_auto]">
+                  <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 sm:gap-4 2xl:grid-cols-[auto_minmax(0,1fr)_auto]">
                   {/* Cover Image */}
                   <div className="w-16 sm:w-24 h-16 rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-app)]">
                     {newsletter.coverImage ? (
@@ -326,7 +326,7 @@ export function NewsletterList({
                   </div>
 
                   {/* Actions */}
-                  <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 xl:col-span-1 [&>button]:min-h-11 [&>button]:min-w-11">
+                  <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 2xl:col-span-1 2xl:self-center [&_button]:inline-flex [&_button]:size-11 [&_button]:shrink-0 [&_button]:items-center [&_button]:justify-center [&_button]:p-0 [&_button]:rounded-xl [&_button]:focus-visible:outline-2 [&_button]:focus-visible:outline-[var(--primary-accent)]">
                     <button
                       onClick={() => onView(newsletter)}
                       onPointerEnter={() => onViewIntent?.(newsletter)}
@@ -382,34 +382,38 @@ export function NewsletterList({
                         />
                       </button>
                     )}
-                    {canSendUpdateCurrent && (
-                      <button
-                        onClick={() => handleSendUpdate(newsletter)}
-                        disabled={Boolean(sendingUpdateId)}
-                        className="p-2 text-[#737373] hover:text-[#D93A3A] hover:bg-red-50 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-60"
-                        title={t('manager.sendUpdateEmail')}
-                        aria-label={t('manager.sendUpdateEmail')}
-                      >
-                        <HugeiconsIcon
-                          icon={isSendingUpdate ? Loading02Icon : Mail01Icon}
-                          className={cn('w-4 h-4', isSendingUpdate && 'animate-spin')}
-                        />
-                      </button>
-                    )}
-                    {canDeleteCurrent && (
-                      <button
-                        onClick={() => handleDelete(newsletter.id)}
-                        disabled={deletingId === newsletter.id}
-                        className={`p-2 rounded-lg transition-colors ${
-                          deleteConfirm === newsletter.id
-                            ? 'text-red-600 bg-red-100'
-                            : 'text-[#737373] hover:text-red-600 hover:bg-red-50'
-                        }`}
-                        title={deleteConfirm === newsletter.id ? t('manager.confirmDelete') : t('manager.delete')}
-                        aria-label={deleteConfirm === newsletter.id ? t('manager.confirmDelete') : t('manager.delete')}
-                      >
-                        <HugeiconsIcon icon={Delete02Icon} className="w-4 h-4" />
-                      </button>
+                    {(canSendUpdateCurrent || canDeleteCurrent) && (
+                      <div className="flex shrink-0 items-center gap-2" data-newsletter-delivery-actions>
+                        {canSendUpdateCurrent && (
+                          <button
+                            onClick={() => handleSendUpdate(newsletter)}
+                            disabled={Boolean(sendingUpdateId)}
+                            className="p-2 text-[var(--text-secondary)] hover:text-[var(--primary-accent)] hover:bg-[var(--primary-accent)]/10 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-60"
+                            title={t('manager.sendUpdateEmail')}
+                            aria-label={t('manager.sendUpdateEmail')}
+                          >
+                            <HugeiconsIcon
+                              icon={isSendingUpdate ? Loading02Icon : Mail01Icon}
+                              className={cn('w-4 h-4', isSendingUpdate && 'animate-spin')}
+                            />
+                          </button>
+                        )}
+                        {canDeleteCurrent && (
+                          <button
+                            onClick={() => handleDelete(newsletter.id)}
+                            disabled={deletingId === newsletter.id}
+                            className={`p-2 rounded-lg transition-colors ${
+                              deleteConfirm === newsletter.id
+                                ? 'text-red-600 bg-red-100'
+                                : 'text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10'
+                            }`}
+                            title={deleteConfirm === newsletter.id ? t('manager.confirmDelete') : t('manager.delete')}
+                            aria-label={deleteConfirm === newsletter.id ? t('manager.confirmDelete') : t('manager.delete')}
+                          >
+                            <HugeiconsIcon icon={Delete02Icon} className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                   </div>

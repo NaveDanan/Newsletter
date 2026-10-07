@@ -53,6 +53,7 @@ export function CommunitySearchScreen({ query, type }: CommunitySearchScreenProp
   );
 
   const list = useCommunityPosts(source, {
+    cacheKey: `search:${type}:${query}`,
     enabled: type === 'posts' && query.trim().length > 0,
     errorMessage: t('community.search.failed'),
   });

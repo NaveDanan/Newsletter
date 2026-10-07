@@ -57,6 +57,62 @@ test('uses the source publication date as article metadata instead of body text'
   }
 });
 
+test('imports English and Hebrew author labels while retaining existing bylines', async () => {
+  const cases = [
+    ['Author: Jane Doe', 'Jane Doe'],
+    ['author Jane Doe', 'Jane Doe'],
+    ['AUTHOR : Jane Doe', 'Jane Doe'],
+    ['מחבר: רוני גבאי', 'רוני גבאי'],
+    ['מחבר:רוני גבאי', 'רוני גבאי'],
+    ['מאת: רוני גבאי', 'רוני גבאי'],
+    ['By Jane Doe', 'Jane Doe'],
+    ['\u200fמחבר:\u200e Jane Doe', 'Jane Doe'],
+  ];
+  for (const [byline, expected] of cases) {
+    const [article] = await parseDocx(await fixture(p('Article', 'Heading1') + p(byline) + p('Article body')));
+    assert.equal(article.author, expected, byline);
+    assert.equal(article.subtitle, '', byline);
+    assert.match(article.content, /Article body/);
+  }
+});
+
+test('prefers the English name within a bilingual author line', async () => {
+  const cases = [
+    ['מחבר: רוני גבאי (Ronny Gabay)', 'Ronny Gabay'],
+    ['מחבר: רוני גבאי / Ronny Gabay', 'Ronny Gabay'],
+    ['Author: Ronny Gabay (רוני גבאי)', 'Ronny Gabay'],
+    ['מחבר: רוני גבאי | Author: Ronny Gabay', 'Ronny Gabay'],
+    ['מחבר: רוני גבאי Ronny Gabay', 'Ronny Gabay'],
+    ["Author: ג׳יין דו / Jane O’Connor-Smith", 'Jane O’Connor-Smith'],
+    ['Author: ז׳וזה / José da Silva', 'José da Silva'],
+  ];
+  for (const [byline, expected] of cases) {
+    const [article] = await parseDocx(await fixture(p('Article', 'Heading1') + p(byline) + p('Article body')));
+    assert.equal(article.author, expected, byline);
+  }
+});
+
+test('prefers an English byline across paragraphs and keeps authors scoped to each article', async () => {
+  const articles = await parseDocx(await fixture(
+    p('One', 'Heading1') + p('מחבר: רוני גבאי') + p('Author: Ronny Gabay') + p('Body one')
+    + p('Two', 'Heading1') + p('Author: Jane Doe') + p('מחבר: ג׳יין דו') + p('Body two')
+    + p('Three', 'Heading1') + p('מחבר: נועה כהן') + p('Body three')
+    + p('Four', 'Heading1') + p('The author discusses English and Hebrew names in this body.'),
+  ));
+  assert.deepEqual(articles.map((article) => article.author), ['Ronny Gabay', 'Jane Doe', 'נועה כהן', '']);
+});
+
+test('reads author labels split across Word runs and retains the preceding subtitle', async () => {
+  const byline = '<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Auth</w:t></w:r><w:r><w:t>or: </w:t></w:r><w:r><w:t>Jane Doe</w:t></w:r></w:p>';
+  const [article] = await parseDocx(await fixture(p('Article', 'Heading1') + p('Source subtitle') + byline + p('Body')));
+  assert.equal(article.author, 'Jane Doe');
+  assert.equal(article.subtitle, 'Source subtitle');
+  assert.doesNotMatch(article.content, /Source subtitle/);
+  const [hebrew] = await parseDocx(await fixture(p('כתבה', 'Heading1') + p('תקציר') + p('מחבר: נועה כהן') + p('תוכן')));
+  assert.equal(hebrew.author, 'נועה כהן');
+  assert.equal(hebrew.subtitle, 'תקציר');
+});
+
 test('extracts the source subtitle before metadata and aligns bidi paragraphs right', async () => {
   const rtlLeft = '<w:bidi w:val="1"/><w:jc w:val="left"/>';
   const [article] = await parseDocx(await fixture(p('כותרת', 'Heading1', rtlLeft) + p('תקציר הכתבה', '', rtlLeft) + p('פורסם: 2026-06-29 07:45:18 +0000') + p('מאת: כותב') + p('תוכן הכתבה', '', rtlLeft) + p('כותרת פנימית', 'Heading2')));
@@ -130,6 +186,18 @@ test('authenticates server-side, skips unchanged files and retries changed files
   assert.equal(repeat.documents.length, 0);
   assert.equal(repeat.skipped, 1);
   assert.equal(requests.length, 3);
+});
+
+test('scheduled DOCX fetches return the selected author for every imported newsletter', async () => {
+  const buffer = await fixture(
+    p('One', 'Heading1') + p('מחבר: רוני גבאי / Ronny Gabay') + p('Body one')
+    + p('Two', 'Heading1') + p('Author: Jane Doe') + p('Body two'),
+  );
+  const settings = { repositoryUrl: 'https://host/artifactory/repo', username: 'reader', token: 'test-token' };
+  const result = await collectDocuments(settings, async (url) => url.includes('/api/storage/')
+    ? Response.json({ files: [{ uri: '/newsletter.docx' }] }) : new Response(buffer));
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.documents[0].articles.map((article) => article.author), ['Ronny Gabay', 'Jane Doe']);
 });
 
 test('reports failures without credentials and rotates batches past failed documents', async () => {

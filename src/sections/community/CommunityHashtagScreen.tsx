@@ -21,7 +21,7 @@ export function CommunityHashtagScreen({ tag }: CommunityHashtagScreenProps) {
     [tag],
   );
 
-  const list = useCommunityPosts(source, { errorMessage: t('community.hashtag.failed') });
+  const list = useCommunityPosts(source, { cacheKey: `hashtag:${tag}`, errorMessage: t('community.hashtag.failed') });
 
   const actions = useCommunityEngagement({
     patchPost: list.patchPost,

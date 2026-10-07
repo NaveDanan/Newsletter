@@ -15,6 +15,20 @@ const escape = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;'
 const enabled = (node) => node && !['0', 'false', 'off', 'none'].includes(attr(node));
 const hebrew = (s) => /[\u0590-\u05ff]/.test(s);
 
+function sourceAuthor(text) {
+  const clean = text.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').trim();
+  const byline = clean.match(/^(?:author|by|מחבר|מאת)(?:\s*:\s*|\s+|$)(.*)$/iu);
+  if (!byline) return null;
+  const name = byline[1].replace(/(?:\b(?:author|by)|מחבר|מאת)\s*:\s*/giu, '').replace(/\s+/g, ' ').trim();
+  if (hebrew(name)) {
+    // A bilingual byline can put the English spelling before or after the
+    // Hebrew name, with parentheses, separators, or only whitespace.
+    const english = name.match(/\p{Script=Latin}[\p{Script=Latin}\p{Mark}]*(?:[ .'’‘-]+[\p{Script=Latin}\p{Mark}]+)*/u);
+    if (english) return english[0];
+  }
+  return name;
+}
+
 function xml(text) {
   if (/<!DOCTYPE|<!ENTITY/i.test(text)) throw new Error('DOCX contains unsupported XML declarations.');
   return new DOMParser({ onError: () => { throw new Error('DOCX contains invalid XML.'); } }).parseFromString(text, 'application/xml');
@@ -182,11 +196,13 @@ export async function parseDocx(buffer, filename = 'Newsletter.docx') {
     const afterTitle = nodes.slice(nodes.indexOf(titleNode) + 1).filter((n) => n.localName === 'p' && paragraphInfo(n).text.trim());
     const first = afterTitle[0] && paragraphInfo(afterTitle[0]);
     const next = afterTitle[1] && paragraphInfo(afterTitle[1]);
-    const isMetadata = (text) => Boolean(sourcePublicationDate(text)) || /^(מאת\s*:?|By\s|כתובת כתבה:)/i.test(text.trim());
+    const isMetadata = (text) => Boolean(sourcePublicationDate(text)) || sourceAuthor(text) !== null || /^כתובת כתבה:/i.test(text.trim());
     const subtitleNode = first && !first.heading && !first.title && !isMetadata(first.text)
       && (first.subtitle || (titleNode && next && isMetadata(next.text))) ? afterTitle[0] : null;
     const subtitle = subtitleNode ? paragraphInfo(subtitleNode).text.trim() : '';
     const publishedAt = infos.map((info) => sourcePublicationDate(info.text)).find(Boolean) || '';
+    const authors = infos.map((info) => sourceAuthor(info.text)).filter(Boolean);
+    const author = authors.find((name) => /\p{Script=Latin}/u.test(name)) || authors[0] || '';
     const contentNodes = nodes.filter((n) => {
       if (n === titleNode || n === subtitleNode) return false;
       const text = n.localName === 'p' ? paragraphInfo(n).text.trim() : '';
@@ -203,7 +219,7 @@ export async function parseDocx(buffer, filename = 'Newsletter.docx') {
       textAlignment: ['left', 'center', 'right'].includes(titleInfo?.align) ? titleInfo.align : rtl ? 'right' : 'left',
       coverImage: html.match(/<img src="([^"]+)"/)?.[1] || '',
       readTime: `${Math.max(1, Math.ceil(text.split(/\s+/).length / 200))} min`,
-      author: infos.find((i) => /^מאת\s*:?\s+/.test(i.text.trim()))?.text.trim().replace(/^מאת\s*:?\s+/, '') || '',
+      author,
     };
   }).filter(Boolean);
   if (!articles.length) throw new Error('DOCX has no article content.');

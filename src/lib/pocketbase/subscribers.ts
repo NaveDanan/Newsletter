@@ -1,5 +1,11 @@
 import type { Locale } from '@/locales/messages';
 import { getPocketBase } from './client';
+import { cachedRead, peekRead, readCache, readScope } from './read-cache';
+
+const STATS_KEY = '/api/newsletter/stats';
+export interface NewsletterStats { activeSubscribers: number; publishedNewsletters: number }
+export function getCachedNewsletterStats(): NewsletterStats | undefined { return peekRead(STATS_KEY, 300_000); }
+function invalidateStats(scope: string) { readCache.invalidate(scope + STATS_KEY); }
 
 interface SubscribeToNewsletterInput {
   email: string;
@@ -32,6 +38,8 @@ function isClientResponseError(error: unknown): error is { response?: { message?
 export async function subscribeToNewsletter({ email, locale, source = 'sidebar' }: SubscribeToNewsletterInput): Promise<'subscribed' | 'already_subscribed'> {
   const pb = getPocketBase();
 
+  const scope = readScope();
+  invalidateStats(scope);
   try {
     const result = await pb.send<SubscribeToNewsletterResponse>('/api/newsletter/subscribe', {
       method: 'POST',
@@ -52,12 +60,14 @@ export async function subscribeToNewsletter({ email, locale, source = 'sidebar' 
     }
 
     throw error;
-  }
+  } finally { invalidateStats(scope); }
 }
 
 export async function unsubscribeFromNewsletter({ subscriberId, email }: UnsubscribeFromNewsletterInput): Promise<'unsubscribed' | 'already_unsubscribed'> {
   const pb = getPocketBase();
 
+  const scope = readScope();
+  invalidateStats(scope);
   try {
     const result = await pb.send<UnsubscribeFromNewsletterResponse>('/api/newsletter/unsubscribe', {
       method: 'POST',
@@ -77,15 +87,19 @@ export async function unsubscribeFromNewsletter({ subscriberId, email }: Unsubsc
     }
 
     throw error;
-  }
+  } finally { invalidateStats(scope); }
+}
+
+export function fetchNewsletterStats({ force = false } = {}): Promise<NewsletterStats> {
+  return cachedRead(STATS_KEY, async () => {
+    const result = await getPocketBase().send<NewsletterStatsResponse>(STATS_KEY, { method: 'GET', requestKey: null });
+    return {
+      activeSubscribers: typeof result?.activeSubscribers === 'number' ? result.activeSubscribers : 0,
+      publishedNewsletters: typeof result?.publishedNewsletters === 'number' ? result.publishedNewsletters : 0,
+    };
+  }, { force });
 }
 
 export async function fetchActiveSubscriberCount(): Promise<number> {
-  const pb = getPocketBase();
-  const result = await pb.send<NewsletterStatsResponse>('/api/newsletter/stats', {
-    method: 'GET',
-    requestKey: null,
-  });
-
-  return typeof result?.activeSubscribers === 'number' ? result.activeSubscribers : 0;
+  return (await fetchNewsletterStats()).activeSubscribers;
 }

@@ -2,6 +2,9 @@ import { type ReactNode, useState, useEffect } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { Home, Compass, Plus, Bell, User, Wifi, Battery, Signal } from 'lucide-react';
 import { UserAvatarCircle } from '@/components/UserAvatarCircle';
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
+import { useLocale } from '@/contexts/LocaleContext';
+import { preloadRoute } from '@/lib/preload-route';
 
 interface AppStageShellProps {
   children: ReactNode;
@@ -30,6 +33,7 @@ export function AppStageShell({
   fullViewport = false,
 }: AppStageShellProps) {
   const { deviceMode } = useTheme();
+  const { t } = useLocale();
   const [currentTime, setCurrentTime] = useState('9:41');
   const navigate = (action: () => void) => {
     if (onNavigate) onNavigate(action);
@@ -49,7 +53,7 @@ export function AppStageShell({
   }, []);
 
   return (
-    <div className={`${fullViewport ? 'app-stage-full' : ''} min-h-screen flex flex-col items-center justify-start py-4 px-2 sm:px-4 md:py-6 max-md:!p-0 transition-colors`}>
+    <div className={`${fullViewport ? 'app-stage-full' : 'py-4 px-2 sm:px-4 md:py-6 max-md:!p-0'} min-h-screen flex flex-col items-center justify-start transition-colors`}>
       {/* Main Stage */}
       <div className={`device-stage mode-${deviceMode} w-full`}>
         <div className="app-window" id="app-window">
@@ -113,22 +117,20 @@ export function AppStageShell({
               <Plus className="size-5 stroke-[2.5]" />
             </button>
 
-            <button
-              type="button"
-              className={`mobile-nav-btn ${activeTab === 'community' ? 'active' : ''}`}
-              title="Community"
-              onClick={() => navigate(() => {
-                onCommunityClick?.();
-              })}
-            >
+            {user ? <NotificationDropdown onNavigate={onNavigate} trigger={
+              <button type="button" className="mobile-nav-btn" title={t('community.notifications.title')} aria-label={t('community.notifications.title')}>
+                <Bell className="size-5" />
+              </button>
+            } /> : <button type="button" className="mobile-nav-btn" title="Community" onClick={() => navigate(() => onCommunityClick?.())}>
               <Bell className="size-5" />
-              {activeTab === 'community' && <span className="mobile-nav-dot" />}
-            </button>
+            </button>}
 
             <button
               type="button"
               className={`mobile-nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
               title="Profile"
+              onPointerEnter={() => preloadRoute(user ? '/profile' : '/sign-in')}
+              onFocus={() => preloadRoute(user ? '/profile' : '/sign-in')}
               onClick={() => navigate(() => {
                 onProfileClick?.();
               })}

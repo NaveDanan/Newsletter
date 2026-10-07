@@ -1,22 +1,16 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { BarChartIcon, Calendar01Icon, Cancel01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Menu01Icon, Shield01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
+import { BarChartIcon, Calendar01Icon, FileAttachmentIcon, FileSpreadsheetIcon, Link01Icon, Shield01Icon, Target01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
 import { useEffect, useRef, useState } from 'react';
-import { AccountMenu } from '@/components/AccountMenu';
+import { ManagerHeader } from '@/components/ManagerHeader';
 import { AppStageShell } from '@/components/AppStageShell';
-import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSubscriberCount } from '@/hooks/useSubscriberCount';
 import { cn } from '@/lib/utils';
-import { ProjectView } from './manager/ProjectView';
-import { GoalsView } from './manager/GoalsView';
-import { GanttView } from './manager/GanttView';
-import { LinksView } from './manager/LinksView';
-import { SpreadsheetView } from './manager/SpreadsheetView';
-import { ScheduledView } from './manager/ScheduledView';
-import { CommunityModerationView } from './manager/CommunityModerationView';
 import { NewsletterList } from './manager/NewsletterList';
-import { NewsletterEditor, type NewsletterEditorHandle } from './manager/NewsletterEditor';
-import { NewsletterViewer } from './NewsletterViewer';
+import type { NewsletterEditorHandle } from './manager/NewsletterEditor';
+import { lazyComponent } from '@/lib/lazy-component';
+import { prefetchNewsletter } from '@/lib/pocketbase/newsletters';
+import { prefetchProjects } from '@/lib/pocketbase/projects';
 import {
   canAccessManagerTab,
   canCreateNewsletter,
@@ -36,10 +30,27 @@ import {
 import type { PocketBaseUser, UserRole } from '@/lib/pocketbase/client';
 import type { Newsletter, NewsletterComment, NewsletterFormData } from '../types/newsletter';
 
+const ProjectView = lazyComponent(() => import('./manager/ProjectView').then((module) => ({ default: module.ProjectView })));
+const GoalsView = lazyComponent(() => import('./manager/GoalsView').then((module) => ({ default: module.GoalsView })));
+const GanttView = lazyComponent(() => import('./manager/GanttView').then((module) => ({ default: module.GanttView })));
+const LinksView = lazyComponent(() => import('./manager/LinksView').then((module) => ({ default: module.LinksView })));
+const SpreadsheetView = lazyComponent(() => import('./manager/SpreadsheetView').then((module) => ({ default: module.SpreadsheetView })));
+const ScheduledView = lazyComponent(() => import('./manager/ScheduledView').then((module) => ({ default: module.ScheduledView })));
+const CommunityModerationView = lazyComponent(() => import('./manager/CommunityModerationView').then((module) => ({ default: module.CommunityModerationView })));
+const NewsletterEditor = lazyComponent(() => import('./manager/NewsletterEditor').then((module) => ({ default: module.NewsletterEditor })));
+const NewsletterViewer = lazyComponent(() => import('./NewsletterViewer').then((module) => ({ default: module.NewsletterViewer })));
+
+const tabComponents = { projects: ProjectView, goals: GoalsView, gantt: GanttView, spreadsheet: SpreadsheetView, links: LinksView, scheduled: ScheduledView, community: CommunityModerationView };
+function prepareTab(tab: Tab) {
+  if (tab !== 'newsletters') tabComponents[tab].preload();
+  if (tab === 'projects' || tab === 'goals' || tab === 'gantt' || tab === 'spreadsheet') prefetchProjects();
+}
+
 export type Tab = 'newsletters' | 'projects' | 'goals' | 'gantt' | 'spreadsheet' | 'links' | 'scheduled' | 'community';
 type ViewMode = 'list' | 'editor' | 'viewer';
 
 interface ManagerDashboardProps {
+  hasNewsletterList?: boolean;
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
   onOpenGanttEditor: (projectId: string) => void;
@@ -51,6 +62,7 @@ interface ManagerDashboardProps {
   currentUser: PocketBaseUser | null;
   currentUserRole: UserRole | null;
   newsletters: Newsletter[];
+  loadNewsletter: (id: string) => Promise<Newsletter | null>;
   addNewsletter: (data: NewsletterFormData) => Promise<Newsletter | null> | Newsletter | null;
   upsertDraftNewsletter: (id: string | null, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
   updateNewsletter: (id: string, data: Partial<NewsletterFormData>) => Promise<Newsletter | null> | Newsletter | null;
@@ -76,6 +88,8 @@ export function ManagerDashboard({
   currentUser,
   currentUserRole,
   newsletters,
+  hasNewsletterList = false,
+  loadNewsletter,
   addNewsletter,
   upsertDraftNewsletter,
   updateNewsletter,
@@ -90,7 +104,7 @@ export function ManagerDashboard({
 }: ManagerDashboardProps) {
   const { formatNumber, isRTL, t } = useLocale();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const { subscriberCount } = useSubscriberCount();
+  const { subscriberCount, publishedNewsletterCount: statsPublishedCount } = useSubscriberCount();
   const [editingNewsletter, setEditingNewsletter] = useState<Newsletter | null>(null);
   const [viewingNewsletter, setViewingNewsletter] = useState<Newsletter | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -99,6 +113,7 @@ export function ManagerDashboard({
   const editorRef = useRef<NewsletterEditorHandle | null>(null);
   const pendingLeaveActionRef = useRef<(() => void) | null>(null);
   const isMountedRef = useRef(false);
+  const openRequestRef = useRef(0);
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -109,7 +124,18 @@ export function ManagerDashboard({
   const activeViewingNewsletter = viewingNewsletter
     ? newsletters.find((newsletter) => newsletter.id === viewingNewsletter.id) ?? null
     : null;
-  const publishedNewsletterCount = newsletters.filter((newsletter) => newsletter.status === 'published').length;
+  const viewingId = activeViewingNewsletter?.id;
+  const viewingVersion = activeViewingNewsletter?.updatedAt;
+  const viewingIsSummary = activeViewingNewsletter?.contentLoaded === false;
+  useEffect(() => {
+    if (viewMode !== 'viewer' || !viewingId || !viewingIsSummary) return;
+    let cancelled = false;
+    void loadNewsletter(viewingId).then((full) => { if (full && !cancelled) setViewingNewsletter(full); });
+    return () => { cancelled = true; };
+  }, [loadNewsletter, viewMode, viewingId, viewingIsSummary, viewingVersion]);
+  const publishedNewsletterCount = hasNewsletterList
+    ? newsletters.filter((newsletter) => newsletter.status === 'published').length
+    : statsPublishedCount ?? newsletters.filter((newsletter) => newsletter.status === 'published').length;
 
   const tabs = [
     { id: 'newsletters' as Tab, label: t('manager.newsletters'), icon: FileAttachmentIcon },
@@ -127,16 +153,32 @@ export function ManagerDashboard({
       return;
     }
 
+    openRequestRef.current++;
+    NewsletterEditor.preload();
     setEditingNewsletter(null);
     setViewMode('editor');
   };
 
-  const handleEditNewsletter = (newsletter: Newsletter) => {
+  const handleEditNewsletter = async (newsletter: Newsletter) => {
+    const request = ++openRequestRef.current;
+    NewsletterEditor.preload();
+    if (newsletter.contentLoaded === false) {
+      const full = await loadNewsletter(newsletter.id);
+      if (full && isMountedRef.current && request === openRequestRef.current) { setEditingNewsletter(full); setViewMode('editor'); }
+      return;
+    }
     setEditingNewsletter(newsletter);
     setViewMode('editor');
   };
 
-  const handleViewNewsletter = (newsletter: Newsletter) => {
+  const handleViewNewsletter = async (newsletter: Newsletter) => {
+    const request = ++openRequestRef.current;
+    NewsletterViewer.preload();
+    if (newsletter.contentLoaded === false) {
+      const full = await loadNewsletter(newsletter.id);
+      if (full && isMountedRef.current && request === openRequestRef.current) { setViewingNewsletter(full); setViewMode('viewer'); }
+      return;
+    }
     setViewingNewsletter(newsletter);
     setViewMode('viewer');
   };
@@ -192,6 +234,7 @@ export function ManagerDashboard({
   };
 
   const handleBackToList = () => {
+    openRequestRef.current++;
     setViewMode('list');
     setEditingNewsletter(null);
     setViewingNewsletter(null);
@@ -277,6 +320,8 @@ export function ManagerDashboard({
             onDelete={handleDeleteNewsletter}
             onSendUpdate={handleSendNewsletterUpdate}
             onView={handleViewNewsletter}
+            onEditIntent={(newsletter) => { NewsletterEditor.preload(); prefetchNewsletter(newsletter.id); }}
+            onViewIntent={(newsletter) => { NewsletterViewer.preload(); prefetchNewsletter(newsletter.id); }}
             onTogglePublish={handleTogglePublish}
             canCreate={canCreateNewsletter(currentUserRole)}
             canEdit={(newsletter) => canEditNewsletter(currentUserRole, currentUser?.id, newsletter)}
@@ -294,6 +339,8 @@ export function ManagerDashboard({
           onDelete={handleDeleteNewsletter}
           onSendUpdate={handleSendNewsletterUpdate}
           onView={handleViewNewsletter}
+          onEditIntent={(newsletter) => { NewsletterEditor.preload(); prefetchNewsletter(newsletter.id); }}
+          onViewIntent={(newsletter) => { NewsletterViewer.preload(); prefetchNewsletter(newsletter.id); }}
           onTogglePublish={handleTogglePublish}
           canCreate={canCreateNewsletter(currentUserRole)}
           canEdit={(newsletter) => canEditNewsletter(currentUserRole, currentUser?.id, newsletter)}
@@ -373,45 +420,17 @@ export function ManagerDashboard({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Top bar */}
-      <header className="sticky top-0 z-50 bg-[var(--bg-app)]/90 backdrop-blur-md border-b border-[var(--border-subtle)]">
-        <div className="flex items-center justify-between px-4 lg:px-8 h-16">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
-              aria-label={showMobileMenu ? t('nav.closeMenu') : t('nav.openMenu')}
-              className="lg:hidden p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]"
-            >
-              {showMobileMenu ? <HugeiconsIcon icon={Cancel01Icon} className="w-5 h-5" /> : <HugeiconsIcon icon={Menu01Icon} className="w-5 h-5" />}
-            </button>
-            <button
-              onClick={() => requestLeaveEditor(onHomeClick)}
-              className="flex items-center gap-3 group text-start"
-            >
-              <div className="brand-logo group-hover:scale-105 transition-transform">
-                <img 
-                  src="/logo.gif" 
-                  alt="AI-BREAK" 
-                  className="w-7 h-7 object-contain rounded-lg"
-                />
-              </div>
-              <span className="font-extrabold text-base sm:text-lg text-[var(--text-primary)] tracking-tight">AI-BREAK</span>
-            </button>
-            <span className="text-[var(--border-highlight)] hidden sm:inline">|</span>
-            <span className="text-xs font-bold text-[var(--primary-accent)] uppercase tracking-wider hidden sm:inline">{t('manager.dashboard')}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <LanguageToggleButton compact />
-            <AccountMenu
-              showManagerItem={false}
-              onProfileClick={onProfileClick}
-              onManagerClick={onHomeClick}
-              onSignOut={onLogout}
-              onNavigate={requestLeaveEditor}
-            />
-          </div>
-        </div>
-      </header>
+      <ManagerHeader
+        title={t('manager.dashboard')}
+        onHomeClick={onHomeClick}
+        onProfileClick={onProfileClick}
+        onManagerClick={onHomeClick}
+        onSignOut={onLogout}
+        onNavigate={requestLeaveEditor}
+        onToggleMenu={() => setShowMobileMenu(!showMobileMenu)}
+        menuOpen={showMobileMenu}
+        showManagerItem={false}
+      />
 
       <div className="flex">
         {/* Sidebar */}
@@ -424,6 +443,8 @@ export function ManagerDashboard({
             {tabs.map((tab) => (
               <button
                 key={tab.id}
+                onPointerEnter={() => prepareTab(tab.id)}
+                onFocus={() => prepareTab(tab.id)}
                 onClick={() => {
                   requestLeaveEditor(() => {
                     onTabChange(tab.id);
@@ -478,7 +499,7 @@ export function ManagerDashboard({
         {/* Main content */}
         <main className="min-w-0 flex-1 p-4 lg:p-8">
           {/* View content */}
-          <div className="min-w-0 animate-in fade-in duration-300">
+          <div className="min-w-0" data-manager-tab={activeTab}>
             {renderContent()}
           </div>
         </main>

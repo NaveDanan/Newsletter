@@ -6,8 +6,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
-import ExcelJS, { type Worksheet } from 'exceljs';
+import type ExcelJS from 'exceljs';
+import type { Worksheet } from 'exceljs';
 import { format, parseISO, eachDayOfInterval, differenceInCalendarDays, startOfDay, isToday } from 'date-fns';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useProjects } from '@/hooks/useProjects';
@@ -50,7 +50,7 @@ function toExcelDate(value: unknown): Date | null {
   return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
 }
 
-function fromExcelDate(value: unknown): string {
+function fromExcelDate(value: unknown, XLSX: typeof import('xlsx')): string {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return format(value, 'yyyy-MM-dd');
   }
@@ -531,6 +531,9 @@ export function SpreadsheetView() {
   // ── ExcelJS Export ────────────────────────────────────────────────────────
 
   const handleExport = useCallback(async () => {
+    let ExcelJS: typeof import('exceljs');
+    try { ({ default: ExcelJS } = await import('exceljs')); }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Export failed'); return; }
     const toExport = selectedProject ? [selectedProject] : projects;
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Pulse AI';
@@ -747,7 +750,7 @@ export function SpreadsheetView() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const buf = await file.arrayBuffer();
+      const [buf, XLSX] = await Promise.all([file.arrayBuffer(), import('xlsx')]);
       const wb = XLSX.read(buf, { type: 'array', cellFormula: true, cellDates: true, dateNF: EXCEL_DATE_FORMAT });
 
       // Build row→title map from Projects sheet for formula resolution
@@ -845,8 +848,8 @@ export function SpreadsheetView() {
           return normalizeTask({
             id,
             name:         String(r['Task Name']      ?? 'Task'),
-            startDate:    fromExcelDate(r['Start Date']),
-            endDate:      fromExcelDate(r['End Date']),
+            startDate:    fromExcelDate(r['Start Date'], XLSX),
+            endDate:      fromExcelDate(r['End Date'], XLSX),
             durationDays: parseInt(String(r['Duration (Days)'] ?? '1')) || 1,
             progress:     parseInt(String(r['Progress (%)']    ?? '0')) || 0,
             status:       parseTaskStatus(String(r['Status']   ?? 'pending')),

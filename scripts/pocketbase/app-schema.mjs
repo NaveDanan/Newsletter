@@ -42,6 +42,7 @@ export const NEWSLETTERS_SCHEMA = {
     text('title', 10000),
     text('subtitle', 10000),
     text('content', 20000000),
+    text('searchText', 20000000, { hidden: true }),
     text('excerpt', 20000000),
     text('author'),
     text('authorAvatar', 20000000),

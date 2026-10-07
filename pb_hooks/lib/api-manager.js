@@ -694,6 +694,15 @@ function createRecord(app, collectionName, values) {
 }
 
 function handleNewsletterList(e) {
+  if (getQueryValue(e, 'view', '') === 'summary' && typeof e.app.store === 'function') {
+    var key = $security.sha256(JSON.stringify({ query: e.requestInfo().query, user: getAuthId(e.auth), role: getRole(e.auth) }));
+    var result = require(__hooks + '/lib/newsletter-read-cache.js').read(e.app, key, function () { return newsletterListData(e); });
+    return e.json(200, result);
+  }
+  return e.json(200, newsletterListData(e));
+}
+
+function newsletterListData(e) {
   var requestedStatus = getQueryValue(e, 'status', '');
   if (requestedStatus) {
     assertStatus(requestedStatus, NEWSLETTER_STATUSES, 'newsletter');
@@ -714,15 +723,129 @@ function handleNewsletterList(e) {
     filters.push('(status = "published" || createdById = "' + getAuthId(e.auth) + '")');
   }
 
-  var all = listRecords(e.app, 'newsletters', filters.join(' && '), sort, 0, 0);
-  var items = all.slice((page - 1) * perPage, page * perPage).map(serializeRecord);
-  return e.json(200, {
+  var filter = filters.join(' && ') || 'id != ""';
+  // These predicates are constructed above from validated statuses and record
+  // IDs. Record filters use &&/||; dbx expressions use SQL AND/OR.
+  var total = e.app.countRecords('newsletters', $dbx.exp(filter.replace(/&&/g, ' AND ').replace(/\|\|/g, ' OR ')));
+  var summary = getQueryValue(e, 'view', '') === 'summary';
+  var rows = summary ? listNewsletterSummaries(e.app, filter, sort, perPage, (page - 1) * perPage)
+    : listRecords(e.app, 'newsletters', filter, sort, perPage, (page - 1) * perPage);
+  var items = rows.map(summary ? serializeNewsletterSummary : serializeRecord);
+  return {
     page: page,
     perPage: perPage,
-    totalItems: all.length,
-    totalPages: Math.ceil(all.length / perPage),
+    totalItems: total,
+    totalPages: Math.ceil(total / perPage),
     items: items,
-  });
+  };
+}
+
+function readableNewsletterText(content) {
+  content = String(content || '');
+  var fragments = [], cursor = 0;
+  while (cursor < content.length) {
+    var open = content.indexOf('<', cursor);
+    if (open < 0) { fragments.push(content.slice(cursor)); break; }
+    fragments.push(content.slice(cursor, open));
+    var close = content.indexOf('>', open);
+    if (close < 0) { fragments.push(content.slice(open)); break; }
+    cursor = close + 1;
+  }
+  return fragments.join(' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function listNewsletterSummaries(app, filter, sort, limit, offset) {
+  if (typeof app.recordQuery !== 'function') return listRecords(app, 'newsletters', filter, sort, limit, offset);
+  try {
+    var collection = app.findCollectionByNameOrId('newsletters');
+    if (!collection.fields.getByName('searchText')) return listRecords(app, 'newsletters', filter, sort, limit, offset);
+    var columns = ['id', 'created', 'updated', 'title', 'subtitle', 'author', 'authorAvatar', 'createdById', 'publishedAt', 'textAlignment', 'searchText', 'status', 'tags', 'likes', 'comments', 'shares', 'likedByUserIds', 'bookmarkedByUserIds', 'poll', 'event', 'hasAudio', 'audioDuration'];
+    columns = columns.filter(function (name) { return name === 'id' || Boolean(collection.fields.getByName(name)); });
+    var embeddedCover = ['png', 'jpeg', 'jpg', 'gif', 'webp', 'avif'].map(function (type) {
+      var prefix = 'data:image/' + type + ';base64,';
+      return "lower(substr(coverImage, 1, " + prefix.length + ")) = '" + prefix + "'";
+    }).join(' OR ');
+    columns.push("CASE WHEN (" + embeddedCover + ") THEN '/api/newsletters/' || id || '/cover?v=' || updated ELSE coverImage END AS coverImage");
+    var order = String(sort).split(',').map(function (term) {
+      var name = term.replace(/^[-+]/, '');
+      if (!/^[a-zA-Z0-9_]+$/.test(name) || (name !== 'id' && !collection.fields.getByName(name))) throw new BadRequestError('Unknown newsletter sort field.');
+      return name + ' ' + (term[0] === '-' ? 'DESC' : 'ASC');
+    });
+    var records = arrayOf(new Record(collection));
+    var query = app.recordQuery(collection);
+    query.select.apply(query, columns).andWhere($dbx.exp(filter.replace(/&&/g, ' AND ').replace(/\|\|/g, ' OR ')));
+    query.orderBy.apply(query, order).limit(limit).offset(offset).all(records);
+    return records;
+  } catch (error) {
+    // Older standalone deployments keep functioning until their schema sync.
+    if (typeof app.recordQuery === 'function') throw error;
+    return listRecords(app, 'newsletters', filter, sort, limit, offset);
+  }
+}
+
+function serializeNewsletterSummary(record) {
+  var value = serializeRecord(record);
+  var text = String(getRecordValue(record, 'searchText') || '') || readableNewsletterText(value.content);
+  value.searchText = text;
+  value.excerpt = text ? text.slice(0, 200) + '...' : '';
+  value.readTime = Math.max(1, Math.ceil((text ? text.split(/\s+/).length : 0) / 200)) + ' min read';
+  value.contentLoaded = false;
+  if (/^data:image\/(?:png|jpe?g|gif|webp|avif);base64,/i.test(value.coverImage || '')) {
+    value.coverImage = '/api/newsletters/' + encodeURIComponent(record.id) + '/cover?v=' + encodeURIComponent(value.updated || value.created || '');
+  }
+  delete value.content;
+  delete value.commentItems;
+  delete value.presentationPreviewManifest;
+  delete value.presentationFiles;
+  return value;
+}
+
+function handleNewsletterCover(e) {
+  var record = findRecord(e.app, 'newsletters', getPathValue(e, 'id'));
+  if (!canReadNewsletter(e.auth, record)) throw new ForbiddenError('Newsletter access denied.');
+  var match = String(getRecordValue(record, 'coverImage') || '').match(/^data:(image\/(?:png|jpe?g|gif|webp|avif));base64,([A-Za-z0-9+/=\s]+)$/i);
+  if (!match) throw new NotFoundError('Embedded newsletter cover not found.');
+  var header = e.response.header();
+  var etag = '"cover-' + record.id + '-' + $security.sha256(match[2]) + '"';
+  header.set('Cache-Control', 'private, max-age=0, must-revalidate');
+  header.set('ETag', etag);
+  header.set('X-Content-Type-Options', 'nosniff');
+  if (e.request.header.get('If-None-Match') === etag) return e.noContent(304);
+  try {
+    // Decode once with Node's native base64 decoder, then stream the binary
+    // with PocketBase's native reader. The original newsletter stays intact.
+    var directory = $filepath.join(e.app.dataDir(), 'newsletter-cover-cache');
+    $os.mkdirAll(directory, 448);
+    var key = $security.sha256(etag);
+    var filename = $filepath.join(directory, key);
+    try { $os.stat(filename); } catch (_) {
+      var input = $filepath.join(directory, key + '-' + $security.randomString(12) + '.input');
+      $os.writeFile(input, match[2], 384);
+      try {
+        var worker = String($os.getenv('APP_ROOT') || __hooks + '/..') + '/scripts/pocketbase/newsletter-cover.mjs';
+        $os.cmd(String($os.getenv('NODE_BINARY') || 'node'), worker, input, filename).output();
+      } finally { try { $os.remove(input); } catch (_) { /* Already removed. */ } }
+    }
+  } catch (_) { /* Standalone PocketBase without Node can use the JS decoder. */ }
+  if (typeof filename !== 'undefined') {
+    try { $os.stat(filename); } catch (_) { filename = undefined; }
+    if (filename) {
+      header.set('Content-Type', match[1].toLowerCase().replace('image/jpg', 'image/jpeg'));
+      return e.fileFS($os.dirFS(directory), key);
+    }
+  }
+  // PocketBase's JSVM has no browser atob. Decode directly into the byte array
+  // accepted by RequestEvent.blob, keeping large images out of list JSON.
+  var alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  var encoded = match[2].replace(/\s+/g, '');
+  var bytes = [], bits = 0, buffer = 0;
+  for (var index = 0; index < encoded.length; index++) {
+    if (encoded[index] === '=') break;
+    buffer = (buffer << 6) | alphabet.indexOf(encoded[index]);
+    bits += 6;
+    if (bits >= 8) { bits -= 8; bytes.push((buffer >> bits) & 255); }
+  }
+  return e.blob(200, match[1].toLowerCase().replace('image/jpg', 'image/jpeg'), bytes);
 }
 
 function handleNewsletterCreate(e) {
@@ -794,6 +917,10 @@ function registerNewsletterRoutes(routerAdd, appApis) {
 
   routerAdd('GET', '/api/newsletters/{id}', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleNewsletterGet(e);
+  }, appApis.skipSuccessActivityLog());
+
+  routerAdd('GET', '/api/newsletters/{id}/cover', function (e) {
+    return require(__hooks + '/lib/api-manager.js').handleNewsletterCover(e);
   }, appApis.skipSuccessActivityLog());
 
   routerAdd('PATCH', '/api/newsletters/{id}', function (e) {
@@ -1073,6 +1200,8 @@ module.exports = {
   handleNewsletterList: handleNewsletterList,
   handleNewsletterCreate: handleNewsletterCreate,
   handleNewsletterGet: handleNewsletterGet,
+  handleNewsletterCover: handleNewsletterCover,
+  readableNewsletterText: readableNewsletterText,
   handleNewsletterPatch: handleNewsletterPatch,
   handleNewsletterDelete: handleNewsletterDelete,
   handleNewsletterMakePublic: handleNewsletterMakePublic,

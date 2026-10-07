@@ -1,3 +1,5 @@
+import { preloadRoute } from '@/lib/preload-route';
+import { warmHomeNavigation } from '@/lib/navigation-warmup';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Navigation } from './components/Navigation';
 import { HeroBanner } from './sections/HeroBanner';
@@ -5,17 +7,7 @@ import { PopularArticles } from './sections/PopularArticles';
 import { LatestArticles } from './sections/LatestArticles';
 import { OurWriters } from './sections/OurWriters';
 import { Sidebar } from './sections/Sidebar';
-import { ManagerDashboard, type Tab as ManagerTab } from './sections/ManagerDashboard';
-import { GanttEditorPage } from './sections/manager/GanttEditorPage';
-import { NewsletterViewer } from './sections/NewsletterViewer';
-import { ProfilePage } from './sections/ProfilePage';
-import { UnsubscribePage } from './sections/UnsubscribePage';
-import { PasswordResetPage } from './components/auth/PasswordResetPage';
-import { VerifyEmailPage } from './components/auth/VerifyEmailPage';
-import { SignIn } from './components/auth/SignIn';
-import { SSOCallback } from './components/auth/SSOCallback';
-import { MigratePage } from './sections/MigratePage';
-import { CommunityPage } from './sections/community/CommunityPage';
+import type { Tab as ManagerTab } from './sections/ManagerDashboard';
 import { useAuth } from './contexts/AuthContext';
 import { useLocale } from './contexts/LocaleContext';
 import { useNewsletters } from './hooks/useNewsletters';
@@ -28,6 +20,12 @@ import { Toaster } from 'sonner';
 import { toast } from 'sonner';
 import type { Newsletter } from './types/newsletter';
 import './App.css';
+import { queueComposeRequest } from './sections/community/compose-request';
+import { prefetchNewsletter } from './lib/pocketbase/newsletters';
+
+import { ManagerDashboard, GanttEditorPage, NewsletterViewer, ProfilePage, UnsubscribePage, PasswordResetPage, VerifyEmailPage, SignIn, SSOCallback, MigratePage, CommunityPage } from '@/lib/route-components';
+
+preloadRoute(window.location.pathname);
 
 export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'verify-email' | 'sso-callback' | 'gantt-editor' | 'migrate' | 'unsubscribe' | 'community' | 'profile';
 
@@ -84,7 +82,7 @@ function matchesNewsletterSearch(newsletter: Newsletter, query: string): boolean
     newsletter.excerpt,
     newsletter.author,
     newsletter.tags.join(' '),
-    newsletter.content,
+    newsletter.searchText ?? newsletter.content,
   ].join(' '));
 
   return normalizedQuery
@@ -234,6 +232,8 @@ function App() {
   const userRole = user?.role ?? null;
   const {
     newsletters,
+    hasNewsletterList,
+    loadNewsletter,
     isLoaded: areNewslettersLoaded,
     refreshNewsletters,
     addNewsletter,
@@ -251,15 +251,21 @@ function App() {
   } = useNewsletters({
     currentUser: user,
     currentUserRole: userRole,
-    enabled: currentRoute.view !== 'migrate' && currentRoute.view !== 'community',
+    enabled: currentRoute.view === 'home' || currentRoute.view === 'article' || (currentRoute.view === 'manager' && currentRoute.managerSection === 'newsletters'),
+    articleId: currentRoute.view === 'article' ? currentRoute.articleId : undefined,
   });
   const [searchQuery, setSearchQuery] = useState('');
   const managerToastRouteRef = useRef<string | null>(null);
   const appReadyRef = useRef(false);
   const toasterPosition = isRTL ? 'top-left' : 'top-right';
-  const publishedNewsletters = newsletters
+  const publishedNewsletters = useMemo(() => newsletters
     .filter((newsletter) => newsletter.status === 'published')
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()), [newsletters]);
+  const featuredArticleId = publishedNewsletters[0]?.id;
+  useEffect(() => {
+    if (currentRoute.view !== 'home' || !areNewslettersLoaded || !featuredArticleId) return;
+    return warmHomeNavigation(featuredArticleId);
+  }, [currentRoute.view, areNewslettersLoaded, featuredArticleId, user?.id, userRole]);
   const trimmedSearchQuery = searchQuery.trim();
   const filteredNewsletters = trimmedSearchQuery
     ? publishedNewsletters.filter((newsletter) => matchesNewsletterSearch(newsletter, trimmedSearchQuery))
@@ -273,6 +279,7 @@ function App() {
 
   const navigateTo = useCallback((pathname: string, { replace = false }: { replace?: boolean } = {}) => {
     const nextRoute = resolveRoute(pathname);
+    preloadRoute(nextRoute.pathname);
     const historyMethod = replace ? 'replaceState' : 'pushState';
 
     bootLogger.step('router', 'Navigation requested', {
@@ -471,9 +478,14 @@ function App() {
     navigateTo(`/gantt-editor/${encodeURIComponent(projectId)}`);
   }, [navigateTo]);
 
-  const handleArticleClick = (article: Newsletter) => {
+  const handleArticleClick = useCallback((article: Newsletter) => {
     navigateTo(getArticlePath(article));
-  };
+  }, [navigateTo]);
+
+  const handleArticleIntent = useCallback((article: Newsletter) => {
+    NewsletterViewer.preload();
+    prefetchNewsletter(article.id);
+  }, []);
 
   const handleBackToHome = () => {
     setSearchQuery('');
@@ -496,9 +508,7 @@ function App() {
   // Posts are only ever created in the community, so the home card routes there.
   const handleQuickCompose = (files?: File[]) => {
     navigateTo('/community');
-    window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('community:compose', { detail: { files } }));
-    }, 0);
+    queueComposeRequest(files);
   };
 
   const handleRequireAuth = () => {
@@ -659,7 +669,7 @@ function App() {
 
   // Render manager dashboard and manager-only editor
   if (currentRoute.view === 'manager' || currentRoute.view === 'gantt-editor') {
-    if (isAuthLoading) {
+    if (isAuthLoading && !isUserAuthenticated) {
       return (
         <AppStageShell
           activeTab="manager"
@@ -741,6 +751,8 @@ function App() {
           currentUser={user}
           currentUserRole={userRole}
           newsletters={newsletters}
+          hasNewsletterList={hasNewsletterList}
+          loadNewsletter={loadNewsletter}
           addNewsletter={addNewsletter}
           upsertDraftNewsletter={upsertDraftNewsletter}
           updateNewsletter={updateNewsletter}
@@ -859,7 +871,7 @@ function App() {
   }
 
   if (currentRoute.view === 'profile') {
-    if (isAuthLoading) {
+    if (isAuthLoading && !isUserAuthenticated) {
       return <div className="min-h-screen bg-[var(--bg-app)]" />;
     }
 
@@ -878,7 +890,7 @@ function App() {
       >
         <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
           <Toaster position={toasterPosition} richColors />
-          <ProfilePage onBack={handleProfileBack} />
+          <ProfilePage onBack={handleProfileBack} onHomeClick={handleHomeClick} onProfileClick={handleProfileClick} onManagerClick={handleManagerClick} onSignOut={handleUserLogout} />
         </div>
       </AppStageShell>
     );
@@ -972,6 +984,7 @@ function App() {
             <HeroBanner
               featuredNewsletter={publishedNewsletters[0] ?? null}
               onArticleClick={handleArticleClick}
+              onArticleIntent={handleArticleIntent}
             />
           ) : null}
 
@@ -1015,11 +1028,13 @@ function App() {
                     <PopularArticles
                       newsletters={filteredNewsletters}
                       onArticleClick={handleArticleClick}
+                      onArticleIntent={handleArticleIntent}
                     />
                     <LatestArticles
                       newsletters={filteredNewsletters}
                       currentUserId={user?.id}
                       onArticleClick={handleArticleClick}
+                      onArticleIntent={handleArticleIntent}
                     />
                   </>
                 ) : (

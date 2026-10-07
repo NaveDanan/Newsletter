@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPocketBaseErrorMessage } from '@/lib/pocketbase/community';
 import type { CommunityPage, CommunityPost } from '@/types/community';
+import { peekRead, readCache, readScope } from '@/lib/pocketbase/read-cache';
 
 // One paging engine behind every list of posts: the feed, a profile tab,
 // bookmarks, a hashtag page and search results all page the same way, so they
@@ -37,21 +38,34 @@ function applyPatch(post: CommunityPost, postId: string, patch: Partial<Communit
 
 export function useCommunityPosts(
   source: CommunityPostSource,
-  options: { enabled?: boolean; errorMessage?: string } = {},
+  options: { enabled?: boolean; errorMessage?: string; cacheKey?: string } = {},
 ): UseCommunityPostsResult {
   const { enabled = true, errorMessage = 'Loading posts failed' } = options;
-  const [posts, setPosts] = useState<CommunityPost[]>([]);
-  const [isLoading, setIsLoading] = useState(enabled);
+  const cacheKey = options.cacheKey ? `community:list:${options.cacheKey}` : '';
+  const scope = readScope();
+  const cached = cacheKey && enabled ? peekRead<CommunityPage<CommunityPost>>(cacheKey, 300_000) : undefined;
+  const [posts, setPosts] = useState<CommunityPost[]>(() => cached?.items ?? []);
+  const [isLoading, setIsLoading] = useState(enabled && !cached);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cursor, setCursor] = useState('');
-  const [hasMore, setHasMore] = useState(false);
+  const [cursor, setCursor] = useState(cached?.cursor ?? '');
+  const [hasMore, setHasMore] = useState(cached?.hasMore ?? false);
+  const [identity, setIdentity] = useState(scope + cacheKey);
+  if (identity !== scope + cacheKey) {
+    setIdentity(scope + cacheKey); setPosts(cached?.items ?? []);
+    setCursor(cached?.cursor ?? ''); setHasMore(cached?.hasMore ?? false);
+    setError(null); setIsLoading(enabled && !cached);
+  }
   const requestRef = useRef(0);
+  const pendingChangesRef = useRef<((items: CommunityPost[]) => CommunityPost[])[] | undefined>(undefined);
   const sourceRef = useRef(source);
   sourceRef.current = source;
 
   const load = useCallback(async (nextCursor: string) => {
+    const requestedScope = readScope();
     const requestId = requestRef.current + 1;
+    const changes: ((items: CommunityPost[]) => CommunityPost[])[] = [];
+    pendingChangesRef.current = changes;
     requestRef.current = requestId;
 
     if (nextCursor) {
@@ -63,25 +77,27 @@ export function useCommunityPosts(
     try {
       const page = await sourceRef.current(nextCursor);
       // A newer request has already started, so this page is stale.
-      if (requestRef.current !== requestId) {
+      if (requestRef.current !== requestId || requestedScope !== readScope()) {
         return;
       }
       setPosts((current) => {
+        const items = changes.reduce((items, change) => change(items), page.items);
         if (!nextCursor) {
-          return page.items;
+          return items;
         }
         const seen = new Set(current.map((post) => post.id));
-        return current.concat(page.items.filter((post) => !seen.has(post.id)));
+        return current.concat(items.filter((post) => !seen.has(post.id)));
       });
       setCursor(page.cursor);
       setHasMore(page.hasMore);
       setError(null);
     } catch (caught) {
-      if (requestRef.current === requestId) {
+      if (requestRef.current === requestId && requestedScope === readScope()) {
         setError(getPocketBaseErrorMessage(caught, errorMessage));
       }
     } finally {
-      if (requestRef.current === requestId) {
+      if (requestRef.current === requestId && requestedScope === readScope()) {
+        pendingChangesRef.current = undefined;
         setIsLoading(false);
         setIsLoadingMore(false);
       }
@@ -99,11 +115,13 @@ export function useCommunityPosts(
       return;
     }
 
-    setPosts([]);
-    setCursor('');
-    setHasMore(false);
     void load('');
-  }, [enabled, load]);
+    return () => { requestRef.current += 1; };
+  }, [enabled, load, source, scope, cacheKey]);
+
+  useEffect(() => {
+    if (cacheKey && enabled && !isLoading && !error && scope === readScope()) readCache.set(scope + cacheKey, { items: posts, cursor, hasMore });
+  }, [cacheKey, cursor, enabled, error, hasMore, isLoading, posts, scope]);
 
   const loadMore = useCallback(() => {
     if (!hasMore || isLoading || isLoadingMore || !cursor) {
@@ -117,20 +135,32 @@ export function useCommunityPosts(
   }, [load]);
 
   const prependPost = useCallback((post: CommunityPost) => {
-    setPosts((current) => [post, ...current.filter((item) => item.id !== post.id)]);
-  }, []);
+    if (scope !== readScope()) return;
+    const change = (current: CommunityPost[]) => [post, ...current.filter((item) => item.id !== post.id)];
+    pendingChangesRef.current?.push(change);
+    setPosts(change);
+  }, [scope]);
 
   const replacePost = useCallback((post: CommunityPost) => {
-    setPosts((current) => current.map((item) => (item.id === post.id ? post : item)));
-  }, []);
+    if (scope !== readScope()) return;
+    const change = (current: CommunityPost[]) => current.map((item) => (item.id === post.id ? post : item));
+    pendingChangesRef.current?.push(change);
+    setPosts(change);
+  }, [scope]);
 
   const removePost = useCallback((postId: string) => {
-    setPosts((current) => current.filter((item) => item.id !== postId));
-  }, []);
+    if (scope !== readScope()) return;
+    const change = (current: CommunityPost[]) => current.filter((item) => item.id !== postId);
+    pendingChangesRef.current?.push(change);
+    setPosts(change);
+  }, [scope]);
 
   const patchPost = useCallback((postId: string, patch: Partial<CommunityPost>) => {
-    setPosts((current) => current.map((item) => applyPatch(item, postId, patch)));
-  }, []);
+    if (scope !== readScope()) return;
+    const change = (current: CommunityPost[]) => current.map((item) => applyPatch(item, postId, patch));
+    pendingChangesRef.current?.push(change);
+    setPosts(change);
+  }, [scope]);
 
   return {
     posts,

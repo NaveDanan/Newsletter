@@ -1,6 +1,8 @@
 import { eventWithUtcDates } from '@/lib/event-time';
 import type { RecordModel } from 'pocketbase';
 import { getPocketBase } from './client';
+import { cachedRead, peekRead, readCache, readScope, invalidateReads } from './read-cache';
+import { readStoredArticle, storePublicArticle, forgetStoredArticle } from '@/lib/article-store';
 import { extractExcerpt, calculateReadTime } from '../newsletters';
 import { inferNewsletterTextAlignment, normalizeNewsletterTextAlignment } from '../newsletter-alignment';
 import type {
@@ -22,6 +24,7 @@ interface NewsletterUpdateEmailResponse {
 
 interface ApiListResponse<T> {
   items?: T[];
+  totalPages?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -255,12 +258,15 @@ export function mapPBRecordToNewsletter(record: RecordModel): Newsletter {
     title: typeof record['title'] === 'string' ? record['title'] : '',
     subtitle: typeof record['subtitle'] === 'string' ? record['subtitle'] : '',
     content,
-    excerpt: extractExcerpt(content),
+    contentLoaded: record['contentLoaded'] !== false,
+    searchText: typeof record['searchText'] === 'string' ? record['searchText'] : undefined,
+    updatedAt: record.updated,
+    excerpt: record['contentLoaded'] === false ? String(record['excerpt'] || '') : extractExcerpt(content),
     author: typeof record['author'] === 'string' ? record['author'] : '',
     authorAvatar: typeof record['authorAvatar'] === 'string' ? record['authorAvatar'] : undefined,
     createdById: typeof record['createdById'] === 'string' ? record['createdById'] : undefined,
     publishedAt: typeof record['publishedAt'] === 'string' && record['publishedAt'] ? record['publishedAt'] : record.created.slice(0, 10),
-    readTime: calculateReadTime(content),
+    readTime: record['contentLoaded'] === false ? String(record['readTime'] || '1 min read') : calculateReadTime(content),
     coverImage: typeof record['coverImage'] === 'string' ? record['coverImage'] : '',
     textAlignment: normalizeNewsletterTextAlignment(record['textAlignment']) ?? inferNewsletterTextAlignment(content),
     likes: typeof record['likes'] === 'number' ? record['likes'] : 0,
@@ -282,20 +288,98 @@ export function mapPBRecordToNewsletter(record: RecordModel): Newsletter {
 // CRUD
 // ---------------------------------------------------------------------------
 
-export async function fetchNewsletters(): Promise<Newsletter[]> {
-  const pb = getPocketBase();
-  const response = await pb.send<ApiListResponse<RecordModel>>('/api/newsletters?sort=-created', {
-    method: 'GET',
-    requestKey: null,
-  });
-  const records = response.items ?? [];
-  return records.map(mapPBRecordToNewsletter);
+const LIST_KEY = 'newsletters:summary';
+const SESSION_KEY = 'newsletter:public-feed:v1:';
+
+export function getCachedNewsletters(): Newsletter[] | undefined {
+  const cached = peekRead<Newsletter[]>(LIST_KEY, 300_000);
+  if (cached) return cached;
+  if (!readScope().endsWith('|anonymous|')) return undefined;
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY + readScope());
+    if (!raw) return undefined;
+    const entry = JSON.parse(raw) as { at: number; items: Newsletter[] };
+    if (Date.now() - entry.at > 300_000 || !Array.isArray(entry.items)) return undefined;
+    readCache.prime(readScope() + LIST_KEY, entry.items);
+    return entry.items;
+  } catch { return undefined; }
+}
+
+export function rememberNewsletters(items: Newsletter[]): void {
+  if (peekRead<Newsletter[]>(LIST_KEY, 300_000) === items) return;
+  readCache.set(readScope() + LIST_KEY, items);
+  if (!readScope().endsWith('|anonymous|')) return;
+  try {
+    // Bodies and base64 images belong in their individual requests, never in
+    // synchronous storage on the critical refresh path.
+    const summaries = items.map((item) => ({ ...item, content: '', contentLoaded: false,
+      searchText: item.searchText ?? item.content.replace(/<img\b[^>]*>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim(),
+      coverImage: /^data:image\/(?:png|jpe?g|gif|webp|avif);base64,/i.test(item.coverImage) ? `/api/newsletters/${encodeURIComponent(item.id)}/cover?v=${encodeURIComponent(item.updatedAt || '')}` : item.coverImage,
+      commentItems: [], presentationFiles: [], presentationPreviews: [],
+    }));
+    const encoded = JSON.stringify({ at: Date.now(), items: summaries });
+    if (encoded.length < 500_000) sessionStorage.setItem(SESSION_KEY + readScope(), encoded);
+  } catch { /* Storage is optional, including in private browsing. */ }
+}
+
+export async function fetchNewsletters({ summary = false, force = false } = {}): Promise<Newsletter[]> {
+  return cachedRead(summary ? LIST_KEY : 'newsletters:full', async () => {
+    const pb = getPocketBase();
+    const path = `/api/newsletters?sort=-created&perPage=100${summary ? '&view=summary' : ''}`;
+    const first = await pb.send<ApiListResponse<RecordModel>>(path, { method: 'GET', requestKey: null });
+    const pages = await Promise.all(Array.from({ length: Math.max(0, (first.totalPages ?? 1) - 1) }, (_, index) =>
+      pb.send<ApiListResponse<RecordModel>>(`${path}&page=${index + 2}`, { method: 'GET', requestKey: null })));
+    return [first, ...pages].flatMap((page) => (page.items ?? []).map(mapPBRecordToNewsletter));
+  }, { force });
+}
+
+export function getCachedNewsletter(id: string): Newsletter | undefined {
+  return peekRead<Newsletter>(`newsletter:${id}`);
+}
+
+export function getStoredNewsletter(id: string): Promise<Newsletter | undefined> {
+  return readScope().endsWith('|anonymous|') ? readStoredArticle(readScope() + id) : Promise.resolve(undefined);
+}
+
+export function fetchNewsletter(id: string, force = false): Promise<Newsletter> {
+  return cachedRead(`newsletter:${id}`, async () => {
+    const scope = readScope();
+    try {
+      const record = await getPocketBase().send<RecordModel>(`/api/newsletters/${encodeURIComponent(id)}`, { method: 'GET', requestKey: null });
+      const newsletter = mapPBRecordToNewsletter(record);
+      if (scope.endsWith('|anonymous|')) void storePublicArticle(scope + id, newsletter);
+      return newsletter;
+    } catch (error) {
+      if (error && typeof error === 'object' && 'status' in error && [401, 403, 404].includes(Number(error.status))) {
+        readCache.invalidate(scope + `newsletter:${id}`);
+        void forgetStoredArticle(scope + id);
+      }
+      throw error;
+    }
+  }, { force });
+}
+
+export function prefetchNewsletter(id: string): void {
+  void fetchNewsletter(id).catch(() => { /* Navigation displays a failed read. */ });
+}
+
+export function invalidateNewsletterReads(): void {
+  invalidateReads();
+  try { sessionStorage.removeItem(SESSION_KEY + readScope()); } catch { /* Optional storage. */ }
+}
+
+function rememberMutatedNewsletter(record: RecordModel, scope: string): Newsletter {
+  invalidateNewsletterReads();
+  const newsletter = mapPBRecordToNewsletter(record);
+  if (scope === readScope()) readCache.set(scope + `newsletter:${newsletter.id}`, newsletter);
+  return newsletter;
 }
 
 export async function createNewsletter(
   data: NewsletterFormData,
   extra: { createdById?: string; authorAvatar?: string } = {},
 ): Promise<Newsletter> {
+  const scope = readScope();
   const pb = getPocketBase();
   const payload = buildNewsletterCreatePayload(data, extra);
 
@@ -308,7 +392,7 @@ export async function createNewsletter(
       body: JSON.stringify(payload),
       requestKey: null,
     });
-    return mapPBRecordToNewsletter(record);
+    return rememberMutatedNewsletter(record, scope);
   } catch (error) {
     if (!isClientResponseError(error) || error.status !== 400) {
       throw error;
@@ -324,7 +408,7 @@ export async function createNewsletter(
         body: JSON.stringify(fallbackPayload),
         requestKey: null,
       });
-      return mapPBRecordToNewsletter(record);
+      return rememberMutatedNewsletter(record, scope);
     } catch (fallbackError) {
       const message = getPocketBaseErrorMessage(fallbackError);
       throw new Error(message);
@@ -336,6 +420,7 @@ export async function patchNewsletter(
   id: string,
   data: Partial<Newsletter>,
 ): Promise<Newsletter> {
+  const scope = readScope();
   const pb = getPocketBase();
   // Recompute derived fields if content changed
   const patch: Record<string, unknown> = { ...data };
@@ -354,7 +439,7 @@ export async function patchNewsletter(
       body: JSON.stringify(patch),
       requestKey: null,
     });
-    return mapPBRecordToNewsletter(record);
+    return rememberMutatedNewsletter(record, scope);
   } catch (error) {
     if (!isClientResponseError(error) || error.status !== 400) {
       throw error;
@@ -370,7 +455,7 @@ export async function patchNewsletter(
         body: JSON.stringify(fallbackPatch),
         requestKey: null,
       });
-      return mapPBRecordToNewsletter(record);
+      return rememberMutatedNewsletter(record, scope);
     } catch (fallbackError) {
       const message = getPocketBaseErrorMessage(fallbackError);
       throw new Error(message);
@@ -379,29 +464,33 @@ export async function patchNewsletter(
 }
 
 export async function removeNewsletter(id: string): Promise<void> {
+  invalidateNewsletterReads();
   const pb = getPocketBase();
   await pb.send(`/api/newsletters/${id}`, {
     method: 'DELETE',
     requestKey: null,
   });
+  invalidateNewsletterReads();
 }
 
 export async function makeNewsletterPublic(id: string): Promise<Newsletter> {
+  const scope = readScope();
   const pb = getPocketBase();
   const record = await pb.send<RecordModel>(`/api/newsletters/${id}/make-public`, {
     method: 'POST',
     requestKey: null,
   });
-  return mapPBRecordToNewsletter(record);
+  return rememberMutatedNewsletter(record, scope);
 }
 
 export async function makeNewsletterDraft(id: string): Promise<Newsletter> {
+  const scope = readScope();
   const pb = getPocketBase();
   const record = await pb.send<RecordModel>(`/api/newsletters/${id}/make-draft`, {
     method: 'POST',
     requestKey: null,
   });
-  return mapPBRecordToNewsletter(record);
+  return rememberMutatedNewsletter(record, scope);
 }
 
 export async function sendNewsletterUpdateEmail(id: string): Promise<number> {
@@ -423,6 +512,7 @@ export async function uploadNewsletterPresentation(
   id: string,
   file: File,
 ): Promise<{ newsletter: Newsletter; url: string; fileName: string; previewUrls: string[]; previewStatus: 'ready' | 'failed'; previewError?: string }> {
+  const scope = readScope();
   const pb = getPocketBase();
   const payload = new FormData();
   payload.append('newsletterId', id);
@@ -444,7 +534,7 @@ export async function uploadNewsletterPresentation(
     throw new Error('Uploaded presentation file was not returned by PocketBase');
   }
 
-  const newsletter = mapPBRecordToNewsletter(record);
+  const newsletter = rememberMutatedNewsletter(record, scope);
   const preview = newsletter.presentationPreviews?.find((item) => item.sourceFileName === fileName);
 
   return {

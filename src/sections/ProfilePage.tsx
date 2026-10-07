@@ -1,5 +1,6 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import { ArrowLeft01Icon, GlobeIcon } from '@hugeicons/core-free-icons';
+import { ManagerHeader } from '@/components/ManagerHeader';
 import { AppearanceSettings } from '@/components/profile/AppearanceSettings';
 import { NotificationPreferences } from '@/components/profile/NotificationPreferences';
 import { ProfileIdentityEditor } from '@/components/profile/ProfileIdentityEditor';
@@ -15,9 +16,13 @@ import { useCommunitySession } from '@/hooks/useCommunitySession';
 
 interface ProfilePageProps {
   onBack: () => void;
+  onHomeClick: () => void;
+  onManagerClick: () => void;
+  onProfileClick: () => void;
+  onSignOut: () => void;
 }
 
-export function ProfilePage({ onBack }: ProfilePageProps) {
+export function ProfilePage({ onBack, onHomeClick, onManagerClick, onProfileClick, onSignOut }: ProfilePageProps) {
   const { user, isAuthenticated } = useAuth();
   const { t, isRTL, toggleLocale } = useLocale();
   // The community session owns the public profile record. Only the real record
@@ -31,21 +36,12 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
-      <header className="sticky top-0 z-50 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-3xl items-center gap-3 px-4 sm:px-6">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex items-center gap-1.5 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-          >
-            <HugeiconsIcon icon={ArrowLeft01Icon} className="rtl-rotate-180 size-4" />
-            {t('common.back')}
-          </button>
-          <h1 className="ms-auto text-sm font-bold text-[var(--text-primary)]">{t('profile.title')}</h1>
-        </div>
-      </header>
-
+      <ManagerHeader title={t('profile.title')} onHomeClick={onHomeClick} onProfileClick={onProfileClick} onManagerClick={onManagerClick} onSignOut={onSignOut} />
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
+        <button type="button" onClick={onBack} className="flex min-h-11 items-center gap-1.5 text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+          <HugeiconsIcon icon={ArrowLeft01Icon} className="rtl-rotate-180 size-4" />
+          {t('common.back')}
+        </button>
         <div>
           <h2 className="text-2xl font-extrabold text-[var(--text-primary)] tracking-tight">{t('profile.title')}</h2>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">{t('profile.subtitle')}</p>

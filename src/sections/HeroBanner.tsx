@@ -1,7 +1,6 @@
+import { memo } from 'react';
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { useEffect, useRef } from 'react';
-import { gsap } from 'gsap';
 import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
 import type { Newsletter } from '../types/newsletter';
@@ -9,31 +8,12 @@ import type { Newsletter } from '../types/newsletter';
 interface HeroBannerProps {
   featuredNewsletter: Newsletter | null;
   onArticleClick?: (newsletter: Newsletter) => void;
+  onArticleIntent?: (newsletter: Newsletter) => void;
 }
 
-export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerProps) {
+export const HeroBanner = memo(function HeroBanner({ featuredNewsletter, onArticleClick, onArticleIntent }: HeroBannerProps) {
   const { formatDate, isRTL, t } = useLocale();
-  const bannerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.fromTo(
-        contentRef.current,
-        { opacity: 0, x: isRTL ? 30 : -30 },
-        { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out', delay: 0.3 }
-      );
-
-      gsap.fromTo(
-        imageRef.current,
-        { opacity: 0, x: isRTL ? -30 : 30 },
-        { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out', delay: 0.5 }
-      );
-    }, bannerRef);
-
-    return () => ctx.revert();
-  }, [isRTL]);
   const heroTitle = featuredNewsletter?.title ?? t('hero.defaultTitle');
   const heroSubtitle = featuredNewsletter?.subtitle ?? t('hero.defaultSubtitle');
   const heroImage = featuredNewsletter?.coverImage || '/hero_city_bg.jpg';
@@ -42,7 +22,7 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
     : t('hero.defaultMeta');
 
   return (
-    <section id="features" ref={bannerRef} className="relative overflow-hidden mb-8 mx-auto w-full max-w-[1120px]">
+    <section id="features" onPointerEnter={() => featuredNewsletter && onArticleIntent?.(featuredNewsletter)} onFocus={() => featuredNewsletter && onArticleIntent?.(featuredNewsletter)} className="relative overflow-hidden mb-8 mx-auto w-full max-w-[1120px]">
       <div className="hero-gradient rounded-3xl border border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-5 sm:p-6 lg:p-7 relative overflow-hidden transition-all">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {[...Array(15)].map((_, i) => (
@@ -60,7 +40,7 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
         </div>
 
         <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-4 items-center">
-          <div ref={contentRef} className="lg:col-span-6 flex flex-col items-start text-start">
+          <div className="lg:col-span-6 flex flex-col items-start text-start">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--primary-accent)] text-[var(--accent-contrast)] text-xs font-bold rounded-full mb-4 shadow-xs">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               {featuredNewsletter ? t('hero.latestNewsletter') : t('hero.latest')}
@@ -87,9 +67,11 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
             </div>
           </div>
 
-          <div ref={imageRef} className="lg:col-span-6 relative">
+          <div className="lg:col-span-6 relative">
             <div className="post-media-frame relative md:aspect-video rounded-2xl overflow-hidden shadow-2xl border border-[var(--border-subtle)] group cursor-pointer" onClick={() => featuredNewsletter && onArticleClick?.(featuredNewsletter)}>
               <img
+                fetchPriority="high"
+                decoding="async"
                 src={heroImage}
                 alt={featuredNewsletter?.title ?? t('hero.imageAlt')}
                 className="w-full h-[300px] md:h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -124,4 +106,4 @@ export function HeroBanner({ featuredNewsletter, onArticleClick }: HeroBannerPro
       </div>
     </section>
   );
-}
+});

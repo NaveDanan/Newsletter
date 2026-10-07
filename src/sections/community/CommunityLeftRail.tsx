@@ -8,6 +8,7 @@ import {
   Shield01Icon,
   UserIcon,
 } from '@hugeicons/core-free-icons';
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -101,7 +102,7 @@ export function CommunityLeftRail({
             || (item.key === 'search' && (section === 'search' || section === 'hashtag'))
             || (item.key === 'profile' && (section === 'profile' || section === 'connections'));
 
-          return (
+          const button = (
             <button
               key={item.key}
               type="button"
@@ -138,6 +139,7 @@ export function CommunityLeftRail({
               <span className="hidden text-[17px] xl:inline leading-none">{item.label}</span>
             </button>
           );
+          return item.key === 'notifications' && isLoggedIn ? <NotificationDropdown key={item.key} trigger={button} /> : button;
         })}
 
         {/* Post button */}

@@ -1,47 +1,34 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchActiveSubscriberCount } from '@/lib/pocketbase/subscribers';
+import { fetchNewsletterStats, getCachedNewsletterStats, type NewsletterStats } from '@/lib/pocketbase/subscribers';
+import { readScope } from '@/lib/pocketbase/read-cache';
 
 export function useSubscriberCount() {
-  const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
+  const scope = readScope();
+  const [stats, setStats] = useState<NewsletterStats | undefined>(() => getCachedNewsletterStats());
+  const [lastScope, setLastScope] = useState(scope);
+  if (lastScope !== scope) { setLastScope(scope); setStats(getCachedNewsletterStats()); }
 
   const refreshSubscriberCount = useCallback(async (): Promise<number> => {
     try {
-      const count = await fetchActiveSubscriberCount();
-      setSubscriberCount(count);
-      return count;
+      const next = await fetchNewsletterStats({ force: true });
+      if (scope === readScope()) setStats(next);
+      return next.activeSubscribers;
     } catch (error) {
       console.error('Failed to load subscriber count:', error);
-      setSubscriberCount(0);
       return 0;
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     let cancelled = false;
+    void fetchNewsletterStats({ force: true }).then(next => {
+      if (!cancelled && scope === readScope()) setStats(next);
+    }).catch(error => {
+      console.error('Failed to load subscriber count:', error);
+      if (!cancelled && scope === readScope()) setStats(current => current ?? { activeSubscribers: 0, publishedNewsletters: 0 });
+    });
+    return () => { cancelled = true; };
+  }, [scope]);
 
-    const loadSubscriberCount = async () => {
-      try {
-        const count = await fetchActiveSubscriberCount();
-        if (!cancelled) {
-          setSubscriberCount(count);
-        }
-      } catch (error) {
-        console.error('Failed to load subscriber count:', error);
-        if (!cancelled) {
-          setSubscriberCount(0);
-        }
-      }
-    };
-
-    void loadSubscriberCount();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return {
-    subscriberCount,
-    refreshSubscriberCount,
-  };
+  return { subscriberCount: stats?.activeSubscribers ?? null, publishedNewsletterCount: stats?.publishedNewsletters ?? null, refreshSubscriberCount };
 }

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { bootLogger } from '@/lib/bootLogger';
+import { readScope } from '@/lib/pocketbase/read-cache';
 import {
   fetchCommunitySession,
   getPocketBaseErrorMessage,
@@ -24,11 +25,19 @@ export interface UseCommunitySessionResult {
 
 export function useCommunitySession(isAuthenticated: boolean): UseCommunitySessionResult {
   const { user } = useAuth();
+  const scope = readScope();
+  const requests = useRef({ generation: 0 });
   const [session, setSession] = useState<CommunitySession | null>(null);
   const [isLoading, setIsLoading] = useState(isAuthenticated);
   const [error, setError] = useState<string | null>(null);
+  const [lastScope, setLastScope] = useState(scope);
+  if (lastScope !== scope) {
+    setLastScope(scope); setSession(null); setError(null); setIsLoading(isAuthenticated);
+  }
 
   const load = useCallback(async () => {
+    const request = ++requests.current.generation;
+    const requestedScope = scope;
     if (!isAuthenticated) {
       setSession(null);
       setIsLoading(false);
@@ -39,6 +48,7 @@ export function useCommunitySession(isAuthenticated: boolean): UseCommunitySessi
     setIsLoading(true);
     try {
       const next = await fetchCommunitySession();
+      if (request !== requests.current.generation || requestedScope !== readScope()) return;
       setSession(next);
       setError(null);
       bootLogger.step('community', 'Community session loaded', {
@@ -46,21 +56,25 @@ export function useCommunitySession(isAuthenticated: boolean): UseCommunitySessi
         canModerate: next.canModerate,
       });
     } catch (caught) {
+      if (request !== requests.current.generation || requestedScope !== readScope()) return;
       setSession(null);
       setError(getPocketBaseErrorMessage(caught, 'Loading your community profile failed'));
       bootLogger.warn('community', 'Community session request failed');
     } finally {
-      setIsLoading(false);
+      if (request === requests.current.generation && requestedScope === readScope()) setIsLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, scope]);
 
   useEffect(() => {
     void load();
+    const activeRequests = requests.current;
+    return () => { activeRequests.generation++; };
   }, [load]);
 
   const saveProfile = useCallback(async (patch: CommunityProfilePatch) => {
+    const requestedScope = readScope();
     const profile = await updateCommunityProfile(patch);
-    setSession((current) => (current ? { ...current, profile } : current));
+    if (requestedScope === readScope()) setSession((current) => (current ? { ...current, profile } : current));
     return profile;
   }, []);
 

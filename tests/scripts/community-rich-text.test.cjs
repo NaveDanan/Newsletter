@@ -205,6 +205,7 @@ test('collapsed comment item passes full source to body rendering and retains th
     '@/components/newsletter/NewsletterPollCard': { NewsletterPollCard: empty },
     '@/components/newsletter/NewsletterEventCard': { NewsletterEventCard: empty },
     '@/lib/pocketbase/community': {}, '@/lib/community-text': text,
+    '@/lib/lazy-component': { lazyComponent: () => empty },
     '@/lib/utils': { cn: (...values) => values.filter(Boolean).join(' ') },
     './CommunityAvatar': { CommunityAvatar: empty }, './CommunityBody': { CommunityBody },
     './CommunityContext': { useCommunity: () => ({ isAuthenticated: false, canModerate: false }) },

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { AccountMenu } from '@/components/AccountMenu';
+import { preloadRoute } from '@/lib/preload-route';
 import { DropdownNavigation, type DropdownNavigationItem } from '@/components/ui/dropdown-navigation';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useNavigationData } from '@/contexts/NavigationDataContext';
@@ -410,6 +411,8 @@ export function Navigation({
             <button
               type="button"
               onClick={onCommunityClick}
+              onPointerEnter={() => preloadRoute('/community')}
+              onFocus={() => preloadRoute('/community')}
               aria-label={t('nav.community')}
               title={t('nav.community')}
               aria-current={isCommunityRoute ? 'page' : undefined}

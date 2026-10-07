@@ -1,6 +1,7 @@
 import { avatarUrlFor } from '@/lib/avatar';
 import { getPocketBase, normalizeUserRole } from './client';
 import { resolveCommunityFileUrl } from './community';
+import { cachedRead, peekRead, readCache, readScope } from './read-cache';
 import type { SiteWriter, WriterCandidate } from '@/types/writer';
 
 // "Our Writers" is admin-curated, never derived from roles. The public list is
@@ -21,16 +22,20 @@ function items(value: unknown): Record<string, unknown>[] {
     : [];
 }
 
-export async function fetchFeaturedWriters(): Promise<SiteWriter[]> {
-  const response: unknown = await getPocketBase().send('/api/site/writers', { method: 'GET', requestKey: null });
-  return items(response)
-    .map((item) => ({
-      id: str(item.id),
-      name: str(item.name).trim(),
-      handle: str(item.handle),
-      avatarUrl: resolveCommunityFileUrl(str(item.avatarUrl)),
-    }))
-    .filter((writer) => writer.id);
+const WRITERS_KEY = 'site:writers';
+export function getCachedFeaturedWriters(): SiteWriter[] | undefined { return peekRead(WRITERS_KEY, 300_000); }
+export function fetchFeaturedWriters(): Promise<SiteWriter[]> {
+  return cachedRead(WRITERS_KEY, async () => {
+    const response: unknown = await getPocketBase().send('/api/site/writers', { method: 'GET', requestKey: null });
+    return items(response)
+      .map((item) => ({
+        id: str(item.id),
+        name: str(item.name).trim(),
+        handle: str(item.handle),
+        avatarUrl: resolveCommunityFileUrl(str(item.avatarUrl)),
+      }))
+      .filter((writer) => writer.id);
+  });
 }
 
 export async function fetchWriterCandidates(): Promise<WriterCandidate[]> {
@@ -52,5 +57,8 @@ export async function fetchWriterCandidates(): Promise<WriterCandidate[]> {
 }
 
 export async function setWriterFeatured(userId: string, featured: boolean): Promise<void> {
-  await getPocketBase().collection('users').update(userId, { featuredWriter: featured }, { requestKey: null });
+  const scope = readScope();
+  readCache.invalidate(scope + WRITERS_KEY);
+  try { await getPocketBase().collection('users').update(userId, { featuredWriter: featured }, { requestKey: null }); }
+  finally { readCache.invalidate(scope + WRITERS_KEY); }
 }

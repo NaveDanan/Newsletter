@@ -8,6 +8,7 @@ import {
   Search01Icon,
   UserIcon,
 } from '@hugeicons/core-free-icons';
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -25,24 +26,22 @@ import {
   parseCommunityRoute,
 } from '@/lib/community-routes';
 import { cn } from '@/lib/utils';
-import { CommunityBookmarksScreen } from './CommunityBookmarksScreen';
-import { CommunityComposerDialog } from './CommunityComposerDialog';
-import { CommunityConnectionsScreen } from './CommunityConnectionsScreen';
+import { lazyComponent } from '@/lib/lazy-component';
+import { readScope } from '@/lib/pocketbase/read-cache';
+import { CommunityThreadScreen } from './screen-loaders';
+
+
 import { type CommunityContextValue } from './CommunityContext';
 import { CommunityProvider } from './CommunityProvider';
 import { CommunityFeedScreen } from './CommunityFeedScreen';
-import { CommunityHashtagScreen } from './CommunityHashtagScreen';
 import { CommunityLeftRail } from './CommunityLeftRail';
-import { CommunityNotificationsScreen } from './CommunityNotificationsScreen';
-import { CommunityProfileScreen } from './CommunityProfileScreen';
-import { CommunityReportDialog } from './CommunityReportDialog';
+
 import { CommunityRightRail } from './CommunityRightRail';
-import { CommunitySearchScreen } from './CommunitySearchScreen';
-import { CommunityThreadScreen } from './CommunityThreadScreen';
 import {
   createComposeRequest,
   releaseComposeRequest,
   type ComposeRequest,
+  takeQueuedComposeRequest,
 } from './compose-request';
 import type { CommunityPost, CommunitySearchType } from '@/types/community';
 
@@ -54,6 +53,15 @@ import type { CommunityPost, CommunitySearchType } from '@/types/community';
 // because any card anywhere can open them, and a modal that unmounts with its
 // screen would close itself on the navigation it triggered. Profile editing is
 // not a modal: it is the unified /profile page shared with the rest of the site.
+
+const CommunityBookmarksScreen = lazyComponent(() => import('./CommunityBookmarksScreen').then((module) => ({ default: module.CommunityBookmarksScreen })));
+const CommunityComposerDialog = lazyComponent(() => import('./CommunityComposerDialog').then((module) => ({ default: module.CommunityComposerDialog })));
+const CommunityConnectionsScreen = lazyComponent(() => import('./CommunityConnectionsScreen').then((module) => ({ default: module.CommunityConnectionsScreen })));
+const CommunityHashtagScreen = lazyComponent(() => import('./CommunityHashtagScreen').then((module) => ({ default: module.CommunityHashtagScreen })));
+const CommunityNotificationsScreen = lazyComponent(() => import('./CommunityNotificationsScreen').then((module) => ({ default: module.CommunityNotificationsScreen })));
+const CommunityProfileScreen = lazyComponent(() => import('./CommunityProfileScreen').then((module) => ({ default: module.CommunityProfileScreen })));
+const CommunityReportDialog = lazyComponent(() => import('./CommunityReportDialog').then((module) => ({ default: module.CommunityReportDialog })));
+const CommunitySearchScreen = lazyComponent(() => import('./CommunitySearchScreen').then((module) => ({ default: module.CommunitySearchScreen })));
 
 interface CommunityPageProps {
   pathname: string;
@@ -117,10 +125,13 @@ export function CommunityPage({
   // The home feed's quick-compose card carries selected attachments here.
   useEffect(() => {
     const handleCompose = (event: Event) => {
+      takeQueuedComposeRequest();
       const detail = (event as CustomEvent<{ files?: File[] }>).detail;
       requestCompose(detail?.files);
     };
     window.addEventListener('community:compose', handleCompose);
+    const queued = takeQueuedComposeRequest();
+    if (queued) queueMicrotask(() => requestCompose(queued.files));
     return () => { window.removeEventListener('community:compose', handleCompose); };
   }, [requestCompose]);
 
@@ -220,12 +231,13 @@ export function CommunityPage({
 
   const renderSection = () => {
     if (route.section === 'post') {
-      return <CommunityThreadScreen key={route.postId} postId={route.postId} />;
+      CommunityThreadScreen.preload();
+      return <CommunityThreadScreen key={readScope() + route.postId} postId={route.postId} />;
     }
 
     if (route.section === 'profile') {
       const targetHandle = (route.handle === 'me' || !route.handle) ? (profile?.handle || '') : route.handle;
-      if (!targetHandle && isLoading) {
+      if ((route.handle === 'me' || !route.handle) && isLoading && !session) {
         return (
           <div className="space-y-4 p-4">
             <Skeleton className="h-48 sm:h-52 w-full rounded-none" />
@@ -243,7 +255,7 @@ export function CommunityPage({
       }
       return (
         <CommunityProfileScreen
-          key={targetHandle + ':' + route.profileTab}
+          key={readScope() + targetHandle + ':' + route.profileTab}
           handle={targetHandle}
           tab={route.profileTab}
           onEditProfile={() => onNavigate('/profile')}
@@ -254,7 +266,7 @@ export function CommunityPage({
     if (route.section === 'connections') {
       return (
         <CommunityConnectionsScreen
-          key={route.handle + ':' + route.direction}
+          key={readScope() + route.handle + ':' + route.direction}
           handle={route.handle}
           direction={route.direction}
         />
@@ -262,7 +274,7 @@ export function CommunityPage({
     }
 
     if (route.section === 'notifications') {
-      return <CommunityNotificationsScreen onUnreadChange={setUnreadNotifications} />;
+      return <CommunityNotificationsScreen key={readScope()} onUnreadChange={setUnreadNotifications} />;
     }
 
     if (route.section === 'bookmarks') {
@@ -270,16 +282,16 @@ export function CommunityPage({
     }
 
     if (route.section === 'search') {
-      return <CommunitySearchScreen key={route.searchType} query={route.query} type={route.searchType} />;
+      return <CommunitySearchScreen key={readScope() + route.searchType} query={route.query} type={route.searchType} />;
     }
 
     if (route.section === 'hashtag') {
-      return <CommunityHashtagScreen key={route.tag} tag={route.tag} />;
+      return <CommunityHashtagScreen key={readScope() + route.tag} tag={route.tag} />;
     }
 
     return (
       <CommunityFeedScreen
-        key={route.feedTab}
+        key={readScope() + route.feedTab}
         tab={route.feedTab}
         composeRequest={composeRequest}
         onComposeRequestHandled={handleComposeRequestHandled}
@@ -306,14 +318,6 @@ export function CommunityPage({
       guarded: true,
     },
   ];
-
-  if (isAuthenticated && isLoading && !session) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-white text-sm font-medium text-[#737373]">
-        {t('community.loading')}
-      </div>
-    );
-  }
 
   return (
     <CommunityProvider value={contextValue}>
@@ -379,7 +383,7 @@ export function CommunityPage({
                   || (item.key === 'search' && (route.section === 'search' || route.section === 'hashtag'))
                   || (item.key === 'profile' && (route.section === 'profile' || route.section === 'connections'));
 
-                return (
+                const button = (
                   <button
                     key={item.key}
                     type="button"
@@ -403,12 +407,13 @@ export function CommunityPage({
                     ) : null}
                   </button>
                 );
+                return item.key === 'notifications' ? <NotificationDropdown key={item.key} trigger={button} /> : button;
               })}
             </nav>
           </>
         )}
 
-        <CommunityComposerDialog
+        {composer ? <CommunityComposerDialog
           mode={composer ? composer.mode : null}
           target={composer ? composer.post : null}
           actions={composerActions}
@@ -418,9 +423,9 @@ export function CommunityPage({
             openPost(post.kind === 'reply' && post.parentId ? post.parentId : post.id);
           }}
           onClose={() => setComposer(null)}
-        />
+        /> : null}
 
-        <CommunityReportDialog target={reportTarget} onClose={() => setReportTarget(null)} />
+        {reportTarget ? <CommunityReportDialog target={reportTarget} onClose={() => setReportTarget(null)} /> : null}
       </div>
     </CommunityProvider>
   );

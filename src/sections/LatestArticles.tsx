@@ -1,6 +1,6 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Heart, Message01Icon, PlayIcon, Share02Icon } from "@hugeicons/core-free-icons";
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { UserAvatarCircle } from '@/components/UserAvatarCircle';
 import { cn } from '@/lib/utils';
@@ -10,9 +10,10 @@ interface LatestArticlesProps {
   newsletters: Newsletter[];
   currentUserId?: string;
   onArticleClick?: (newsletter: Newsletter) => void;
+  onArticleIntent?: (newsletter: Newsletter) => void;
 }
 
-export function LatestArticles({ newsletters, currentUserId, onArticleClick }: LatestArticlesProps) {
+export const LatestArticles = memo(function LatestArticles({ newsletters, currentUserId, onArticleClick, onArticleIntent }: LatestArticlesProps) {
   const { formatDate, formatNumber, isRTL, t } = useLocale();
   const tabs = [
     { key: 'Latest', label: t('latest.tab.latest') },
@@ -81,8 +82,10 @@ export function LatestArticles({ newsletters, currentUserId, onArticleClick }: L
           filteredArticles.map((article) => (
             <article
               key={article.id}
-              className="feed-post-card group cursor-pointer transition-all"
+              className="feed-post-card group cursor-pointer transition-all [content-visibility:auto] [contain-intrinsic-size:auto_600px]"
               onClick={() => onArticleClick?.(article)}
+              onPointerEnter={() => onArticleIntent?.(article)}
+              onFocus={() => onArticleIntent?.(article)}
             >
               {/* Post Author Header */}
               <div className="post-header flex items-center justify-between">
@@ -134,6 +137,8 @@ export function LatestArticles({ newsletters, currentUserId, onArticleClick }: L
               {/* Newsletter cover */}
               <div className="post-media-frame relative h-48 md:h-auto md:aspect-video rounded-2xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-app)]">
                 <img
+                  loading="lazy"
+                  decoding="async"
                   src={article.coverImage}
                   alt={article.title}
                   className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500"
@@ -203,4 +208,4 @@ export function LatestArticles({ newsletters, currentUserId, onArticleClick }: L
       </div>
     </section>
   );
-}
+});

@@ -1,0 +1,297 @@
+{
+  "measuredAt": "2026-10-06",
+  "baselineCommit": "0527f25",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "method": {
+    "browser": "T3 collaborative browser",
+    "readiness": "populated target DOM and two animation frames, at least first contentful paint",
+    "staticAssets": "warm",
+    "applicationData": "cleared before each uncached sample",
+    "pairedComparison": "original and final frontend alternated, gzip enabled for both, same updated backend and unchanged original newsletter data",
+    "cpuThrottling": false,
+    "bandwidthThrottling": false
+  },
+  "pairedRefresh": [
+    {
+      "build": "original",
+      "path": "/",
+      "visibleMs": 2151,
+      "readyMs": 2151,
+      "firstContentfulPaintMs": 364
+    },
+    {
+      "build": "updated",
+      "path": "/",
+      "visibleMs": 372,
+      "readyMs": 298,
+      "firstContentfulPaintMs": 372
+    },
+    {
+      "build": "original",
+      "path": "/",
+      "visibleMs": 2195,
+      "readyMs": 2195,
+      "firstContentfulPaintMs": 468
+    },
+    {
+      "build": "updated",
+      "path": "/",
+      "visibleMs": 521,
+      "readyMs": 521,
+      "firstContentfulPaintMs": 372
+    },
+    {
+      "build": "original",
+      "path": "/",
+      "visibleMs": 1789,
+      "readyMs": 1789,
+      "firstContentfulPaintMs": 364
+    },
+    {
+      "build": "updated",
+      "path": "/",
+      "visibleMs": 454,
+      "readyMs": 454,
+      "firstContentfulPaintMs": 360
+    },
+    {
+      "build": "original",
+      "path": "/article/uvnuhns6hcoeuwc/chatgpt",
+      "visibleMs": 1812,
+      "readyMs": 1812,
+      "firstContentfulPaintMs": 340
+    },
+    {
+      "build": "updated",
+      "path": "/article/uvnuhns6hcoeuwc/chatgpt",
+      "visibleMs": 247,
+      "readyMs": 247,
+      "firstContentfulPaintMs": 140
+    },
+    {
+      "build": "original",
+      "path": "/article/uvnuhns6hcoeuwc/chatgpt",
+      "visibleMs": 1745,
+      "readyMs": 1745,
+      "firstContentfulPaintMs": 396
+    },
+    {
+      "build": "updated",
+      "path": "/article/uvnuhns6hcoeuwc/chatgpt",
+      "visibleMs": 213,
+      "readyMs": 213,
+      "firstContentfulPaintMs": 140
+    },
+    {
+      "build": "original",
+      "path": "/article/uvnuhns6hcoeuwc/chatgpt",
+      "visibleMs": 1677,
+      "readyMs": 1677,
+      "firstContentfulPaintMs": 428
+    },
+    {
+      "build": "updated",
+      "path": "/article/uvnuhns6hcoeuwc/chatgpt",
+      "visibleMs": 201,
+      "readyMs": 201,
+      "firstContentfulPaintMs": 152
+    },
+    {
+      "build": "original",
+      "path": "/community",
+      "visibleMs": 403,
+      "readyMs": 403,
+      "firstContentfulPaintMs": 368
+    },
+    {
+      "build": "updated",
+      "path": "/community",
+      "visibleMs": 181,
+      "readyMs": 181,
+      "firstContentfulPaintMs": 180
+    },
+    {
+      "build": "original",
+      "path": "/community",
+      "visibleMs": 454,
+      "readyMs": 454,
+      "firstContentfulPaintMs": 452
+    },
+    {
+      "build": "updated",
+      "path": "/community",
+      "visibleMs": 188,
+      "readyMs": 145,
+      "firstContentfulPaintMs": 188
+    },
+    {
+      "build": "original",
+      "path": "/community",
+      "visibleMs": 244,
+      "readyMs": 244,
+      "firstContentfulPaintMs": 244
+    },
+    {
+      "build": "updated",
+      "path": "/community",
+      "visibleMs": 189,
+      "readyMs": 189,
+      "firstContentfulPaintMs": 168
+    }
+  ],
+  "finalRefreshSeparatePass": [
+    {
+      "path": "/",
+      "visibleMs": 299,
+      "readyMs": 299
+    },
+    {
+      "path": "/",
+      "visibleMs": 575,
+      "readyMs": 575
+    },
+    {
+      "path": "/",
+      "visibleMs": 490,
+      "readyMs": 490
+    },
+    {
+      "path": "/article/uvnuhns6hcoeuwc/chatgpt",
+      "visibleMs": 304,
+      "readyMs": 195
+    },
+    {
+      "path": "/article/uvnuhns6hcoeuwc/chatgpt",
+      "visibleMs": 157,
+      "readyMs": 157
+    },
+    {
+      "path": "/article/uvnuhns6hcoeuwc/chatgpt",
+      "visibleMs": 241,
+      "readyMs": 241
+    },
+    {
+      "path": "/community",
+      "visibleMs": 396,
+      "readyMs": 227
+    },
+    {
+      "path": "/community",
+      "visibleMs": 202,
+      "readyMs": 202
+    },
+    {
+      "path": "/community",
+      "visibleMs": 368,
+      "readyMs": 288
+    }
+  ],
+  "delayedApiMs": 500,
+  "postAndBack": [
+    {
+      "post": 64,
+      "back": 71
+    },
+    {
+      "post": 64,
+      "back": 72
+    },
+    {
+      "post": 25,
+      "back": 47
+    }
+  ],
+  "preparedHomeNavigation": [
+    {
+      "article": 74,
+      "back": 138,
+      "community": 50,
+      "home": 65
+    },
+    {
+      "article": 48,
+      "back": 79,
+      "community": 32,
+      "home": 139
+    },
+    {
+      "article": 65,
+      "back": 104,
+      "community": 170,
+      "home": 252
+    }
+  ],
+  "projectTabs": {
+    "beforeFinalCachePass": {
+      "goals": [
+        588,
+        586,
+        546
+      ],
+      "projects": [
+        573,
+        566,
+        556
+      ]
+    },
+    "after": [
+      {
+        "tab": "goals",
+        "ms": 60,
+        "error": false
+      },
+      {
+        "tab": "projects",
+        "ms": 29,
+        "error": false
+      },
+      {
+        "tab": "goals",
+        "ms": 37,
+        "error": false
+      },
+      {
+        "tab": "projects",
+        "ms": 34,
+        "error": false
+      },
+      {
+        "tab": "goals",
+        "ms": 33,
+        "error": false
+      },
+      {
+        "tab": "projects",
+        "ms": 32,
+        "error": false
+      }
+    ]
+  },
+  "cachedArticleRefresh": [
+    {
+      "visibleMs": 296,
+      "articleApiMs": 563
+    },
+    {
+      "visibleMs": 352,
+      "articleApiMs": 556
+    },
+    {
+      "visibleMs": 292,
+      "articleApiMs": 578
+    }
+  ],
+  "payload": {
+    "initialEntryBytes": {
+      "before": 3358736,
+      "after": 601364
+    },
+    "newsletterListBytes": {
+      "before": 28333391,
+      "after": 426854
+    }
+  }
+}

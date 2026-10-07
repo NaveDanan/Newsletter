@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
 import type { Newsletter } from '../../types/newsletter';
+import { NewsletterCoverImage } from '@/components/newsletter/NewsletterCoverImage';
 
 interface NewsletterListProps {
   newsletters: Newsletter[];
@@ -13,6 +14,8 @@ interface NewsletterListProps {
   onDelete: (id: string) => Promise<boolean> | boolean;
   onSendUpdate: (id: string) => Promise<number | null> | number | null;
   onView: (newsletter: Newsletter) => void;
+  onEditIntent?: (newsletter: Newsletter) => void;
+  onViewIntent?: (newsletter: Newsletter) => void;
   onTogglePublish: (newsletter: Newsletter) => Promise<Newsletter | boolean | null> | Newsletter | boolean | null;
   canCreate: boolean;
   canEdit: (newsletter: Newsletter) => boolean;
@@ -27,6 +30,8 @@ export function NewsletterList({
   onDelete,
   onSendUpdate,
   onView,
+  onEditIntent,
+  onViewIntent,
   onTogglePublish,
   canCreate,
   canEdit,
@@ -228,15 +233,15 @@ export function NewsletterList({
               return (
                 <div
                   key={newsletter.id}
-                  className="p-4 sm:p-5 hover:bg-[var(--bg-card-hover)] transition-colors group"
+                  data-newsletter-id={newsletter.id}
+                  className="p-4 sm:p-5 hover:bg-[var(--bg-card-hover)] transition-colors group [content-visibility:auto] [contain-intrinsic-size:auto_180px]"
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 sm:gap-4 2xl:grid-cols-[auto_minmax(0,1fr)_auto]">
                   {/* Cover Image */}
-                  <div className="w-24 h-16 rounded-xl overflow-hidden shrink-0 border border-[var(--border-subtle)] bg-[var(--bg-app)]">
+                  <div className="w-16 sm:w-24 h-16 rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-app)]">
                     {newsletter.coverImage ? (
-                      <img
-                        src={newsletter.coverImage}
-                        alt={newsletter.title || 'Newsletter cover'}
+                      <NewsletterCoverImage
+                        newsletter={newsletter}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
                     ) : (
@@ -248,8 +253,8 @@ export function NewsletterList({
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
+                    <div className="flex flex-wrap items-start gap-2">
+                      <div className="min-w-0 w-full">
                         <h3 className="font-bold text-sm sm:text-base text-[var(--text-primary)] group-hover:text-[var(--primary-accent)] transition-colors line-clamp-1" dir="auto">
                           {newsletter.title || t('manager.untitledDraft')}
                         </h3>
@@ -289,7 +294,7 @@ export function NewsletterList({
                     </div>
 
                     {/* Meta */}
-                    <div className="flex items-center gap-4 mt-2 text-xs sm:text-sm text-[var(--text-secondary)]">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-xs sm:text-sm text-[var(--text-secondary)]">
                       <span dir="auto">{newsletter.author || t('manager.unknownAuthor')}</span>
                       <span>·</span>
                       <span>{newsletter.publishedAt}</span>
@@ -298,7 +303,7 @@ export function NewsletterList({
                       {newsletter.tags.length > 0 && (
                         <>
                           <span>·</span>
-                          <span className="flex items-center gap-1">
+                          <span className="flex flex-wrap items-center gap-1">
                             {newsletter.tags.slice(0, 2).map(tag => (
                               <span key={tag} className="skill-tag text-[10px] py-0.5 px-2">
                                 #{tag}
@@ -313,7 +318,7 @@ export function NewsletterList({
                     </div>
 
                     {/* Engagement */}
-                    <div className="flex items-center gap-4 mt-2 text-xs sm:text-sm text-[var(--text-muted)]">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs sm:text-sm text-[var(--text-muted)]">
                       <span>{formatNumber(newsletter.likes)} {t('manager.likes')}</span>
                       <span>{formatNumber(newsletter.comments)} {t('manager.comments')}</span>
                       <span>{formatNumber(newsletter.shares)} {t('manager.shares')}</span>
@@ -321,19 +326,25 @@ export function NewsletterList({
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 2xl:col-span-1 2xl:self-center [&_button]:inline-flex [&_button]:size-11 [&_button]:shrink-0 [&_button]:items-center [&_button]:justify-center [&_button]:p-0 [&_button]:rounded-xl [&_button]:focus-visible:outline-2 [&_button]:focus-visible:outline-[var(--primary-accent)]">
                     <button
                       onClick={() => onView(newsletter)}
+                      onPointerEnter={() => onViewIntent?.(newsletter)}
+                      onFocus={() => onViewIntent?.(newsletter)}
                       className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] rounded-xl transition-colors"
                       title={t('manager.view')}
+                      aria-label={t('manager.view')}
                     >
                       <HugeiconsIcon icon={ViewIcon} className="w-4 h-4" />
                     </button>
                     {canEditCurrent && (
                       <button
                         onClick={() => onEdit(newsletter)}
+                        onPointerEnter={() => onEditIntent?.(newsletter)}
+                        onFocus={() => onEditIntent?.(newsletter)}
                         className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)] rounded-xl transition-colors"
                         title={t('manager.edit')}
+                        aria-label={t('manager.edit')}
                       >
                         <HugeiconsIcon icon={Edit02Icon} className="w-4 h-4" />
                       </button>
@@ -371,32 +382,38 @@ export function NewsletterList({
                         />
                       </button>
                     )}
-                    {canSendUpdateCurrent && (
-                      <button
-                        onClick={() => handleSendUpdate(newsletter)}
-                        disabled={Boolean(sendingUpdateId)}
-                        className="p-2 text-[#737373] hover:text-[#D93A3A] hover:bg-red-50 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-60"
-                        title={t('manager.sendUpdateEmail')}
-                      >
-                        <HugeiconsIcon
-                          icon={isSendingUpdate ? Loading02Icon : Mail01Icon}
-                          className={cn('w-4 h-4', isSendingUpdate && 'animate-spin')}
-                        />
-                      </button>
-                    )}
-                    {canDeleteCurrent && (
-                      <button
-                        onClick={() => handleDelete(newsletter.id)}
-                        disabled={deletingId === newsletter.id}
-                        className={`p-2 rounded-lg transition-colors ${
-                          deleteConfirm === newsletter.id
-                            ? 'text-red-600 bg-red-100'
-                            : 'text-[#737373] hover:text-red-600 hover:bg-red-50'
-                        }`}
-                        title={deleteConfirm === newsletter.id ? t('manager.confirmDelete') : t('manager.delete')}
-                      >
-                        <HugeiconsIcon icon={Delete02Icon} className="w-4 h-4" />
-                      </button>
+                    {(canSendUpdateCurrent || canDeleteCurrent) && (
+                      <div className="flex shrink-0 items-center gap-2" data-newsletter-delivery-actions>
+                        {canSendUpdateCurrent && (
+                          <button
+                            onClick={() => handleSendUpdate(newsletter)}
+                            disabled={Boolean(sendingUpdateId)}
+                            className="p-2 text-[var(--text-secondary)] hover:text-[var(--primary-accent)] hover:bg-[var(--primary-accent)]/10 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-60"
+                            title={t('manager.sendUpdateEmail')}
+                            aria-label={t('manager.sendUpdateEmail')}
+                          >
+                            <HugeiconsIcon
+                              icon={isSendingUpdate ? Loading02Icon : Mail01Icon}
+                              className={cn('w-4 h-4', isSendingUpdate && 'animate-spin')}
+                            />
+                          </button>
+                        )}
+                        {canDeleteCurrent && (
+                          <button
+                            onClick={() => handleDelete(newsletter.id)}
+                            disabled={deletingId === newsletter.id}
+                            className={`p-2 rounded-lg transition-colors ${
+                              deleteConfirm === newsletter.id
+                                ? 'text-red-600 bg-red-100'
+                                : 'text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10'
+                            }`}
+                            title={deleteConfirm === newsletter.id ? t('manager.confirmDelete') : t('manager.delete')}
+                            aria-label={deleteConfirm === newsletter.id ? t('manager.confirmDelete') : t('manager.delete')}
+                          >
+                            <HugeiconsIcon icon={Delete02Icon} className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                   </div>

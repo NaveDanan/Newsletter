@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Heart, Message01Icon, Share02Icon } from "@hugeicons/core-free-icons";
 import { useLocale } from '@/contexts/LocaleContext';
@@ -6,9 +7,10 @@ import type { Newsletter } from '../types/newsletter';
 interface PopularArticlesProps {
   newsletters: Newsletter[];
   onArticleClick?: (newsletter: Newsletter) => void;
+  onArticleIntent?: (newsletter: Newsletter) => void;
 }
 
-export function PopularArticles({ newsletters, onArticleClick }: PopularArticlesProps) {
+export const PopularArticles = memo(function PopularArticles({ newsletters, onArticleClick, onArticleIntent }: PopularArticlesProps) {
   const { formatDate, formatNumber, t } = useLocale();
   const articles = [...newsletters]
     .sort((a, b) => (b.likes + b.comments + b.shares) - (a.likes + a.comments + a.shares))
@@ -36,7 +38,9 @@ export function PopularArticles({ newsletters, onArticleClick }: PopularArticles
         {articles.map((article) => (
           <article
             key={article.id}
-            onClick={() => onArticleClick?.(article)}
+              onClick={() => onArticleClick?.(article)}
+              onPointerEnter={() => onArticleIntent?.(article)}
+              onFocus={() => onArticleIntent?.(article)}
             className="feed-post-card group cursor-pointer p-4 sm:p-5"
           >
             <div className="flex gap-4">
@@ -76,6 +80,8 @@ export function PopularArticles({ newsletters, onArticleClick }: PopularArticles
               </div>
               <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-2xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-card-alt)]">
                 <img
+                  loading="lazy"
+                  decoding="async"
                   src={article.coverImage}
                   alt={article.title}
                   className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
@@ -87,4 +93,4 @@ export function PopularArticles({ newsletters, onArticleClick }: PopularArticles
       </div>
     </section>
   );
-}
+});

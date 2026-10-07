@@ -76,7 +76,7 @@ export function TimelineScrollbar({ viewportWidth, contentWidth, scrollElementRe
       onLostPointerCapture={() => { drag.current = null; setIsDragging(false); }}
     >
       <div
-        className={`absolute top-1 h-3 rounded-full bg-[var(--text-secondary)] transition-opacity ${isDragging ? 'opacity-100' : 'opacity-45'}`}
+        className={`absolute top-1 h-3 rounded-full bg-[var(--text-secondary)] transition-opacity ${isDragging ? 'opacity-100' : 'opacity-[0.45]'}`}
         style={{ width: thumbWidth, left: 4 + travel * position / maxScroll }}
       />
     </div>

@@ -22,6 +22,8 @@ function asDate(value: Date | string | number) {
   return isNaN(d.getTime()) ? new Date() : d;
 }
 
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
     const storedLocale = readStoredValue<string>(STORAGE_KEY, DEFAULT_LOCALE);
@@ -62,12 +64,21 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const t = useCallback((key: string, params: MessageParams = {}) => getMessage(locale, key, params), [locale]);
+  const numberFormatter = useMemo(() => new Intl.NumberFormat(intlLocale), [intlLocale]);
+  const relativeFormatter = useMemo(() => new Intl.RelativeTimeFormat(intlLocale, { numeric: 'auto' }), [intlLocale]);
 
   const formatDate = useCallback((value: Date | string | number, options?: Intl.DateTimeFormatOptions) => {
-    return new Intl.DateTimeFormat(intlLocale, options).format(asDate(value));
+    const key = intlLocale + JSON.stringify(options ?? {});
+    let formatter = dateFormatters.get(key);
+    if (!formatter) {
+      formatter = new Intl.DateTimeFormat(intlLocale, options);
+      if (dateFormatters.size >= 32) dateFormatters.clear();
+      dateFormatters.set(key, formatter);
+    }
+    return formatter.format(asDate(value));
   }, [intlLocale]);
 
-  const formatNumber = useCallback((value: number) => new Intl.NumberFormat(intlLocale).format(value), [intlLocale]);
+  const formatNumber = useCallback((value: number) => numberFormatter.format(value), [numberFormatter]);
 
   const formatRelativeTime = useCallback((value: Date | string | number) => {
     const target = asDate(value);
@@ -75,7 +86,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     const diffMinutes = Math.round(diffMs / (1000 * 60));
     const diffHours = Math.round(diffMs / (1000 * 60 * 60));
     const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-    const rtf = new Intl.RelativeTimeFormat(intlLocale, { numeric: 'auto' });
+    const rtf = relativeFormatter;
 
     if (Math.abs(diffMinutes) < 60) {
       return rtf.format(diffMinutes, 'minute');
@@ -94,7 +105,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       day: 'numeric',
       year: 'numeric',
     });
-  }, [formatDate, intlLocale]);
+  }, [formatDate, relativeFormatter]);
 
   const value = useMemo<LocaleContextValue>(() => ({
     locale,

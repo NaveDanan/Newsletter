@@ -6,7 +6,7 @@ import { useCommunityPosts } from '@/hooks/useCommunityPosts';
 import { communityFeedPath } from '@/lib/community-routes';
 import { fetchCommunityFeed } from '@/lib/pocketbase/community';
 import { cn } from '@/lib/utils';
-import { CommunityComposer } from './CommunityComposer';
+import { lazyComponent } from '@/lib/lazy-component';
 import { useCommunity } from './CommunityContext';
 import { CommunityFeedList } from './CommunityFeedList';
 import {
@@ -19,6 +19,9 @@ import { COMMUNITY_FEED_TABS, type CommunityFeedTab, type CommunityPost } from '
 // The three feed tabs are three different server queries over the same shape,
 // so switching tabs simply swaps the source function and lets
 // useCommunityPosts restart its cursor.
+
+
+const CommunityComposer = lazyComponent(() => import('./CommunityComposer').then((module) => ({ default: module.CommunityComposer })));
 
 interface CommunityFeedScreenProps {
   tab: CommunityFeedTab;
@@ -67,7 +70,7 @@ export function CommunityFeedScreen({
     [tab],
   );
 
-  const feed = useCommunityPosts(source, { errorMessage: t('community.feed.failed') });
+  const feed = useCommunityPosts(source, { cacheKey: `feed:${tab}`, errorMessage: t('community.feed.failed') });
   const actions = useCommunityEngagement({
     patchPost: feed.patchPost,
     removePost: feed.removePost,

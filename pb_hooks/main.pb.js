@@ -93,8 +93,8 @@ routerAdd('GET', '/api/newsletter/stats', function (e) {
   var helpers = require(__hooks + '/lib/newsletter-mail.js');
   helpers.syncRegisteredUsersAsSubscribers(e.app);
 
-  var activeSubscribers = e.app.findRecordsByFilter('newsletter_subscribers', 'isActive = true', '', 0, 0).length;
-  var publishedNewsletters = e.app.findRecordsByFilter('newsletters', 'status = "published"', '', 0, 0).length;
+  var activeSubscribers = e.app.countRecords('newsletter_subscribers', $dbx.hashExp({ isActive: true }));
+  var publishedNewsletters = e.app.countRecords('newsletters', $dbx.hashExp({ status: 'published' }));
 
   return e.json(200, {
     activeSubscribers: activeSubscribers,

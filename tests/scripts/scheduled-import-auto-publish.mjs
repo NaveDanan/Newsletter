@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 import PocketBase from 'pocketbase';
 import { NEWSLETTERS_SCHEMA, NEWSLETTER_IMPORT_JOBS_SCHEMA, NEWSLETTER_IMPORTS_SCHEMA } from '../../scripts/pocketbase/app-schema.mjs';
 
+assert.ok(NEWSLETTER_IMPORT_JOBS_SCHEMA.fields.some((field) => field.name === 'autoPublish' && field.type === 'bool'), 'The schedule schema must expose the saved auto-publish switch');
+
 const binary = process.env.IMPORT_TEST_PB_BINARY;
 if (!binary) throw new Error('Set IMPORT_TEST_PB_BINARY to a local PocketBase executable.');
 const appRoot = fileURLToPath(new URL('../../', import.meta.url));

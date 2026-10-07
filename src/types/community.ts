@@ -164,6 +164,8 @@ export interface CommunityHashtag {
 }
 
 export interface CommunityNotification {
+  /** Published newsletter cover URL; embedded covers are served separately. */
+  newsletterCoverUrl?: string;
   targetPath: string;
   id: string;
   kind: CommunityNotificationKind;

@@ -9,6 +9,13 @@ import { LocaleProvider } from './contexts/LocaleProvider.tsx'
 import { NavigationDataProvider } from './contexts/NavigationDataContext.tsx'
 import { NotificationsProvider } from './contexts/NotificationsContext.tsx'
 import { bootLogger } from './lib/bootLogger.ts'
+import { fetchNewsletter, fetchNewsletters } from './lib/pocketbase/newsletters'
+
+// Start route data before React mounts. The hook shares these pending reads.
+if (window.location.pathname === '/') void fetchNewsletters({ summary: true, force: true }).catch(() => {})
+else if (window.location.pathname.startsWith('/article/')) {
+  try { void fetchNewsletter(decodeURIComponent(window.location.pathname.split('/')[2])).catch(() => {}) } catch { /* The router handles malformed paths. */ }
+}
 
 bootLogger.once('bootstrap:module-evaluated', () => {
   bootLogger.step('bootstrap', 'main.tsx evaluated', {

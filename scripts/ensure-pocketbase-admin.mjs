@@ -20,6 +20,15 @@ function escapeFilterValue(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
+async function passwordMatches(pocketbaseUrl, email, password) {
+  try {
+    await new PocketBase(pocketbaseUrl).collection('users').authWithPassword(email, password);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
   const env = loadProjectEnv();
   const pocketbaseUrl = resolvePocketBaseUrl(env);
@@ -47,8 +56,15 @@ async function main() {
 
   try {
     const existingUser = await users.getFirstListItem(`email = "${escapeFilterValue(adminEmail)}"`);
-    // Keep the admin's chosen display name; it runs on every container start.
-    await users.update(existingUser.id, payload);
+    // This runs on every container start. Keep the admin's chosen display name,
+    // and only reset a password that no longer matches: setting it rotates the
+    // token key, which signs the admin out of every browser.
+    const update = { ...payload };
+    if (await passwordMatches(pocketbaseUrl, adminEmail, adminPassword)) {
+      delete update.password;
+      delete update.passwordConfirm;
+    }
+    await users.update(existingUser.id, update);
     console.log(`Updated app admin user ${adminEmail}`);
     return;
   } catch (error) {

@@ -41,13 +41,13 @@ async function main() {
     email: adminEmail,
     password: adminPassword,
     passwordConfirm: adminPassword,
-    name: 'Admin',
     role: 'admin',
     verified: true,
   };
 
   try {
     const existingUser = await users.getFirstListItem(`email = "${escapeFilterValue(adminEmail)}"`);
+    // Keep the admin's chosen display name; it runs on every container start.
     await users.update(existingUser.id, payload);
     console.log(`Updated app admin user ${adminEmail}`);
     return;
@@ -66,7 +66,7 @@ async function main() {
     }
   }
 
-  await users.create(payload);
+  await users.create({ ...payload, name: 'Admin' });
   console.log(`Created app admin user ${adminEmail}`);
 }
 

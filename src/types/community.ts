@@ -143,6 +143,8 @@ export interface CommunityProfile {
   postCount: number;
   isSuspended: boolean;
   suspendedReason: string;
+  /** Writer role or above; only these profiles show the verified badge. */
+  isWriter: boolean;
   createdAt: string;
   isFollowing: boolean;
   isFollowedBy: boolean;

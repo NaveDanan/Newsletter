@@ -1,5 +1,5 @@
 import { avatarUrlFor } from '@/lib/avatar';
-import { getPocketBase, normalizeUserRole } from './client';
+import { getPocketBase, normalizeUserRole, type UserRole } from './client';
 import { resolveCommunityFileUrl } from './community';
 import { cachedRead, peekRead, readCache, readScope } from './read-cache';
 import type { SiteWriter, WriterCandidate } from '@/types/writer';
@@ -8,8 +8,11 @@ import type { SiteWriter, WriterCandidate } from '@/types/writer';
 // served by /api/site/writers because the users collection is owner/admin-only;
 // curation edits users.featuredWriter directly, which only an admin may change.
 
-// Page size for loading every account into the admin curation list.
+// Page size for loading every eligible account into the admin curation list.
 const CANDIDATE_PAGE_SIZE = 500;
+
+// Writer and above. Mirrors WRITER_ROLES in pb_hooks/lib/community-core.js.
+const WRITER_ROLES: readonly UserRole[] = ['author', 'manager', 'general_manager', 'admin'];
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value : '';
@@ -40,7 +43,9 @@ export function fetchFeaturedWriters(): Promise<SiteWriter[]> {
 
 export async function fetchWriterCandidates(): Promise<WriterCandidate[]> {
   const pb = getPocketBase();
+  // Only writers and above are eligible; viewers never appear in the list.
   const records = await pb.collection('users').getFullList({
+    filter: WRITER_ROLES.map((role) => `role = "${role}"`).join(' || '),
     sort: '-featuredWriter,name',
     batch: CANDIDATE_PAGE_SIZE,
     requestKey: null,

@@ -67,7 +67,7 @@ function invalidateWriters(app) {
 // Fields the writers row renders or filters on; other edits (theme saves and
 // the like) leave the cached list valid.
 var WRITER_FIELDS = {
-  users: ['featuredWriter', 'name', 'avatar'],
+  users: ['featuredWriter', 'role', 'name', 'avatar'],
   community_profiles: ['userId', 'displayName', 'handle', 'avatar', 'avatarUrl', 'isSuspended'],
 };
 
@@ -148,7 +148,9 @@ function listFeaturedWriters(app) {
 }
 
 function buildFeaturedWriters(app) {
-  var users = safeFind(app, 'users', 'featuredWriter = true', 'name', MAX_WRITERS);
+  // A viewer never appears, even one ticked before being demoted.
+  var roles = core().buildInFilter('role', core().WRITER_ROLES, 'r');
+  var users = safeFind(app, 'users', 'featuredWriter = true && ' + roles.filter, 'name', MAX_WRITERS, roles.params);
   var identities = loadIdentities(app, users.map(function (user) { return String(user.id); }));
 
   var items = [];

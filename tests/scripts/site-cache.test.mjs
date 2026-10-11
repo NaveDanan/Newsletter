@@ -33,6 +33,7 @@ function fixture() {
   const core = {
     asText: (value) => String(value ?? ''),
     uniqueStrings: (values) => [...new Set(values)],
+    WRITER_ROLES: ['author', 'manager', 'general_manager', 'admin'],
     buildInFilter: (_field, ids) => ({ filter: '', params: { ids } }),
     profileAvatarUrl: () => '',
     fileUrl: () => '',
@@ -46,7 +47,7 @@ function fixture() {
       queries++;
       interleaving.query?.(collection, filter);
       if (collection === 'users') {
-        if (filter === 'featuredWriter = true' && !featured) return [];
+        if (filter.startsWith('featuredWriter = true') && !featured) return [];
         return [record('writer', { name: 'Writer', created: '2026-09-01 10:00:00Z' })];
       }
       if (collection === 'community_profiles') {

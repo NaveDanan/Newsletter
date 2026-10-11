@@ -12,9 +12,10 @@ import { fetchWriterCandidates, setWriterFeatured } from '@/lib/pocketbase/write
 import type { WriterCandidate } from '@/types/writer';
 
 /**
- * Admin-only curation of the homepage "Our Writers" row. Every user is listed
- * unticked by default, managers and admins included: a writing role on its own
- * never puts anybody in the row.
+ * Admin-only curation of the homepage "Our Writers" row. Every user with a
+ * writer role or above is listed, unticked by default, managers and admins
+ * included: a writing role on its own never puts anybody in the row. Viewers
+ * are never eligible.
  */
 export function FeaturedWritersManager() {
   const { t } = useLocale();

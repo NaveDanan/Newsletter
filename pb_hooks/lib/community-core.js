@@ -21,6 +21,9 @@ var NOTIFICATION_PAGE_SIZE = 30;
 var PREVIEW_LENGTH = 140;
 
 var MODERATOR_ROLES = ['manager', 'general_manager', 'admin'];
+// Writer and above: the roles that earn the verified badge and may sit in the
+// homepage "Our Writers" row.
+var WRITER_ROLES = ['author', 'manager', 'general_manager', 'admin'];
 var POST_KINDS = ['post', 'reply', 'quote'];
 var REPORT_REASONS = ['spam', 'abuse', 'harassment', 'misinformation', 'sensitive', 'other'];
 var REPORT_STATUSES = ['open', 'resolved', 'dismissed'];
@@ -852,6 +855,11 @@ function profileAvatarUrl(app, profile) {
   return '';
 }
 
+function isWriterUser(app, userId) {
+  var userRecord = userId ? findByIdOrNull(app, 'users', userId) : null;
+  return Boolean(userRecord) && includes(WRITER_ROLES, userRecord.getString('role'));
+}
+
 function serializeProfile(app, profile, viewerState) {
   if (!profile) {
     return null;
@@ -875,6 +883,7 @@ function serializeProfile(app, profile, viewerState) {
     postCount: profile.getInt('postCount'),
     isSuspended: profile.getBool('isSuspended'),
     suspendedReason: profile.getString('suspendedReason'),
+    isWriter: isWriterUser(app, profile.getString('userId')),
     createdAt: profile.getString('created'),
     isFollowing: Boolean(viewerState && viewerState.isFollowing),
     isFollowedBy: Boolean(viewerState && viewerState.isFollowedBy),
@@ -897,6 +906,7 @@ module.exports = {
   MAX_FEED_PAGE_SIZE: MAX_FEED_PAGE_SIZE,
   NOTIFICATION_PAGE_SIZE: NOTIFICATION_PAGE_SIZE,
   MODERATOR_ROLES: MODERATOR_ROLES,
+  WRITER_ROLES: WRITER_ROLES,
   POST_KINDS: POST_KINDS,
   REPORT_REASONS: REPORT_REASONS,
   REPORT_STATUSES: REPORT_STATUSES,

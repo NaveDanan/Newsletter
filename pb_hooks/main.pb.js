@@ -148,6 +148,13 @@ routerAdd('POST', '/api/scheduled/newsletter-digest/run', function (e) {
   return e.json(200, scheduled.runJobNow(e.app, { force: true }));
 }, $apis.bodyLimit(16384), $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
 
+routerAdd('POST', '/api/scheduled/newsletter-digest/test', function (e) {
+  var scheduled = require(__hooks + '/lib/scheduled-digest.js');
+  scheduled.ensureAdminAccess(e.auth);
+  var body = e.requestInfo().body || {};
+  return e.json(200, scheduled.sendTestDigest(e.app, body.email));
+}, $apis.bodyLimit(16384), $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
+
 onRecordAfterCreateSuccess(function (e) {
   var helpers = require(__hooks + '/lib/newsletter-mail.js');
   helpers.upsertSubscriberForUser(e.app, e.record);

@@ -6,25 +6,29 @@ import {
   FileAttachmentIcon,
   Loading02Icon,
   Mail01Icon,
+  MailSend01Icon,
   UserGroupIcon,
 } from '@hugeicons/core-free-icons';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { useLocale } from '@/contexts/LocaleContext';
 import {
   fetchNewsletterDigestSchedule,
   runNewsletterDigestNow,
+  sendNewsletterDigestTest,
   updateNewsletterDigestSchedule,
   type NewsletterDigestSchedule,
 } from '@/lib/pocketbase/scheduled';
-import type { UserRole } from '@/lib/pocketbase/client';
+import { getPocketBase, type UserRole } from '@/lib/pocketbase/client';
 
 interface ScheduledViewProps {
   currentUserRole: UserRole | null;
 }
 
 type IntervalUnit = 'hours' | 'days' | 'weeks';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function formatDateTime(value: string, locale: string): string {
   if (!value) return '-';
@@ -78,6 +82,8 @@ export function ScheduledPublishesSection({ currentUserRole }: ScheduledViewProp
   const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>('weeks');
   const [intervalValue, setIntervalValue] = useState(1);
   const [maxNewsletters, setMaxNewsletters] = useState(4);
+  const [testEmail, setTestEmail] = useState(() => String(getPocketBase().authStore.record?.email ?? ''));
+  const [isSendingTest, setIsSendingTest] = useState(false);
 
   const intervalMinutes = useMemo(
     () => toMinutes(intervalValue, intervalUnit),
@@ -190,6 +196,31 @@ export function ScheduledPublishesSection({ currentUserRole }: ScheduledViewProp
       toast.error(message);
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const handleSendTest = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSendingTest) return;
+
+    const email = testEmail.trim();
+    if (!EMAIL_PATTERN.test(email)) {
+      toast.error(t('scheduled.testInvalidEmail'));
+      return;
+    }
+
+    setIsSendingTest(true);
+    try {
+      const result = await sendNewsletterDigestTest(email);
+      toast.success(t(result.usedLatestPublished ? 'scheduled.testSentLatest' : 'scheduled.testSent', {
+        newsletters: result.newsletterCount,
+        email: result.email,
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('scheduled.testFailed');
+      toast.error(message);
+    } finally {
+      setIsSendingTest(false);
     }
   };
 
@@ -331,6 +362,37 @@ export function ScheduledPublishesSection({ currentUserRole }: ScheduledViewProp
             <p className="mt-2 text-xs text-[#737373]">{t('scheduled.maxNewslettersHint')}</p>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-xl border border-[#E5E5E5] bg-white p-5">
+        <h2 className="text-lg font-semibold text-[#171717]">{t('scheduled.testTitle')}</h2>
+        <p className="mt-1 text-sm text-[#737373]">{t('scheduled.testDescription')}</p>
+        <form onSubmit={handleSendTest} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,360px)_auto] sm:items-end">
+          <div>
+            <label htmlFor="scheduled-test-email" className="mb-2 block text-sm font-medium text-[#171717]">
+              {t('scheduled.testEmail')}
+            </label>
+            <input
+              id="scheduled-test-email"
+              type="email"
+              dir="ltr"
+              autoComplete="email"
+              required
+              value={testEmail}
+              onChange={(event) => setTestEmail(event.target.value)}
+              placeholder="name@example.com"
+              className="w-full"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isSendingTest}
+            className="btn-secondary flex items-center justify-center gap-2 self-end disabled:cursor-wait disabled:opacity-60"
+          >
+            <HugeiconsIcon icon={isSendingTest ? Loading02Icon : MailSend01Icon} className={isSendingTest ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            {t('scheduled.testSend')}
+          </button>
+        </form>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">

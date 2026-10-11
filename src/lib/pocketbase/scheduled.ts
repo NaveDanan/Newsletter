@@ -78,6 +78,26 @@ export async function runNewsletterDigestNow(): Promise<NewsletterDigestSchedule
   });
 }
 
+export interface NewsletterDigestTestResult {
+  status: string;
+  email: string;
+  newsletterCount: number;
+  newsletterIds: string[];
+  usedLatestPublished: boolean;
+}
+
+export async function sendNewsletterDigestTest(email: string): Promise<NewsletterDigestTestResult> {
+  const pb = getPocketBase();
+  return pb.send<NewsletterDigestTestResult>('/api/scheduled/newsletter-digest/test', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+    requestKey: null,
+  });
+}
+
 export interface NewsletterImportSchedule {
   enabled: boolean;
   autoPublish: boolean;

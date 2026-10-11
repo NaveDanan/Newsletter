@@ -235,6 +235,42 @@ function runDigest(app, options) {
   }
 }
 
+// Sends the digest that the next run would send, but only to `email`. When
+// nothing is pending it falls back to the latest published newsletters so the
+// template can still be checked. Job state and notificationSentAt are untouched.
+function sendTestDigest(app, email) {
+  var helpers = require(__hooks + '/lib/newsletter-mail.js');
+  if (!helpers.isValidEmail(helpers.normalizeEmail(email))) {
+    throw new BadRequestError('A valid email address is required.');
+  }
+
+  var job = ensureJob(app);
+  var maxNewsletters = getMaxNewsletters(job);
+  var newsletters = listPendingNewsletters(app).slice(0, maxNewsletters);
+  var usedLatestPublished = false;
+
+  if (!newsletters.length) {
+    newsletters = app.findRecordsByFilter('newsletters', 'status = "published"', '-publishedAt,-created', maxNewsletters, 0);
+    usedLatestPublished = true;
+  }
+
+  if (!newsletters.length) {
+    throw new BadRequestError('There are no published newsletters to include in a test email.');
+  }
+
+  try {
+    var result = helpers.sendNewsletterDigestTest(app, newsletters, email);
+    result.status = 'ok';
+    result.usedLatestPublished = usedLatestPublished;
+    return result;
+  } catch (error) {
+    if (error instanceof BadRequestError) throw error;
+    var message = error && error.message ? String(error.message) : String(error);
+    console.error('Newsletter digest test send failed:', error);
+    throw new BadRequestError('Failed to send the test email: ' + message);
+  }
+}
+
 function runJobNow(app, options) {
   var job = ensureJob(app);
 
@@ -275,6 +311,7 @@ module.exports = {
   ensureJob: ensureJob,
   JOB_KEY: JOB_KEY,
   runJobNow: runJobNow,
+  sendTestDigest: sendTestDigest,
   serializeJob: serializeJob,
   tick: tick,
   updateJobSettings: updateJobSettings,

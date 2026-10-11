@@ -72,7 +72,33 @@ function dotStuff(value) {
     .join(NEWLINE);
 }
 
-function buildMessage(payload) {
+function foldBinary(buffer) {
+  return buffer.toString('base64').replace(/.{1,76}/g, '$&' + NEWLINE).trimEnd();
+}
+
+function inlineImageType(bytes) {
+  if (bytes[0] === 0x89 && bytes.subarray(1, 4).toString('ascii') === 'PNG') return 'image/png';
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'image/jpeg';
+  if (bytes.subarray(0, 4).toString('ascii') === 'GIF8') return 'image/gif';
+  return 'application/octet-stream';
+}
+
+// Inline images referenced from the HTML as cid:<name>.
+async function readInlineImages(message) {
+  const inline = Array.isArray(message && message.inline) ? message.inline : [];
+  const images = [];
+
+  for (const item of inline) {
+    const cid = String(item && item.cid || '').replace(/[^A-Za-z0-9._-]/g, '');
+    if (!cid || !item.path) continue;
+    const bytes = await fs.readFile(item.path);
+    images.push({ cid, bytes, type: inlineImageType(bytes) });
+  }
+
+  return images;
+}
+
+function buildMessage(payload, inlineImages = []) {
   const message = payload.message || {};
   const from = normalizeAddress(message.from || payload.from);
   const to = normalizeAddressList(message.to);
@@ -111,8 +137,11 @@ function buildMessage(payload) {
   }
 
   let body = '';
+  // With inline images the content goes inside a multipart/related wrapper,
+  // so it is collected as its own part headers first.
+  const contentHeaders = inlineImages.length ? [] : headers;
   if (text && html) {
-    headers.push(['Content-Type', 'multipart/alternative; boundary="' + boundary + '"']);
+    contentHeaders.push(['Content-Type', 'multipart/alternative; boundary="' + boundary + '"']);
     body = [
       '--' + boundary,
       'Content-Type: text/plain; charset=UTF-8',
@@ -128,17 +157,41 @@ function buildMessage(payload) {
       '',
     ].join(NEWLINE);
   } else if (html) {
-    headers.push(
+    contentHeaders.push(
       ['Content-Type', 'text/html; charset=UTF-8'],
       ['Content-Transfer-Encoding', 'base64'],
     );
     body = foldBase64(html);
   } else {
-    headers.push(
+    contentHeaders.push(
       ['Content-Type', 'text/plain; charset=UTF-8'],
       ['Content-Transfer-Encoding', 'base64'],
     );
     body = foldBase64(text);
+  }
+
+  if (inlineImages.length) {
+    const related = boundary + '_related';
+    const parts = [
+      '--' + related,
+      ...contentHeaders.map(([key, value]) => key + ': ' + value),
+      '',
+      body,
+    ];
+    for (const image of inlineImages) {
+      parts.push(
+        '--' + related,
+        'Content-Type: ' + image.type + '; name="' + image.cid + '"',
+        'Content-Transfer-Encoding: base64',
+        'Content-ID: <' + image.cid + '>',
+        'Content-Disposition: inline; filename="' + image.cid + '"',
+        '',
+        foldBinary(image.bytes),
+      );
+    }
+    parts.push('--' + related + '--', '');
+    headers.push(['Content-Type', 'multipart/related; boundary="' + related + '"; type="' + (text && html ? 'multipart/alternative' : 'text/html') + '"']);
+    body = parts.join(NEWLINE);
   }
 
   return {
@@ -251,7 +304,7 @@ async function sendMail(payload) {
   const host = String(smtp.host || '').trim();
   const port = Number(smtp.port);
   const localName = String(smtp.localName || 'localhost').trim() || 'localhost';
-  const { envelope, raw } = buildMessage(payload);
+  const { envelope, raw } = buildMessage(payload, await readInlineImages(payload.message));
 
   if (!host || !Number.isInteger(port)) {
     throw new Error('Missing SMTP host or port.');

@@ -140,14 +140,10 @@ function getNodeBinaryPath() {
   return String($os.getenv('NODE_BIN') || 'node').trim() || 'node';
 }
 
-function createTempMailPayload(payload) {
+function createTempMailPayloadPath() {
   var tempDir = String($os.tempDir() || '/tmp').replace(/[\\\/]+$/, '');
   var suffix = String(Date.now()) + '-' + String(Math.floor(Math.random() * 1000000));
-  var path = tempDir + '/pocketbase-mail-' + suffix + '.json';
-
-  $os.writeFile(path, JSON.stringify(payload), 384);
-
-  return path;
+  return tempDir + '/pocketbase-mail-' + suffix + '.json';
 }
 
 function serializeAddressList(value) {
@@ -168,7 +164,27 @@ function serializeAddressList(value) {
   return result;
 }
 
-function serializeMessage(message, app) {
+// Inline (cid:) images travel to the Node mailer as temporary files; the
+// caller removes them after sending.
+function serializeInlineAttachments(message, payloadPath) {
+  var result = [];
+  var attachments = message && message.inlineAttachments;
+
+  if (!attachments) {
+    return result;
+  }
+
+  var names = Object.keys(attachments);
+  for (var i = 0; i < names.length; i += 1) {
+    var path = payloadPath + '.inline-' + i;
+    $os.writeFile(path, toBytes(attachments[names[i]]), 384);
+    result.push({ cid: String(names[i]), path: path });
+  }
+
+  return result;
+}
+
+function serializeMessage(message, app, payloadPath) {
   var sender = message && message.from && message.from.address ? message.from : getSender(app);
 
   return {
@@ -183,6 +199,7 @@ function serializeMessage(message, app) {
     html: message && message.html ? String(message.html) : '',
     text: message && message.text ? String(message.text) : '',
     headers: message && message.headers ? message.headers : {},
+    inline: serializeInlineAttachments(message, payloadPath),
   };
 }
 
@@ -198,7 +215,9 @@ function sendMailWithInsecureTlsVerification(app, message) {
     return false;
   }
 
-  var payloadPath = createTempMailPayload({
+  var payloadPath = createTempMailPayloadPath();
+  var serialized = serializeMessage(message, app, payloadPath);
+  $os.writeFile(payloadPath, JSON.stringify({
     insecureSkipVerify: true,
     smtp: {
       host: String(smtp.host || ''),
@@ -209,8 +228,8 @@ function sendMailWithInsecureTlsVerification(app, message) {
       tls: Boolean(smtp.tls),
       localName: String(smtp.localName || ''),
     },
-    message: serializeMessage(message, app),
-  });
+    message: serialized,
+  }), 384);
 
   var errFilePath = payloadPath + '.err';
 
@@ -233,6 +252,9 @@ function sendMailWithInsecureTlsVerification(app, message) {
   } finally {
     try { $os.remove(payloadPath); } catch (_) {}
     try { $os.remove(errFilePath); } catch (_) {}
+    for (var i = 0; i < serialized.inline.length; i += 1) {
+      try { $os.remove(serialized.inline[i].path); } catch (_) {}
+    }
   }
 
   return true;
@@ -386,20 +408,29 @@ function upsertSubscriber(app, email, options) {
     return null;
   }
 
-  var subscriber = null;
-  subscriber = findSubscriberByEmail(app, email);
+  var locale = normalizeLocale(options.locale);
+  var source = normalizeSource(options.source || 'registered_account');
+  var subscriber = findSubscriberByEmail(app, email);
 
   if (!subscriber) {
     var collection = app.findCollectionByNameOrId('newsletter_subscribers');
     subscriber = new Record(collection);
     subscriber.set('email', email);
+    subscriber.set('locale', locale);
+    subscriber.set('isActive', true);
+    subscriber.set('source', source);
+    app.save(subscriber);
+    return subscriber;
   }
 
-  subscriber.set('locale', normalizeLocale(options.locale));
-  subscriber.set('isActive', true);
-  subscriber.set('source', normalizeSource(options.source || 'registered_account'));
-
-  app.save(subscriber);
+  // An existing row keeps its isActive value: a subscriber an admin switched
+  // off in the PocketBase UI must stay off through the registered-user sync,
+  // user record updates and repeated subscribe requests.
+  if (subscriber.getString('locale') !== locale || subscriber.getString('source') !== source) {
+    subscriber.set('locale', locale);
+    subscriber.set('source', source);
+    app.save(subscriber);
+  }
 
   return subscriber;
 }
@@ -511,75 +542,151 @@ function buildUnsubscribeUrl(subscriber) {
     + '&locale=' + encodeURIComponent(locale);
 }
 
-function buildUnsubscribeFooter(locale, unsubscribeUrl) {
+// All emails share one layout tuned for older Outlook desktop: fixed-width
+// tables with bgcolor attributes, hex colours only and inline styles. Rounded
+// corners and the web font are progressive extras that Outlook skips.
+var EMAIL_WIDTH = 880;
+var EMAIL_GUTTER = 40;
+var EMAIL_CONTENT_WIDTH = EMAIL_WIDTH - EMAIL_GUTTER * 2;
+var EMAIL_FONT = "'Plus Jakarta Sans',Heebo,'Segoe UI',Arial,sans-serif";
+
+function emailImages() {
+  return require(__hooks + '/lib/email-image.js');
+}
+
+function emailThemes() {
+  return require(__hooks + '/lib/email-theme.js');
+}
+
+function getSubscriberTheme(app, subscriber) {
+  return emailThemes().themeForEmail(app, subscriber ? subscriber.getString('email') : '');
+}
+
+function buildUnsubscribeFooter(locale, unsubscribeUrl, theme) {
   var unsubscribeLabel = locale === 'he' ? 'הסרה מהרשימה' : 'Unsubscribe';
   var unsubscribeCopy = locale === 'he'
     ? 'אם אינכם רוצים לקבל עדכוני ניוזלטר נוספים, אפשר להסיר את עצמכם כאן.'
     : 'If you no longer want newsletter updates, you can unsubscribe here.';
 
-  if (!unsubscribeUrl) {
-    return '<p style="margin:8px 0 0;color:#A3A3A3;font-size:12px;line-height:1.6">' + unsubscribeCopy + '</p>';
-  }
-
   return ''
-    + '<p style="margin:8px 0 0;color:#A3A3A3;font-size:12px;line-height:1.6">'
+    + '<p style="margin:8px 0 0;color:' + theme.textMuted + ';font-family:' + EMAIL_FONT + ';font-size:12px;line-height:19px">'
     + unsubscribeCopy
-    + ' <a href="' + escapeHtml(unsubscribeUrl) + '" style="color:#D93A3A;text-decoration:underline;font-weight:600">' + unsubscribeLabel + '</a>'
+    + (unsubscribeUrl
+      ? ' <a href="' + escapeHtml(unsubscribeUrl) + '" style="color:' + theme.accentText + ';text-decoration:underline;font-weight:700">' + unsubscribeLabel + '</a>'
+      : '')
     + '</p>';
 }
 
-function buildEmailButton(url, label, align) {
+// A pill button on the recipient's accent. Outlook ignores padding on links,
+// so mso-padding-alt pads the cell there instead.
+function buildEmailButton(url, label, align, theme) {
   if (!url) {
     return '';
   }
 
   return ''
-    + '<table role="presentation" border="0" cellspacing="0" cellpadding="0" align="' + align + '" style="border-collapse:collapse;margin:0">'
+    + '<table role="presentation" border="0" cellspacing="0" cellpadding="0" align="' + align + '" style="border-collapse:separate;margin:0">'
     + '<tr>'
-    + '<td bgcolor="#D93A3A" style="background:#D93A3A;padding:14px 22px;font-family:Arial,sans-serif;font-size:15px;line-height:18px;font-weight:800">'
-    + '<a href="' + escapeHtml(url) + '" style="color:#ffffff;text-decoration:none;display:inline-block">' + label + '</a>'
+    + '<td align="center" bgcolor="' + theme.accent + '" style="background:' + theme.accent + ';border-radius:9999px;mso-padding-alt:14px 30px">'
+    + '<a href="' + escapeHtml(url) + '" style="display:inline-block;padding:14px 30px;border-radius:9999px;color:' + theme.accentContrast + ';font-family:' + EMAIL_FONT + ';font-size:15px;line-height:18px;font-weight:700;text-decoration:none">' + label + '</a>'
     + '</td>'
     + '</tr>'
     + '</table>';
 }
 
-function appendImageOptimizationParams(url, thumb) {
-  url = String(url || '').trim();
-  if (!url) {
-    return '';
-  }
+function buildDivider(theme) {
+  return '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td height="1" bgcolor="' + theme.border + '" style="height:1px;line-height:1px;font-size:1px;background:' + theme.border + '">&nbsp;</td></tr></table>';
+}
 
-  var separator = url.indexOf('?') === -1 ? '?' : '&';
-  return url + separator + 'thumb=' + encodeURIComponent(thumb || '420x180') + '&quality=72';
+function buildSpacer(height) {
+  return '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td height="' + height + '" style="height:' + height + 'px;line-height:' + height + 'px;font-size:1px">&nbsp;</td></tr></table>';
+}
+
+// Covers are usually data URLs; they are compressed and attached inline (cid:)
+// when `inlineImages` is given. The record id + update time identify the
+// cover, so a send run prepares each image once instead of per subscriber.
+function buildCoverImage(app, record, alt, maxWidth, inlineImages, radius) {
+  var html = emailImages().buildEmailImage({
+    app: app,
+    inlineImages: inlineImages,
+    src: record.getString('coverImage'),
+    alt: alt,
+    maxWidth: maxWidth,
+    baseUrl: getFrontendPublicUrl(),
+    cacheKey: 'newsletter:' + record.id + ':' + record.getString('updated'),
+  });
+
+  return radius && html ? html.replace('style="', 'style="border-radius:' + radius + ';') : html;
 }
 
 function buildEmailShell(options) {
+  var theme = options.theme;
   var direction = options.direction || 'ltr';
   var textAlign = options.textAlign || 'left';
-  var width = options.width || 640;
+  var locale = direction === 'rtl' ? 'he' : 'en';
   var preheader = options.preheader || '';
   var footerBrand = options.footerBrand || '';
 
   return ''
-    + '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
-    + '<body style="margin:0;padding:0;background:#F3F4F6;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">'
+    + '<!doctype html>'
+    + '<html lang="' + locale + '" dir="' + direction + '" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">'
+    + '<head>'
+    + '<meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<meta http-equiv="X-UA-Compatible" content="IE=edge">'
+    + '<meta name="color-scheme" content="' + theme.mode + '">'
+    + '<meta name="supported-color-schemes" content="' + theme.mode + '">'
+    // 96 PPI stops Outlook on scaled Windows displays from resizing images
+    // and table widths; the font rule avoids its Times New Roman fallback.
+    + '<!--[if mso]><xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>'
+    + '<style>table,td,p,a,h1,h2,span,div{font-family:"Segoe UI",Arial,sans-serif !important}</style><![endif]-->'
+    + '<style>@media screen and (max-width:640px){.email-gutter{padding-left:20px !important;padding-right:20px !important}.email-title{font-size:30px !important;line-height:36px !important}}</style>'
+    + '</head>'
+    + '<body bgcolor="' + theme.outer + '" style="margin:0;padding:0;background:' + theme.outer + ';-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">'
     + '<div style="display:none;max-height:0;overflow:hidden;color:transparent;opacity:0;mso-hide:all">' + preheader + '</div>'
-    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#F3F4F6" style="border-collapse:collapse;background:#F3F4F6;width:100%">'
+    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="' + theme.outer + '" style="border-collapse:collapse;background:' + theme.outer + ';width:100%">'
     + '<tr>'
-    + '<td align="center" style="padding:28px 12px">'
-    + '<table role="presentation" width="' + width + '" border="0" cellspacing="0" cellpadding="0" dir="' + direction + '" style="border-collapse:collapse;width:100%;max-width:' + width + 'px;background:#ffffff;border:1px solid #E5E5E5;text-align:' + textAlign + ';font-family:Arial,sans-serif;color:#171717">'
-    + '<tr><td bgcolor="#D93A3A" height="6" style="height:6px;line-height:6px;font-size:1px;background:#D93A3A">&nbsp;</td></tr>'
+    + '<td align="center" style="padding:32px 12px">'
+    + '<table role="presentation" width="' + EMAIL_WIDTH + '" align="center" border="0" cellspacing="0" cellpadding="0" dir="' + direction + '" bgcolor="' + theme.card + '" style="border-collapse:separate;width:100%;max-width:' + EMAIL_WIDTH + 'px;background:' + theme.card + ';border:1px solid ' + theme.border + ';border-radius:22px;text-align:' + textAlign + ';font-family:' + EMAIL_FONT + ';color:' + theme.text + '">'
+    + '<tr><td height="6" bgcolor="' + theme.accent + '" style="height:6px;line-height:6px;font-size:1px;background:' + theme.accent + ';border-radius:22px 22px 0 0">&nbsp;</td></tr>'
     + options.body
     + '</table>'
-    + (footerBrand ? '<table role="presentation" width="' + width + '" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;max-width:' + width + 'px"><tr><td align="center" style="padding:18px 12px 0;color:#A3A3A3;font-family:Arial,sans-serif;font-size:12px;line-height:18px">' + footerBrand + '</td></tr></table>' : '')
+    + (footerBrand
+      ? '<table role="presentation" width="' + EMAIL_WIDTH + '" align="center" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;max-width:' + EMAIL_WIDTH + 'px"><tr><td align="center" style="padding:20px 12px 0;color:' + theme.textMuted + ';font-family:' + EMAIL_FONT + ';font-size:12px;line-height:18px">' + footerBrand + '</td></tr></table>'
+      : '')
     + '</td>'
     + '</tr>'
     + '</table>'
     + '</body></html>';
 }
 
-function buildNewsletterEmail(app, record, subscriber) {
+function buildEmailHeader(options) {
+  var theme = options.theme;
+
+  return ''
+    + '<tr><td class="email-gutter" style="padding:36px ' + EMAIL_GUTTER + 'px 28px;font-family:' + EMAIL_FONT + ';text-align:' + options.textAlign + '">'
+    + '<p style="margin:0 0 14px;color:' + theme.accentText + ';font-size:12px;line-height:16px;font-weight:800;letter-spacing:2px;text-transform:uppercase">' + escapeHtml(options.appName) + '</p>'
+    + (options.eyebrow ? '<p style="margin:0 0 18px;color:' + theme.textMuted + ';font-size:13px;line-height:18px;font-weight:600">' + options.eyebrow + '</p>' : '')
+    + '<h1 class="email-title" style="margin:0;color:' + theme.text + ';font-size:40px;line-height:46px;font-weight:800">' + options.title + '</h1>'
+    + (options.subtitle ? '<p style="margin:16px 0 0;color:' + theme.textSecondary + ';font-size:19px;line-height:30px;font-weight:500">' + options.subtitle + '</p>' : '')
+    + '</td></tr>';
+}
+
+// The accent-tinted callout with a coloured edge on the reading side.
+function buildCallout(theme, textAlign, html) {
+  var edge = textAlign === 'right' ? 'border-right' : 'border-left';
+
+  return ''
+    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:separate">'
+    + '<tr><td bgcolor="' + theme.accentWash + '" style="background:' + theme.accentWash + ';' + edge + ':4px solid ' + theme.accent + ';border-radius:14px;padding:22px 26px;font-family:' + EMAIL_FONT + ';text-align:' + textAlign + '">'
+    + html
+    + '</td></tr>'
+    + '</table>';
+}
+
+function buildNewsletterUpdateEmail(app, record, subscriber, inlineImages) {
   var locale = normalizeLocale(subscriber.getString('locale'));
+  var theme = getSubscriberTheme(app, subscriber);
   var appName = getAppName(app);
   var subject = locale === 'he'
     ? 'ניוזלטר חדש מ-' + appName
@@ -589,177 +696,142 @@ function buildNewsletterEmail(app, record, subscriber) {
   var excerptSource = stripHtml(record.getString('excerpt') || record.getString('content'));
   var excerpt = escapeHtml(excerptSource.slice(0, 320));
   var articleUrl = buildArticleUrl(record);
-  var unsubscribeUrl = buildUnsubscribeUrl(subscriber);
-  var ctaLabel = locale === 'he' ? 'לקריאת הניוזלטר' : 'Read the newsletter';
-  var intro = locale === 'he'
-    ? 'ניוזלטר חדש פורסם באתר.'
-    : 'A new newsletter has just been published.';
-  var textAlign = getNewsletterTextAlignment(record);
-
-  return {
-    subject: subject,
-    html: ''
-      + '<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#171717;line-height:1.6;text-align:' + textAlign + '">'
-      + '<p style="margin:0 0 16px">' + escapeHtml(appName) + '</p>'
-      + '<h1 style="margin:0 0 12px;font-size:28px;line-height:1.2">' + title + '</h1>'
-      + (subtitle ? '<p style="margin:0 0 16px;font-size:18px;color:#525252">' + subtitle + '</p>' : '')
-      + '<p style="margin:0 0 16px">' + intro + '</p>'
-      + (excerpt ? '<p style="margin:0 0 24px;color:#404040">' + excerpt + '</p>' : '')
-      + (articleUrl
-        ? '<p style="margin:0 0 24px"><a href="' + escapeHtml(articleUrl) + '" style="display:inline-block;background:#d93a3a;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px">' + ctaLabel + '</a></p>'
-        : '')
-      + '<p style="margin:0;color:#737373;font-size:14px">'
-      + (locale === 'he' ? 'קיבלתם את ההודעה כי נרשמתם לעדכוני הניוזלטר.' : 'You received this email because you subscribed to newsletter updates.')
-      + '</p>'
-      + buildUnsubscribeFooter(locale, unsubscribeUrl)
-      + '</div>',
-  };
-}
-
-function buildNewsletterUpdateEmail(app, record, subscriber) {
-  var locale = normalizeLocale(subscriber.getString('locale'));
-  var appName = getAppName(app);
-  var subject = locale === 'he'
-    ? '\u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8 \u05d7\u05d3\u05e9 \u05de-' + appName
-    : 'A new newsletter from ' + appName;
-  var title = escapeHtml(record.getString('title'));
-  var subtitle = escapeHtml(record.getString('subtitle'));
-  var excerptSource = stripHtml(record.getString('excerpt') || record.getString('content'));
-  var excerpt = escapeHtml(excerptSource.slice(0, 320));
-  var articleUrl = buildArticleUrl(record);
-  var coverImage = escapeHtml(record.getString('coverImage'));
+  var coverImage = buildCoverImage(app, record, title, EMAIL_CONTENT_WIDTH, inlineImages, '18px');
   var publishedAt = escapeHtml(record.getString('publishedAt'));
   var readTime = escapeHtml(record.getString('readTime'));
   var direction = locale === 'he' ? 'rtl' : 'ltr';
   var textAlign = getNewsletterTextAlignment(record);
-  var accentSide = textAlign === 'right' ? 'right' : 'left';
   var ctaLabel = locale === 'he'
-    ? '\u05dc\u05e7\u05e8\u05d9\u05d0\u05ea \u05d4\u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8'
+    ? 'לקריאת הניוזלטר'
     : 'Read the newsletter';
   var latestLabel = locale === 'he'
-    ? '\u05e4\u05d5\u05e8\u05e1\u05dd \u05e2\u05db\u05e9\u05d9\u05d5 \u05d1\u05d0\u05ea\u05e8'
+    ? 'פורסם עכשיו באתר'
     : 'Fresh on the site';
   var footerText = locale === 'he'
-    ? '\u05e7\u05d9\u05d1\u05dc\u05ea\u05dd \u05d0\u05ea \u05d4\u05d4\u05d5\u05d3\u05e2\u05d4 \u05db\u05d9 \u05e0\u05e8\u05e9\u05de\u05ea\u05dd \u05dc\u05e2\u05d3\u05db\u05d5\u05e0\u05d9 \u05d4\u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8.'
+    ? 'קיבלתם את ההודעה כי נרשמתם לעדכוני הניוזלטר.'
     : 'You received this email because you subscribed to newsletter updates.';
   var intro = locale === 'he'
-    ? '\u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8 \u05d7\u05d3\u05e9 \u05e2\u05dc\u05d4 \u05dc\u05d0\u05ea\u05e8 \u05e2\u05dd \u05ea\u05d5\u05d1\u05e0\u05d5\u05ea \u05d5\u05e2\u05d3\u05db\u05d5\u05e0\u05d9\u05dd \u05e9\u05db\u05d3\u05d0\u05d9 \u05dc\u05e4\u05ea\u05d5\u05d7.'
+    ? 'ניוזלטר חדש עלה לאתר עם תובנות ועדכונים שכדאי לפתוח.'
     : 'A new newsletter is live on the site, with the latest signals and practical takeaways.';
   var meta = [publishedAt, readTime].filter(function (value) { return Boolean(value); }).join(' / ');
-  var calloutBorder = textAlign === 'right' ? 'border-right:4px solid #D93A3A;padding-right:18px' : 'border-left:4px solid #D93A3A;padding-left:18px';
   var buttonAlign = textAlign === 'right' ? 'right' : textAlign === 'center' ? 'center' : 'left';
   var unsubscribeUrl = buildUnsubscribeUrl(subscriber);
   var body = ''
-    + '<tr><td style="padding:30px 32px 24px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
-    + '<p style="margin:0 0 12px;color:#D93A3A;font-size:12px;line-height:16px;font-weight:800;letter-spacing:2px;text-transform:uppercase">' + escapeHtml(appName) + '</p>'
-    + '<p style="margin:0 0 20px;color:#737373;font-size:13px;line-height:18px;font-weight:600">' + latestLabel + (meta ? ' / ' + meta : '') + '</p>'
-    + '<h1 style="margin:0 0 18px;color:#171717;font-size:38px;line-height:42px;font-weight:800">' + title + '</h1>'
-    + (subtitle ? '<p style="margin:0;color:#404040;font-size:18px;line-height:28px;font-weight:500">' + subtitle + '</p>' : '')
-    + '</td></tr>'
+    + buildEmailHeader({
+      theme: theme,
+      textAlign: textAlign,
+      appName: appName,
+      eyebrow: latestLabel + (meta ? ' / ' + meta : ''),
+      title: title,
+      subtitle: subtitle,
+    })
     + (coverImage
-      ? '<tr><td style="padding:0 32px 28px"><img src="' + coverImage + '" alt="' + title + '" width="656" style="display:block;width:100%;max-width:656px;height:auto;border:0;outline:none;text-decoration:none" /></td></tr>'
-      : '<tr><td style="padding:0 32px 28px"><table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td height="1" bgcolor="#E5E5E5" style="height:1px;line-height:1px;font-size:1px;background:#E5E5E5">&nbsp;</td></tr></table></td></tr>')
-    + '<tr><td style="padding:0 32px 34px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
-    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td style="' + calloutBorder + ';text-align:' + textAlign + ';font-family:Arial,sans-serif">'
-    + '<p style="margin:0 0 16px;color:#171717;font-size:17px;line-height:28px">' + intro + '</p>'
-    + (excerpt ? '<p style="margin:0;color:#525252;font-size:16px;line-height:28px">' + excerpt + '</p>' : '')
-    + '</td></tr></table>'
-    + (articleUrl ? '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td align="' + buttonAlign + '" style="padding:30px 0 34px">' + buildEmailButton(articleUrl, ctaLabel, buttonAlign) + '</td></tr></table>' : '')
-    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td height="1" bgcolor="#E5E5E5" style="height:1px;line-height:1px;font-size:1px;background:#E5E5E5">&nbsp;</td></tr></table>'
-    + '<p style="margin:18px 0 0;color:#737373;font-size:13px;line-height:21px">' + footerText + '</p>'
-    + buildUnsubscribeFooter(locale, unsubscribeUrl)
+      ? '<tr><td class="email-gutter" align="center" style="padding:0 ' + EMAIL_GUTTER + 'px 32px">' + coverImage + '</td></tr>'
+      : '<tr><td class="email-gutter" style="padding:0 ' + EMAIL_GUTTER + 'px 32px">' + buildDivider(theme) + '</td></tr>')
+    + '<tr><td class="email-gutter" style="padding:0 ' + EMAIL_GUTTER + 'px 36px;font-family:' + EMAIL_FONT + ';text-align:' + textAlign + '">'
+    + buildCallout(theme, textAlign, ''
+      + '<p style="margin:0' + (excerpt ? ' 0 14px' : '') + ';color:' + theme.text + ';font-size:17px;line-height:28px;font-weight:600">' + intro + '</p>'
+      + (excerpt ? '<p style="margin:0;color:' + theme.textSecondary + ';font-size:16px;line-height:28px">' + excerpt + '</p>' : ''))
+    + (articleUrl ? '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td align="' + buttonAlign + '" style="padding:32px 0 36px">' + buildEmailButton(articleUrl, ctaLabel, buttonAlign, theme) + '</td></tr></table>' : buildSpacer(32))
+    + buildDivider(theme)
+    + '<p style="margin:18px 0 0;color:' + theme.textMuted + ';font-size:13px;line-height:21px">' + footerText + '</p>'
+    + buildUnsubscribeFooter(locale, unsubscribeUrl, theme)
     + '</td></tr>';
 
   return {
     subject: subject,
     html: buildEmailShell({
+      theme: theme,
       direction: direction,
       textAlign: textAlign,
-      width: 720,
       preheader: intro,
       body: body,
     }),
   };
 }
 
-function buildDigestNewsletterItem(record, locale) {
+function buildDigestNewsletterItem(app, record, locale, theme, inlineImages) {
   var title = escapeHtml(record.getString('title'));
   var subtitle = escapeHtml(record.getString('subtitle'));
   var excerptSource = stripHtml(record.getString('excerpt') || record.getString('content'));
-  var excerpt = escapeHtml(excerptSource.slice(0, 220));
+  var excerpt = escapeHtml(excerptSource.slice(0, 260));
   var articleUrl = buildArticleUrl(record);
-  var coverImage = escapeHtml(appendImageOptimizationParams(record.getString('coverImage'), '420x180'));
+  // The card's 1px border leaves 2px less than the content column.
+  var coverImage = buildCoverImage(app, record, title, EMAIL_CONTENT_WIDTH - 2, inlineImages, '18px 18px 0 0');
   var publishedAt = escapeHtml(record.getString('publishedAt'));
   var readTime = escapeHtml(record.getString('readTime'));
   var meta = [publishedAt, readTime].filter(function (value) { return Boolean(value); }).join(' / ');
+  var textAlign = locale === 'he' ? 'right' : 'left';
+  var arrow = locale === 'he' ? '&larr;' : '&rarr;';
   var ctaLabel = locale === 'he'
-    ? '\u05dc\u05e7\u05e8\u05d9\u05d0\u05ea \u05d4\u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8'
+    ? 'לקריאת הניוזלטר'
     : 'Read newsletter';
-  var bannerLabel = title || 'AI-BREAK';
   var banner = coverImage
-    ? '<tr><td align="center" style="padding:0 0 12px"><img src="' + coverImage + '" alt="' + title + '" width="420" style="display:block;width:100%;max-width:420px;height:auto;border:0;outline:none;text-decoration:none" /></td></tr>'
-    : '<tr><td align="center" style="padding:0 0 12px"><table role="presentation" width="420" border="0" cellspacing="0" cellpadding="0" bgcolor="#171717" style="border-collapse:collapse;background:#171717;width:100%;max-width:420px"><tr><td align="center" height="92" style="height:92px;color:#ffffff;font-family:Arial,sans-serif;font-size:12px;line-height:17px;font-weight:800;letter-spacing:2px;text-transform:uppercase">' + bannerLabel + '</td></tr></table></td></tr>';
+    ? '<tr><td align="center" style="padding:0;line-height:0;font-size:0">' + coverImage + '</td></tr>'
+    : '<tr><td align="center" height="120" bgcolor="' + theme.accent + '" style="height:120px;background:' + theme.accent + ';border-radius:18px 18px 0 0;color:' + theme.accentContrast + ';font-family:' + EMAIL_FONT + ';font-size:14px;line-height:20px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:0 24px">' + (title || escapeHtml(getAppName(app))) + '</td></tr>';
 
   return ''
-    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border-top:1px solid #E5E5E5">'
-    + '<tr><td style="padding:22px 0;font-family:Arial,sans-serif">'
-    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse">'
+    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="' + theme.surface + '" style="border-collapse:separate;background:' + theme.surface + ';border:1px solid ' + theme.border + ';border-radius:18px">'
     + banner
-    + '</table>'
-    + (meta ? '<p style="margin:0 0 8px;color:#737373;font-size:12px;line-height:17px;font-weight:700">' + meta + '</p>' : '')
-    + '<h2 style="margin:0 0 10px;color:#171717;font-size:22px;line-height:28px;font-weight:800">' + title + '</h2>'
-    + (subtitle ? '<p style="margin:0 0 10px;color:#404040;font-size:15px;line-height:23px;font-weight:600">' + subtitle + '</p>' : '')
-    + (excerpt ? '<p style="margin:0 0 14px;color:#525252;font-size:14px;line-height:24px">' + excerpt + '</p>' : '')
+    + '<tr><td style="padding:26px 30px 30px;font-family:' + EMAIL_FONT + ';text-align:' + textAlign + '">'
+    + (meta ? '<p style="margin:0 0 10px;color:' + theme.textMuted + ';font-size:12px;line-height:17px;font-weight:700">' + meta + '</p>' : '')
+    + '<h2 style="margin:0 0 10px;color:' + theme.text + ';font-size:26px;line-height:33px;font-weight:800">' + title + '</h2>'
+    + (subtitle ? '<p style="margin:0 0 12px;color:' + theme.textSecondary + ';font-size:16px;line-height:25px;font-weight:600">' + subtitle + '</p>' : '')
+    + (excerpt ? '<p style="margin:0 0 18px;color:' + theme.textSecondary + ';font-size:15px;line-height:25px">' + excerpt + '</p>' : '')
     + (articleUrl
-      ? '<p style="margin:0"><a href="' + escapeHtml(articleUrl) + '" style="color:#D93A3A;text-decoration:underline;font-size:14px;font-weight:800">' + ctaLabel + '</a></p>'
+      ? '<p style="margin:0"><a href="' + escapeHtml(articleUrl) + '" style="color:' + theme.accentText + ';text-decoration:none;font-size:15px;line-height:20px;font-weight:800">' + ctaLabel + ' ' + arrow + '</a></p>'
       : '')
     + '</td></tr>'
-    + '</table>';
+    + '</table>'
+    + buildSpacer(24);
 }
 
-function buildNewsletterDigestEmail(app, records, subscriber) {
+function buildNewsletterDigestEmail(app, records, subscriber, inlineImages) {
   var locale = 'he';
+  var theme = getSubscriberTheme(app, subscriber);
   var appName = getAppName(app);
   var direction = locale === 'he' ? 'rtl' : 'ltr';
   var textAlign = locale === 'he' ? 'right' : 'left';
   var count = records.length;
   var subject = locale === 'he'
-    ? '\u05e2\u05d3\u05db\u05d5\u05e0\u05d9 \u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8 \u05d7\u05d3\u05e9\u05d9\u05dd \u05de-' + appName
+    ? 'עדכוני ניוזלטר חדשים מ-' + appName
     : 'New newsletter updates from ' + appName;
   var title = locale === 'he'
-    ? '\u05e2\u05d3\u05db\u05d5\u05e0\u05d9 \u05d4\u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8 \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd'
+    ? 'עדכוני הניוזלטר האחרונים'
     : 'Latest newsletter updates';
   var intro = locale === 'he'
-    ? '\u05e8\u05d9\u05db\u05d6\u05e0\u05d5 \u05e2\u05d1\u05d5\u05e8\u05db\u05dd ' + count + ' \u05e4\u05e8\u05e1\u05d5\u05de\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd \u05e9\u05e2\u05dc\u05d5 \u05dc\u05d0\u05ea\u05e8.'
+    ? 'ריכזנו עבורכם ' + count + ' פרסומים חדשים שעלו לאתר.'
     : 'Here are ' + count + ' new newsletter publications now available on the site.';
   var footerText = locale === 'he'
-    ? '\u05e7\u05d9\u05d1\u05dc\u05ea\u05dd \u05d0\u05ea \u05d4\u05d4\u05d5\u05d3\u05e2\u05d4 \u05db\u05d9 \u05e0\u05e8\u05e9\u05de\u05ea\u05dd \u05dc\u05e2\u05d3\u05db\u05d5\u05e0\u05d9 \u05d4\u05e0\u05d9\u05d5\u05d6\u05dc\u05d8\u05e8.'
+    ? 'קיבלתם את ההודעה כי נרשמתם לעדכוני הניוזלטר.'
     : 'You received this email because you subscribed to newsletter updates.';
   var unsubscribeUrl = buildUnsubscribeUrl(subscriber);
   var items = '';
 
   for (var i = 0; i < records.length; i += 1) {
-    items += buildDigestNewsletterItem(records[i], locale);
+    items += buildDigestNewsletterItem(app, records[i], locale, theme, inlineImages);
   }
   var body = ''
-    + '<tr><td style="padding:30px 32px 18px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
-    + '<p style="margin:0 0 12px;color:#D93A3A;font-size:12px;line-height:16px;font-weight:800;letter-spacing:2px;text-transform:uppercase">' + escapeHtml(appName) + '</p>'
-    + '<h1 style="margin:0 0 14px;color:#171717;font-size:34px;line-height:39px;font-weight:800">' + title + '</h1>'
-    + '<p style="margin:0;color:#404040;font-size:16px;line-height:27px">' + intro + '</p>'
-    + '</td></tr>'
-    + '<tr><td style="padding:0 32px 34px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
+    + buildEmailHeader({
+      theme: theme,
+      textAlign: textAlign,
+      appName: appName,
+      title: title,
+      subtitle: intro,
+    })
+    + '<tr><td class="email-gutter" style="padding:0 ' + EMAIL_GUTTER + 'px 36px;font-family:' + EMAIL_FONT + ';text-align:' + textAlign + '">'
     + items
-    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td height="1" bgcolor="#E5E5E5" style="height:1px;line-height:1px;font-size:1px;background:#E5E5E5">&nbsp;</td></tr></table>'
-    + '<p style="margin:18px 0 0;color:#737373;font-size:13px;line-height:21px">' + footerText + '</p>'
-    + buildUnsubscribeFooter(locale, unsubscribeUrl)
+    + buildDivider(theme)
+    + '<p style="margin:18px 0 0;color:' + theme.textMuted + ';font-size:13px;line-height:21px">' + footerText + '</p>'
+    + buildUnsubscribeFooter(locale, unsubscribeUrl, theme)
     + '</td></tr>';
 
   return {
     subject: subject,
     html: buildEmailShell({
+      theme: theme,
       direction: direction,
       textAlign: textAlign,
-      width: 720,
       preheader: intro,
       body: body,
     }),
@@ -824,6 +896,7 @@ function buildPasswordResetEmail(app, record, resetUrl) {
       ? 'אם לא ביקשתם את השינוי הזה, אפשר להתעלם מהאימייל. הקישור יפוג בהתאם להגדרות האבטחה של החשבון.'
       : 'If you did not request this change, you can ignore this email. The link expires according to your account security settings.',
     locale: locale,
+    theme: emailThemes().buildTheme(emailThemes().readPreferences(record)),
   });
 }
 
@@ -847,18 +920,18 @@ function buildVerificationEmail(app, record, verificationUrl) {
       ? 'אם לא יצרתם את החשבון הזה, אפשר להתעלם מהאימייל.'
       : 'If you did not create this account, you can ignore this email.',
     locale: locale,
+    theme: emailThemes().buildTheme(emailThemes().readPreferences(record)),
   });
 }
 
-function buildTransactionalEmail(app, options) {
+function buildTransactionalEmailTable(app, options) {
   var appName = getAppName(app);
   var locale = normalizeLocale(options.locale);
+  var theme = options.theme || emailThemes().buildTheme();
   var isHebrew = locale === 'he';
   var direction = isHebrew ? 'rtl' : 'ltr';
   var textAlign = isHebrew ? 'right' : 'left';
-  var accentStyle = isHebrew
-    ? 'padding-right:18px;border-right:4px solid #D93A3A'
-    : 'padding-left:18px;border-left:4px solid #D93A3A';
+  var buttonAlign = isHebrew ? 'right' : 'left';
   var fallbackCopy = isHebrew
     ? 'אם הכפתור לא נפתח, אפשר להשתמש בקישור הזה:'
     : 'If the button does not work, open this link:';
@@ -870,85 +943,30 @@ function buildTransactionalEmail(app, options) {
   var actionUrl = escapeHtml(options.actionUrl || '');
   var actionLabel = escapeHtml(options.actionLabel || 'Open');
   var note = escapeHtml(options.note || '');
-
-  return {
-    subject: subject,
-    html: ''
-      + '<div dir="' + direction + '" style="margin:0;background:#F3F4F6;color:#171717;font-family:Inter,Arial,sans-serif;line-height:1.6;text-align:' + textAlign + '">'
-      + '<div style="display:none;max-height:0;overflow:hidden;color:transparent;opacity:0">' + body + '</div>'
-      + '<div style="max-width:640px;margin:0 auto;padding:28px 18px">'
-      + '<div style="background:#ffffff;border:1px solid #E5E5E5;border-radius:16px;overflow:hidden">'
-      + '<div style="height:6px;background:#D93A3A;line-height:6px;font-size:1px">&nbsp;</div>'
-      + '<div style="padding:30px 32px 12px">'
-      + '<p style="margin:0 0 12px;color:#D93A3A;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase">' + escapeHtml(appName) + '</p>'
-      + '<p style="margin:0 0 18px;color:#737373;font-size:13px;font-weight:700">' + eyebrow + '</p>'
-      + '<h1 style="margin:0;color:#171717;font-size:34px;line-height:1.14;font-weight:800;letter-spacing:0">' + title + '</h1>'
-      + '</div>'
-      + '<div style="padding:14px 32px 34px">'
-      + '<div style="' + accentStyle + '">'
-      + '<p style="margin:0 0 12px;color:#171717;font-size:16px;font-weight:700">' + greeting + '</p>'
-      + '<p style="margin:0;color:#404040;font-size:16px;line-height:1.75">' + body + '</p>'
-      + '</div>'
-      + (actionUrl
-        ? '<p style="margin:28px 0 28px"><a href="' + actionUrl + '" style="display:inline-block;background:#D93A3A;color:#ffffff;text-decoration:none;padding:14px 22px;border-radius:6px;font-size:15px;font-weight:800">' + actionLabel + '</a></p>'
-        : '')
-      + (actionUrl
-        ? '<p style="margin:0 0 20px;color:#737373;font-size:12px;line-height:1.7">' + fallbackCopy + '<br><a href="' + actionUrl + '" style="color:#D93A3A;text-decoration:underline;word-break:break-all">' + actionUrl + '</a></p>'
-        : '')
-      + '<div style="height:1px;background:#E5E5E5;line-height:1px;font-size:1px">&nbsp;</div>'
-      + (note ? '<p style="margin:18px 0 0;color:#737373;font-size:13px;line-height:1.7">' + note + '</p>' : '')
-      + '</div>'
-      + '</div>'
-      + '<p style="margin:18px 0 0;text-align:center;color:#A3A3A3;font-size:12px;line-height:1.6">' + escapeHtml(appName) + '</p>'
-      + '</div>'
-      + '</div>',
-  };
-}
-
-function buildTransactionalEmailTable(app, options) {
-  var appName = getAppName(app);
-  var locale = normalizeLocale(options.locale);
-  var isHebrew = locale === 'he';
-  var direction = isHebrew ? 'rtl' : 'ltr';
-  var textAlign = isHebrew ? 'right' : 'left';
-  var accentStyle = isHebrew
-    ? 'padding-right:18px;border-right:4px solid #D93A3A'
-    : 'padding-left:18px;border-left:4px solid #D93A3A';
-  var buttonAlign = isHebrew ? 'right' : 'left';
-  var fallbackCopy = isHebrew
-    ? '\u05d0\u05dd \u05d4\u05db\u05e4\u05ea\u05d5\u05e8 \u05dc\u05d0 \u05e0\u05e4\u05ea\u05d7, \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05e9\u05ea\u05de\u05e9 \u05d1\u05e7\u05d9\u05e9\u05d5\u05e8 \u05d4\u05d6\u05d4:'
-    : 'If the button does not work, open this link:';
-  var subject = String(options.subject || appName);
-  var title = escapeHtml(options.title || appName);
-  var eyebrow = escapeHtml(options.eyebrow || appName);
-  var greeting = escapeHtml(options.greeting || 'Hello,');
-  var body = escapeHtml(options.body || '');
-  var actionUrl = escapeHtml(options.actionUrl || '');
-  var actionLabel = escapeHtml(options.actionLabel || 'Open');
-  var note = escapeHtml(options.note || '');
   var bodyHtml = ''
-    + '<tr><td style="padding:30px 32px 12px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
-    + '<p style="margin:0 0 12px;color:#D93A3A;font-size:12px;line-height:16px;font-weight:800;letter-spacing:2px;text-transform:uppercase">' + escapeHtml(appName) + '</p>'
-    + '<p style="margin:0 0 18px;color:#737373;font-size:13px;line-height:18px;font-weight:700">' + eyebrow + '</p>'
-    + '<h1 style="margin:0;color:#171717;font-size:34px;line-height:39px;font-weight:800">' + title + '</h1>'
-    + '</td></tr>'
-    + '<tr><td style="padding:14px 32px 34px;font-family:Arial,sans-serif;text-align:' + textAlign + '">'
-    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td style="' + accentStyle + ';font-family:Arial,sans-serif;text-align:' + textAlign + '">'
-    + '<p style="margin:0 0 12px;color:#171717;font-size:16px;line-height:23px;font-weight:700">' + greeting + '</p>'
-    + '<p style="margin:0;color:#404040;font-size:16px;line-height:28px">' + body + '</p>'
-    + '</td></tr></table>'
-    + (actionUrl ? '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td align="' + buttonAlign + '" style="padding:28px 0">' + buildEmailButton(options.actionUrl || '', actionLabel, buttonAlign) + '</td></tr></table>' : '')
-    + (actionUrl ? '<p style="margin:0 0 20px;color:#737373;font-size:12px;line-height:20px">' + fallbackCopy + '<br><a href="' + actionUrl + '" style="color:#D93A3A;text-decoration:underline;word-break:break-all">' + actionUrl + '</a></p>' : '')
-    + '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td height="1" bgcolor="#E5E5E5" style="height:1px;line-height:1px;font-size:1px;background:#E5E5E5">&nbsp;</td></tr></table>'
-    + (note ? '<p style="margin:18px 0 0;color:#737373;font-size:13px;line-height:22px">' + note + '</p>' : '')
+    + buildEmailHeader({
+      theme: theme,
+      textAlign: textAlign,
+      appName: appName,
+      eyebrow: eyebrow,
+      title: title,
+    })
+    + '<tr><td class="email-gutter" style="padding:0 ' + EMAIL_GUTTER + 'px 36px;font-family:' + EMAIL_FONT + ';text-align:' + textAlign + '">'
+    + buildCallout(theme, textAlign, ''
+      + '<p style="margin:0 0 12px;color:' + theme.text + ';font-size:16px;line-height:23px;font-weight:700">' + greeting + '</p>'
+      + '<p style="margin:0;color:' + theme.textSecondary + ';font-size:16px;line-height:28px">' + body + '</p>')
+    + (actionUrl ? '<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr><td align="' + buttonAlign + '" style="padding:30px 0">' + buildEmailButton(options.actionUrl || '', actionLabel, buttonAlign, theme) + '</td></tr></table>' : buildSpacer(30))
+    + (actionUrl ? '<p style="margin:0 0 22px;color:' + theme.textMuted + ';font-size:12px;line-height:20px">' + fallbackCopy + '<br><a href="' + actionUrl + '" style="color:' + theme.accentText + ';text-decoration:underline;word-break:break-all">' + actionUrl + '</a></p>' : '')
+    + buildDivider(theme)
+    + (note ? '<p style="margin:18px 0 0;color:' + theme.textMuted + ';font-size:13px;line-height:22px">' + note + '</p>' : '')
     + '</td></tr>';
 
   return {
     subject: subject,
     html: buildEmailShell({
+      theme: theme,
       direction: direction,
       textAlign: textAlign,
-      width: 640,
       preheader: body,
       body: bodyHtml,
       footerBrand: escapeHtml(appName),
@@ -956,26 +974,24 @@ function buildTransactionalEmailTable(app, options) {
   };
 }
 
-function createNewsletterMessage(app, record, subscriber) {
-  var mail = buildNewsletterUpdateEmail(app, record, subscriber);
-
-  return new MailerMessage({
+// Builds the message, attaches its compressed inline images and sends it.
+// `build(inlineImages)` returns { subject, html } and collects the images.
+function sendBuiltEmail(app, mailClient, address, build, subjectPrefix) {
+  var inlineImages = [];
+  var mail = build(inlineImages);
+  var message = new MailerMessage({
     from: getSender(app),
-    to: [{ address: subscriber.getString('email') }],
-    subject: mail.subject,
+    to: [{ address: address }],
+    subject: (subjectPrefix || '') + mail.subject,
     html: mail.html,
   });
-}
+  var release = emailImages().attachInlineImages(message, inlineImages);
 
-function createNewsletterDigestMessage(app, records, subscriber) {
-  var mail = buildNewsletterDigestEmail(app, records, subscriber);
-
-  return new MailerMessage({
-    from: getSender(app),
-    to: [{ address: subscriber.getString('email') }],
-    subject: mail.subject,
-    html: mail.html,
-  });
+  try {
+    mailClient.send(message);
+  } finally {
+    release();
+  }
 }
 
 function markNotificationSent(app, record, sentCount) {
@@ -1005,7 +1021,9 @@ function sendNewsletterDigestNotifications(app, records, subscribers) {
     }
 
     try {
-      mailClient.send(createNewsletterDigestMessage(app, records, subscriber));
+      sendBuiltEmail(app, mailClient, email, function (inlineImages) {
+        return buildNewsletterDigestEmail(app, records, subscriber, inlineImages);
+      });
       sentCount += 1;
     } catch (error) {
       console.error('Failed to send newsletter digest to ' + email + ':', error);
@@ -1021,6 +1039,34 @@ function sendNewsletterDigestNotifications(app, records, subscribers) {
     sentCount: sentCount,
     newsletterCount: records.length,
     newsletterIds: newsletterIds,
+  };
+}
+
+// Sends one digest to a single address so admins can check the real email
+// before subscribers get it. Nothing is marked as sent and no subscriber is
+// created; delivery errors are thrown so the caller can report them.
+function sendNewsletterDigestTest(app, records, email) {
+  email = normalizeEmail(email);
+
+  if (!isValidEmail(email)) {
+    throw new BadRequestError('A valid email address is required.');
+  }
+
+  var recipient = findSubscriberByEmail(app, email) || {
+    id: '',
+    getString: function (key) {
+      return key === 'email' ? email : '';
+    },
+  };
+
+  sendBuiltEmail(app, app.newMailClient(), email, function (inlineImages) {
+    return buildNewsletterDigestEmail(app, records, recipient, inlineImages);
+  }, '[TEST] ');
+
+  return {
+    email: email,
+    newsletterCount: records.length,
+    newsletterIds: records.map(function (record) { return record.id; }),
   };
 }
 
@@ -1058,7 +1104,9 @@ function sendNewsletterNotifications(app, record, options) {
     }
 
     try {
-      mailClient.send(createNewsletterMessage(app, record, subscriber));
+      sendBuiltEmail(app, mailClient, email, function (inlineImages) {
+        return buildNewsletterUpdateEmail(app, record, subscriber, inlineImages);
+      });
       sentCount += 1;
     } catch (error) {
       console.error('Failed to send newsletter notification to ' + email + ':', error);
@@ -1083,6 +1131,7 @@ module.exports = {
   normalizeSource: normalizeSource,
   sendMailWithInsecureTlsVerification: sendMailWithInsecureTlsVerification,
   sendNewsletterDigestNotifications: sendNewsletterDigestNotifications,
+  sendNewsletterDigestTest: sendNewsletterDigestTest,
   sendNewsletterNotifications: sendNewsletterNotifications,
   shouldSkipSmtpTlsVerification: shouldSkipSmtpTlsVerification,
   subscribeEmail: subscribeEmail,

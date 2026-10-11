@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Policy for scripts/pocketbase/email-image.mjs, which re-encodes newsletter
+  covers as small JPEGs for email. Input always arrives on stdin, so no file
+  path comes from users. There are no path rules: on ImageMagick 7.1 a
+  `path none *` rule also denies the temp file that stdin is spooled to,
+  whatever later allow rule is added. Coders stay limited to browser formats.
+-->
+<policymap>
+  <policy domain="resource" name="memory" value="256MiB"/>
+  <policy domain="resource" name="map" value="512MiB"/>
+  <policy domain="resource" name="disk" value="1GiB"/>
+  <policy domain="resource" name="width" value="16KP"/>
+  <policy domain="resource" name="height" value="16KP"/>
+  <policy domain="resource" name="list-length" value="32"/>
+  <policy domain="resource" name="thread" value="2"/>
+  <policy domain="resource" name="time" value="30"/>
+  <policy domain="delegate" rights="none" pattern="*"/>
+  <policy domain="filter" rights="none" pattern="*"/>
+  <policy domain="coder" rights="none" pattern="*"/>
+  <policy domain="coder" rights="read" pattern="{PNG,GIF,WEBP,BMP}"/>
+  <policy domain="coder" rights="read|write" pattern="{JPEG,JPG}"/>
+</policymap>

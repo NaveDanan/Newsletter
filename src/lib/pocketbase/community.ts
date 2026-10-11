@@ -244,6 +244,7 @@ export function mapCommunityProfile(raw: unknown): CommunityProfile {
     postCount: num(value.postCount),
     isSuspended: bool(value.isSuspended),
     suspendedReason: str(value.suspendedReason),
+    isWriter: bool(value.isWriter),
     createdAt: str(value.createdAt),
     isFollowing: bool(value.isFollowing),
     isFollowedBy: bool(value.isFollowedBy),

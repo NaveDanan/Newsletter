@@ -1518,7 +1518,8 @@ function getTrends(e) {
         .forEach(function (record) { followingIds.push(record.getString('followingId')); });
     }
 
-    var candidates = app.findRecordsByFilter('community_profiles', 'isSuspended = false', '-followerCount,-postCount', 20, 0);
+    // Only real members who have posted in the community are suggested.
+    var candidates = app.findRecordsByFilter('community_profiles', 'isSuspended = false && postCount > 0', '-followerCount,-postCount', 20, 0);
     candidates.forEach(function (record) {
       if (suggestions.length >= 5) {
         return;

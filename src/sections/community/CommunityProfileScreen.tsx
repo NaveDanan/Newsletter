@@ -75,72 +75,6 @@ function VerifiedBadge({ className = 'size-4' }: { className?: string }) {
   );
 }
 
-const DEFAULT_SUGGESTIONS: CommunityProfile[] = [
-  {
-    id: 'sug-1',
-    userId: 'u-1',
-    handle: 'aibreak',
-    displayName: 'AI-BREAK',
-    bio: 'הניוזלטר המוביל לבינה מלאכותית, עדכונים, כלים ומדריכים מעשיים.',
-    location: 'Israel',
-    website: '',
-    avatarUrl: '',
-    bannerUrl: '',
-    pinnedPostId: '',
-    followerCount: 1420,
-    followingCount: 12,
-    postCount: 84,
-    isSuspended: false,
-    suspendedReason: '',
-    createdAt: '2025-01-01T00:00:00Z',
-    isFollowing: false,
-    isFollowedBy: false,
-    isSelf: false,
-  },
-  {
-    id: 'sug-2',
-    userId: 'u-2',
-    handle: 'navedanan',
-    displayName: 'Nave Danan',
-    bio: 'Product Designer & Full-stack Engineer. Building AI experiences.',
-    location: 'Tel Aviv',
-    website: '',
-    avatarUrl: '',
-    bannerUrl: '',
-    pinnedPostId: '',
-    followerCount: 520,
-    followingCount: 38,
-    postCount: 42,
-    isSuspended: false,
-    suspendedReason: '',
-    createdAt: '2025-03-01T00:00:00Z',
-    isFollowing: false,
-    isFollowedBy: false,
-    isSelf: false,
-  },
-  {
-    id: 'sug-3',
-    userId: 'u-3',
-    handle: 'techlead',
-    displayName: 'Tech Lead',
-    bio: 'כל מה שחם בפיתוח, ארכיטקטורה וחדשנות דיגיטלית.',
-    location: '',
-    website: '',
-    avatarUrl: '',
-    bannerUrl: '',
-    pinnedPostId: '',
-    followerCount: 890,
-    followingCount: 45,
-    postCount: 128,
-    isSuspended: false,
-    suspendedReason: '',
-    createdAt: '2025-02-01T00:00:00Z',
-    isFollowing: false,
-    isFollowedBy: false,
-    isSelf: false,
-  },
-];
-
 export function CommunityProfileScreen({ handle, tab, onEditProfile }: CommunityProfileScreenProps) {
   const { t, formatDate, formatNumber } = useLocale();
   const { isAuthenticated, navigate, openReport, requireAuth, canModerate } = useCommunity();
@@ -239,14 +173,11 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
   };
 
   const updateSuggestion = (sugHandle: string, isFollowing: boolean, followerCount: number) => {
-    setSuggestions((current) => {
-      const list = current.length > 0 ? current : DEFAULT_SUGGESTIONS;
-      return list.map((item) => (
-        item.handle === sugHandle
-          ? { ...item, isFollowing, followerCount: followerCount >= 0 ? followerCount : item.followerCount }
-          : item
-      ));
-    });
+    setSuggestions((current) => current.map((item) => (
+      item.handle === sugHandle
+        ? { ...item, isFollowing, followerCount: followerCount >= 0 ? followerCount : item.followerCount }
+        : item
+    )));
   };
 
   if (isLoading && !profile) {
@@ -280,8 +211,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
     : `${profile.displayName || profile.handle} ${t('community.post.reposted')}`;
 
   const renderWhoToFollow = () => {
-    const filtered = suggestions.filter((s) => s.handle !== profile.handle);
-    const displayedSuggestions = (filtered.length > 0 ? filtered : DEFAULT_SUGGESTIONS.filter((s) => s.handle !== profile.handle)).slice(0, 3);
+    const displayedSuggestions = suggestions.filter((s) => s.handle !== profile.handle).slice(0, 3);
     if (displayedSuggestions.length === 0) {
       return null;
     }
@@ -311,7 +241,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
                     <span className="truncate text-[15px] font-bold text-[var(--text-primary)] hover:underline">
                       {item.displayName || item.handle}
                     </span>
-                    <VerifiedBadge className="size-4" />
+                    {item.isWriter ? <VerifiedBadge className="size-4" /> : null}
                   </div>
                   <p className="truncate text-sm text-[var(--text-secondary)]">@{item.handle}</p>
                   {item.bio ? (
@@ -365,7 +295,7 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
               <h1 className="truncate text-xl font-bold text-[var(--text-primary)]">
                 {profile.displayName || profile.handle}
               </h1>
-              <VerifiedBadge className="size-4" />
+              {profile.isWriter ? <VerifiedBadge className="size-4" /> : null}
             </div>
             <p className="truncate text-xs sm:text-sm text-[var(--text-secondary)]">
               {profile.postCount === 1
@@ -471,9 +401,9 @@ export function CommunityProfileScreen({ handle, tab, onEditProfile }: Community
               <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">
                 {profile.displayName || profile.handle}
               </h2>
-              <VerifiedBadge className="size-5" />
+              {profile.isWriter ? <VerifiedBadge className="size-5" /> : null}
             </div>
-            {profile.isSelf ? (
+            {profile.isSelf && !profile.isWriter ? (
               <button
                 type="button"
                 onClick={() => toast.info('Verified badges are awarded to recognized contributors.')}

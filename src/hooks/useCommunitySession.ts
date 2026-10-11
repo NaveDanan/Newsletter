@@ -108,6 +108,7 @@ export function useCommunitySession(isAuthenticated: boolean): UseCommunitySessi
         postCount: 0,
         isSuspended: false,
         suspendedReason: '',
+        isWriter: user.role !== 'viewer',
         createdAt: user.created || '',
         isFollowing: false,
         isFollowedBy: false,

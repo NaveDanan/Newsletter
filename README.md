@@ -128,6 +128,7 @@ Helm chart support is available in `helm/newsletter`.
 - Dev example: `helm/newsletter/values.dev.example.yaml`
 - Production example: `helm/newsletter/values.production.example.yaml`
 - Deployment guide: `docs/kubernetes.md`
+- Guided persistent Artifactory CA setup: `bash scripts/artifactory-ca-wizard.sh` ([instructions](docs/kubernetes.md#persistent-artifactory-ca-trust)).
 
 ### Email Delivery
 

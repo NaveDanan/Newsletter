@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test:add-newsletter-fixture": "node tests/scripts/add-newsletter-fixture.mjs",
     "test:scheduled-import": "node --test tests/scripts/scheduled-import.test.mjs",
+    "test:scheduled-import-errors": "node tests/scripts/scheduled-import-errors.mjs",
     "test:community-core": "node scripts/test-community-core.cjs",
     "test:community-mirror": "node scripts/test-community-mirror.cjs",
     "test:community-api": "node tests/scripts/community-api.mjs",

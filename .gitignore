@@ -16,4 +16,6 @@ __pycache__/
 !.env.example
 !.env.docker.example
 /manager-roadmap-gantts-import*.xlsx
+.newsletter-ca-wizard.env
+newsletter-ca-setup.*/
 /tests/geektime-ai-newsletter-2026-07-13.json

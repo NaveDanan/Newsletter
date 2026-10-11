@@ -56,3 +56,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s:%s" $repository .Values.image.tag -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "newsletter.artifactoryCaBundle" -}}
+{{- get (default dict .Values.artifactoryCa) "bundle" | default "" | trim -}}
+{{- end -}}
+
+{{- define "newsletter.artifactoryCaName" -}}
+{{- printf "%s-artifactory-ca" (include "newsletter.fullname" . | trunc 48 | trimSuffix "-") -}}
+{{- end -}}

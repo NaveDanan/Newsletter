@@ -100,6 +100,24 @@ A complete example Application manifest is available in `docs/argocd-application
 
 Important detail: `CreateNamespace=true` only creates the namespace. If your chart values use `credentials.existingSecret`, that secret still needs to be created declaratively in the target namespace.
 
+## Persistent Artifactory CA trust
+
+When the Newsletter pod cannot verify Artifactory's certificate, use the guided setup on a workstation that can access the affected cluster:
+
+```bash
+bash scripts/artifactory-ca-wizard.sh
+```
+
+Requirements: Bash, kubectl, Helm 3, OpenSSL, and Python 3 with PyYAML (for example the Linux `python3-yaml` package). Use the updated chart shipped with the wizard.
+
+The wizard selects the context, namespace and Deployment; validates PEM or DER CA certificates from `.pem`/`.crt` files; combines and deduplicates them; and saves the public bundle under `artifactoryCa.bundle` in the existing values file used for this cluster. It preserves other values, backs up the file, renders a private review plan, and checks that the current image and data volume/mount are retained before asking to apply. No Artifactory credentials are requested.
+
+Helm manages the CA ConfigMap, read-only pod mount and `NODE_EXTRA_CA_CERTS`. A checksum annotation restarts the pod when the certificate bundle changes. Continue using the updated chart and the same values file when changing the image version; the CA survives those upgrades without being installed on individual cluster nodes. Avoid a duplicate `NODE_EXTRA_CA_CERTS` entry in `extraEnv`, since the chart sets it automatically when a bundle is supplied.
+
+For a Helm-managed release the wizard applies the reviewed chart configuration. For ArgoCD it prepares the values file and guides you to publish the updated chart and values through your existing GitOps workflow, then verifies the installed bundle and TLS. It does not push Git changes or sync ArgoCD for you.
+
+The `.newsletter-ca-wizard.env` state file contains public selections only. The generated `newsletter-ca-setup.*` directories contain the backup and rendered deployment values, which may include existing credentials: keep them private and outside Git. The wizard checks TLS without authentication; retry the import afterward to verify repository permissions.
+
 ## Mail and Reset Links
 
 Set both public URLs in your values file:

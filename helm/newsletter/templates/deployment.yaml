@@ -1,3 +1,11 @@
+{{- $caBundle := include "newsletter.artifactoryCaBundle" . -}}
+{{- if $caBundle }}
+{{- range .Values.extraEnv }}
+{{- if eq .name "NODE_EXTRA_CA_CERTS" }}
+{{- fail "artifactoryCa.bundle sets NODE_EXTRA_CA_CERTS automatically; remove its duplicate entry from extraEnv." }}
+{{- end }}
+{{- end }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,9 +26,14 @@ spec:
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- with .Values.podAnnotations }}
+      {{- if or .Values.podAnnotations $caBundle }}
       annotations:
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if $caBundle }}
+        checksum/artifactory-ca: {{ $caBundle | sha256sum | quote }}
+        {{- end }}
       {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
@@ -123,6 +136,10 @@ spec:
               value: {{ ternary "1" "0" .Values.env.pocketbaseRecreateCollections | quote }}
             - name: NEWSLETTER_TELEMETRY
               value: {{ ternary "true" "false" .Values.env.newsletterTelemetry | quote }}
+            {{- if $caBundle }}
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/newsletter-artifactory-ca/ca-bundle.pem
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -147,6 +164,11 @@ spec:
           volumeMounts:
             - name: pb-data
               mountPath: {{ .Values.persistence.mountPath }}
+            {{- if $caBundle }}
+            - name: artifactory-ca
+              mountPath: /etc/newsletter-artifactory-ca
+              readOnly: true
+            {{- end }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -159,6 +181,11 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- if $caBundle }}
+        - name: artifactory-ca
+          configMap:
+            name: {{ include "newsletter.artifactoryCaName" . }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

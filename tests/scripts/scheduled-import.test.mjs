@@ -176,7 +176,7 @@ test('authenticates server-side, skips unchanged files and retries changed files
   const fetcher = async (url, options) => {
     requests.push(url);
     assert.equal(options.headers.Authorization, `Basic ${Buffer.from('reader:private-token').toString('base64')}`);
-    assert.equal(options.redirect, 'error');
+    assert.equal(options.redirect, 'manual');
     return url.includes('/api/storage/') ? Response.json({ files: [{ uri: '/article.docx', sha1 }, { uri: '/ignore.pdf' }] }) : new Response(buffer);
   };
   const settings = { repositoryUrl: 'https://host/artifactory/repo', username: 'reader', token: 'private-token' };
@@ -211,4 +211,120 @@ test('reports failures without credentials and rotates batches past failed docum
   const next = await collectDocuments({ ...settings, cursor: first.cursor }, fetcher);
   assert.equal(next.errors[0].file, '/d.docx');
   assert.doesNotMatch(JSON.stringify(next), /private-token/);
+});
+
+test('distinguishes DNS, TLS, timeout and connection failures without exposing request details', async () => {
+  const settings = { repositoryUrl: 'https://host/artifactory/repo', username: 'reader', token: 'private-token' };
+  const cases = [
+    ['ENOTFOUND', /hostname.*resolved/i],
+    ['EAI_AGAIN', /DNS/i],
+    ['UNABLE_TO_VERIFY_LEAF_SIGNATURE', /certificate.*chain/i],
+    ['UNABLE_TO_GET_ISSUER_CERT_LOCALLY', /certificate.*chain/i],
+    ['SELF_SIGNED_CERT_IN_CHAIN', /certificate.*chain/i],
+    ['DEPTH_ZERO_SELF_SIGNED_CERT', /certificate.*chain/i],
+    ['CERT_HAS_EXPIRED', /certificate.*expired/i],
+    ['CERT_NOT_YET_VALID', /certificate.*not yet valid/i],
+    ['ERR_TLS_CERT_ALTNAME_INVALID', /certificate.*hostname/i],
+    ['ECONNREFUSED', /connection.*refused/i],
+    ['ETIMEDOUT', /timed out/i],
+    ['UND_ERR_CONNECT_TIMEOUT', /timed out/i],
+    ['ENETUNREACH', /network.*unreachable/i],
+    ['ECONNRESET', /connection.*reset/i],
+  ];
+  const messages = [];
+  for (const [code, reason] of cases) {
+    await assert.rejects(collectDocuments(settings, async () => {
+      throw new TypeError('fetch failed: private-token', {
+        cause: Object.assign(new Error('private-token'), { code }),
+      });
+    }), (error) => {
+      assert.match(error.message, reason, code);
+      assert.ok(error.message.includes(code), 'Preserve the known diagnostic code');
+      assert.doesNotMatch(error.message, /private-token/);
+      messages.push(error.message);
+      return true;
+    });
+  }
+  assert.equal(new Set(messages).size, cases.length);
+  await assert.rejects(collectDocuments(settings, async () => {
+    throw new DOMException('private-token', 'TimeoutError');
+  }), /timed out/i);
+  await assert.rejects(collectDocuments(settings, async () => {
+    throw new TypeError('private-token', { cause: new AggregateError([
+      Object.assign(new Error('private-token'), { code: 'ECONNREFUSED' }),
+    ]) });
+  }), /ECONNREFUSED/);
+  await assert.rejects(collectDocuments(settings, async () => {
+    throw Object.assign(new Error('private-token'), { code: 'private-token' });
+  }), (error) => {
+    assert.match(error.message, /Cannot reach Artifactory/);
+    assert.doesNotMatch(error.message, /private-token/);
+    return true;
+  });
+});
+
+test('reports redirects distinctly without following them or displaying the location', async () => {
+  const settings = { repositoryUrl: 'https://host/artifactory/repo', username: 'reader', token: 'private-token' };
+  for (const status of [301, 302, 303, 307, 308]) {
+    let requests = 0;
+    await assert.rejects(collectDocuments(settings, async (_url, options) => {
+      requests++;
+      assert.equal(options.redirect, 'manual');
+      return new Response(null, { status, headers: { Location: 'https://other-host/login?token=private-token' } });
+    }), (error) => {
+      assert.match(error.message, new RegExp('redirect.*HTTP ' + status));
+      assert.doesNotMatch(error.message, /private-token|other-host/);
+      return true;
+    });
+    assert.equal(requests, 1);
+  }
+});
+
+test('distinguishes missing repository URLs, credentials, permissions and server errors', async () => {
+  const settings = { repositoryUrl: 'https://host/artifactory/repo', username: 'reader', token: 'private-token' };
+  for (const [status, reason] of [
+    [401, /credentials/i], [403, /permission/i], [404, /repository.*not found/i],
+    [429, /rate limit/i], [503, /server/i],
+  ]) {
+    await assert.rejects(collectDocuments(settings, async () => new Response('private-token', { status })), (error) => {
+      assert.match(error.message, new RegExp('HTTP ' + status));
+      assert.match(error.message, reason);
+      assert.doesNotMatch(error.message, /private-token/);
+      return true;
+    });
+  }
+});
+
+test('reports invalid repository API responses without displaying their contents', async () => {
+  const settings = { repositoryUrl: 'https://host/artifactory/repo', username: 'reader', token: 'private-token' };
+  await assert.rejects(collectDocuments(settings, async () => new Response('<html>private-token</html>')), (error) => {
+    assert.match(error.message, /invalid JSON/i);
+    assert.doesNotMatch(error.message, /private-token/);
+    return true;
+  });
+  for (const listing of [null, {}, { files: 'private-token' }]) {
+    await assert.rejects(collectDocuments(settings, async () => Response.json(listing)), /did not return a file list/);
+  }
+});
+
+test('reports interrupted response streams for listings and individual downloads without leaking secrets', async () => {
+  const settings = { repositoryUrl: 'https://host/artifactory/repo', username: 'reader', token: 'private-token' };
+  function interruptedResponse() {
+    return new Response(new ReadableStream({
+      start(controller) {
+        controller.error(Object.assign(new Error('private-token'), { code: 'ECONNRESET' }));
+      },
+    }));
+  }
+  await assert.rejects(collectDocuments(settings, async () => interruptedResponse()), (error) => {
+    assert.match(error.message, /ECONNRESET/);
+    assert.doesNotMatch(error.message, /private-token/);
+    return true;
+  });
+  const result = await collectDocuments(settings, async (url) => url.includes('/api/storage/')
+    ? Response.json({ files: [{ uri: '/article.docx' }] }) : interruptedResponse());
+  assert.equal(result.errors.length, 1);
+  assert.equal(result.errors[0].file, '/article.docx');
+  assert.match(result.errors[0].message, /ECONNRESET/);
+  assert.doesNotMatch(JSON.stringify(result), /private-token/);
 });

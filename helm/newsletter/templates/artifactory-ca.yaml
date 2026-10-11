@@ -1,0 +1,12 @@
+{{- $caBundle := include "newsletter.artifactoryCaBundle" . -}}
+{{- if $caBundle }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "newsletter.artifactoryCaName" . }}
+  labels:
+    {{- include "newsletter.labels" . | nindent 4 }}
+data:
+  ca-bundle.pem: |
+    {{- $caBundle | nindent 4 }}
+{{- end }}

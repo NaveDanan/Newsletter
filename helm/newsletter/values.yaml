@@ -75,6 +75,11 @@ extraEnv: []
 # - name: NODE_ENV
 #   value: production
 
+# Public issuing CA certificates in PEM format. Helm manages the ConfigMap,
+# pod mount and NODE_EXTRA_CA_CERTS; certificate changes restart the pod.
+artifactoryCa:
+  bundle: ""
+
 ingress:
   frontend:
     enabled: false

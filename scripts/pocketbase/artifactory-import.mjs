@@ -3,6 +3,53 @@ import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { parseDocx } from './docx-import.mjs';
 
+const connectionReasons = new Map([
+  ['ENOTFOUND', 'The Artifactory hostname could not be resolved. Check the repository URL and DNS access from the Newsletter container.'],
+  ['EAI_AGAIN', 'Artifactory DNS lookup temporarily failed. Check cluster DNS and retry.'],
+  ...['UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'UNABLE_TO_GET_ISSUER_CERT', 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY', 'SELF_SIGNED_CERT_IN_CHAIN', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'CERT_UNTRUSTED', 'CERT_SIGNATURE_FAILURE'].map((code) => [code, 'The Artifactory TLS certificate chain could not be verified. Check the issuing CA trust inside the Newsletter container and the certificate chain served by Artifactory.']),
+  ['CERT_HAS_EXPIRED', 'The Artifactory TLS certificate has expired. Ask the server administrator to renew it.'],
+  ['CERT_NOT_YET_VALID', 'The Artifactory TLS certificate is not yet valid. Check the certificate dates and cluster clock.'],
+  ['ERR_TLS_CERT_ALTNAME_INVALID', 'The Artifactory TLS certificate does not cover the URL hostname. Check the repository hostname.'],
+  ...['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT'].map((code) => [code, 'The Artifactory request timed out. Check pod egress, routing, firewall rules and server availability.']),
+  ['ECONNREFUSED', 'The Artifactory connection was refused. Check the hostname, port and server availability.'],
+  ...['ENETUNREACH', 'EHOSTUNREACH'].map((code) => [code, 'The Artifactory network or host is unreachable. Check pod egress and cluster routing.']),
+  ['ECONNRESET', 'The Artifactory connection was reset before the response completed. Check the server and network connection.'],
+  ['UND_ERR_SOCKET', 'The Artifactory connection closed before the response completed. Check the server and network connection.'],
+]);
+
+function connectionFailure(error) {
+  // Fetch wraps transport failures in cause and may aggregate per-address errors.
+  // Never copy raw error messages, unknown codes, URLs or response bodies.
+  const pending = [error], seen = new Set();
+  while (pending.length && seen.size < 32) {
+    const current = pending.shift();
+    if (!current || typeof current !== 'object' || seen.has(current)) continue;
+    seen.add(current);
+    const reason = connectionReasons.get(current.code);
+    if (reason) return `Artifactory request failed (${current.code}): ${reason}`;
+    if (current.name === 'TimeoutError') return 'Artifactory request timed out (TimeoutError). Check pod egress, routing and server availability.';
+    if (current.name === 'AbortError') return 'Artifactory request was interrupted (AbortError). The request may have timed out.';
+    pending.push(current.cause);
+    if (Array.isArray(current.errors)) pending.push(...current.errors.slice(0, 32));
+  }
+  return 'Cannot reach Artifactory. An unexpected connection failure occurred. Check network access from the Newsletter container.';
+}
+
+function httpFailure(status) {
+  const reasons = {
+    400: 'The repository API rejected the request. Check the repository URL.',
+    401: 'Authentication failed. Check the saved username and token credentials.',
+    403: 'Access was denied. Check repository read and File List API permissions.',
+    404: 'The repository or artifact path was not found. Check the URL, repository name, folder and read permissions.',
+    405: 'The endpoint does not support this request. Check that the URL points to the Artifactory repository API.',
+    429: 'The Artifactory rate limit was reached. Wait and retry.',
+  };
+  const reason = reasons[status] || (status >= 500 ? 'An Artifactory server or upstream error occurred. Check server availability and logs.' : 'Check the repository URL and server configuration.');
+  return `Artifactory returned HTTP ${status}. ${reason}`;
+}
+
+class ArtifactoryRequestError extends Error {}
+
 export function repositoryUrls(value) {
   let url;
   try { url = new URL(value); } catch { throw new Error('Enter a valid Artifactory repository URL.'); }
@@ -19,20 +66,33 @@ export async function collectDocuments(settings, fetcher = fetch) {
   async function request(url, limit) {
     let response;
     try {
-      response = await fetcher(url, { headers: { Authorization: authorization }, redirect: 'error', signal: AbortSignal.timeout(15000) });
-    } catch { throw new Error('Cannot reach Artifactory. Check the URL, TLS certificate and network access. Redirects are not followed.'); }
-    if (!response.ok) throw new Error(`Artifactory returned HTTP ${response.status}. Check repository permissions and credentials.`);
+      response = await fetcher(url, { headers: { Authorization: authorization }, redirect: 'manual', signal: AbortSignal.timeout(15000) });
+    } catch (error) { throw new ArtifactoryRequestError(connectionFailure(error)); }
+    if (!response.ok) {
+      // Discard error responses without exposing their contents or redirect URLs.
+      try { await response.body?.cancel(); } catch { /* Keep the original HTTP failure. */ }
+      if (response.status >= 300 && response.status < 400) throw new ArtifactoryRequestError(`Artifactory returned a redirect (HTTP ${response.status}). Use the direct HTTPS repository URL, without a UI or SSO redirect. Redirects are not followed.`);
+      throw new ArtifactoryRequestError(httpFailure(response.status));
+    }
     const chunks = [];
     let size = 0;
-    for await (const chunk of response.body) {
-      size += chunk.length;
-      if (size > limit) throw new Error('Artifactory response exceeds the supported size.');
-      chunks.push(chunk);
+    try {
+      if (response.body) for await (const chunk of response.body) {
+        size += chunk.length;
+        if (size > limit) throw new ArtifactoryRequestError('Artifactory response exceeds the supported size.');
+        chunks.push(chunk);
+      }
+    } catch (error) {
+      if (error instanceof ArtifactoryRequestError) throw error;
+      throw new ArtifactoryRequestError(connectionFailure(error));
     }
     return Buffer.concat(chunks);
   }
-  const listing = JSON.parse((await request(urls.listing, 10 * 1024 * 1024)).toString('utf8'));
-  if (!Array.isArray(listing.files)) throw new Error('Artifactory did not return a file list. Check the repository URL and File List API permissions.');
+  const listingBody = await request(urls.listing, 10 * 1024 * 1024);
+  let listing;
+  try { listing = JSON.parse(listingBody.toString('utf8')); }
+  catch { throw new ArtifactoryRequestError('Artifactory returned invalid JSON. Check that the repository URL reaches the File List API rather than a UI or login page.'); }
+  if (!listing || !Array.isArray(listing.files)) throw new ArtifactoryRequestError('Artifactory did not return a file list. Check the repository URL and File List API permissions.');
   let candidates = listing.files.filter((f) => !f.folder && /\.docx$/i.test(f.uri || '')).sort((a, b) => String(a.uri).localeCompare(String(b.uri)));
   const resume = candidates.findIndex((f) => f.uri === settings.cursor) + 1;
   candidates = [...candidates.slice(resume), ...candidates.slice(0, resume)];

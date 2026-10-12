@@ -16,6 +16,7 @@ import { parseCommunityRoute } from './lib/community-routes';
 import { bootLogger } from './lib/bootLogger';
 import { AppStageShell } from './components/AppStageShell';
 import { QuickComposeCard } from './components/QuickComposeCard';
+import { PageScrollSidebar } from './components/PageScrollSidebar';
 import { Toaster } from 'sonner';
 import { toast } from 'sonner';
 import type { Newsletter } from './types/newsletter';
@@ -1053,12 +1054,12 @@ function App() {
               </div>
 
               {/* Right Sidebar Column */}
-              <div className="lg:col-span-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto">
+              <PageScrollSidebar>
                 <Sidebar
                   publishedCount={publishedNewsletters.length}
                   onNavigate={navigateTo}
                 />
-              </div>
+              </PageScrollSidebar>
             </div>
           </div>
         </main>

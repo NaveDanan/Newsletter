@@ -9,7 +9,7 @@ var MAX_BODY_LENGTH = 5000;
 var MAX_MEDIA_PER_POST = 4;
 var MAX_REPLY_DEPTH = 25;
 var MAX_HANDLE_LENGTH = 30;
-var MIN_HANDLE_LENGTH = 3;
+var MIN_HANDLE_LENGTH = 1;
 var MAX_BIO_LENGTH = 500;
 var MAX_DISPLAY_NAME_LENGTH = 120;
 var MAX_LOCATION_LENGTH = 120;
@@ -99,8 +99,8 @@ function isValidHandle(value) {
   return /[A-Za-z_]/.test(handle);
 }
 
-function suggestHandle(name, emailAddress, suffix) {
-  var source = asText(name).trim() || asText(emailAddress).split('@')[0] || 'member';
+function suggestHandle(emailAddress, suffix) {
+  var source = asText(emailAddress).split('@')[0] || 'member';
   var base = source
     .toLowerCase()
     .replace(/[^0-9a-z]+/g, '_')
@@ -109,10 +109,6 @@ function suggestHandle(name, emailAddress, suffix) {
 
   if (!/[a-z_]/.test(base)) {
     base = ('member_' + base).replace(/_+$/, '');
-  }
-
-  if (base.length < MIN_HANDLE_LENGTH) {
-    base = (base + '_member').slice(0, MAX_HANDLE_LENGTH);
   }
 
   var extra = asText(suffix);
@@ -784,14 +780,14 @@ function ensureProfile(app, userId) {
   var name = userRecord.getString('name');
   var emailAddress = userRecord.getString('email');
   var attempt = 0;
-  var handle = suggestHandle(name, emailAddress, '');
+  var handle = suggestHandle(emailAddress, '');
 
-  while (attempt < 12 && (!isValidHandle(handle) || isHandleTaken(app, handle, ''))) {
+  while (attempt < 12 && (handle === 'me' || !isValidHandle(handle) || isHandleTaken(app, handle, ''))) {
     attempt += 1;
-    handle = suggestHandle(name, emailAddress, String(attempt === 1 ? 1 : Math.floor(Math.random() * 100000)));
+    handle = suggestHandle(emailAddress, String(attempt === 1 ? 1 : Math.floor(Math.random() * 100000)));
   }
 
-  if (!isValidHandle(handle) || isHandleTaken(app, handle, '')) {
+  if (handle === 'me' || !isValidHandle(handle) || isHandleTaken(app, handle, '')) {
     handle = 'member_' + $security.randomString(10).toLowerCase();
   }
 

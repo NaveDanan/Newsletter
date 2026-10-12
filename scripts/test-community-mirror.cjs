@@ -96,7 +96,7 @@ const BODIES = [
   '#one #one #two',
   'mention @12345 is numeric only',
   'mention @123_5 has an underscore',
-  'mention @ab is too short, @abc is not',
+  'mention @ab and @abc are both valid',
   'mention @_lead starts with an underscore',
   'http://localhost:5173/x is a dev link',
   'https://nodots/a has no dot',

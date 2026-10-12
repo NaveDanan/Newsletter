@@ -64,19 +64,22 @@ assert.equal(community.buildPreview('one\n\ntwo   three'), 'one two three');
 assert.equal(community.normalizeHandle('@AviCohen'), 'avicohen');
 assert.equal(community.normalizeHandle('  @@Nave  '), 'nave');
 assert.equal(community.isValidHandle('nave'), true);
-assert.equal(community.isValidHandle('na'), false);
+assert.equal(community.isValidHandle('na'), true);
+assert.equal(community.isValidHandle(''), false);
 assert.equal(community.isValidHandle('123456'), false, 'numeric-only handles collide with numeric routes');
 assert.equal(community.isValidHandle('nave danan'), false);
 assert.equal(community.isValidHandle('n'.repeat(31)), false);
 assert.equal(community.isValidHandle('a_1'), true);
+assert.equal(community.isValidHandle('x'), true, 'one-character email usernames remain valid nicknames');
 
-assert.equal(community.suggestHandle('Nave Danan', 'nave@example.com', ''), 'nave_danan');
-assert.equal(community.suggestHandle('', 'someone@example.com', ''), 'someone');
-assert.equal(community.suggestHandle('נave', 'x@example.com', ''), 'ave', 'non-latin characters collapse away');
-assert.equal(community.suggestHandle('שם', 'x@example.com', ''), 'member', 'an all-Hebrew name falls back to a generic base');
-assert.ok(community.suggestHandle('Nave Danan', '', '7').endsWith('_7'));
-assert.ok(community.suggestHandle('A very extremely long display name here', '', '').length <= 30);
-assert.ok(community.isValidHandle(community.suggestHandle('שם בעברית', 'user@example.com', '')));
+assert.equal(community.suggestHandle('purple@njlabs.com', ''), 'purple');
+assert.equal(community.suggestHandle('X@example.com', ''), 'x');
+assert.equal(community.suggestHandle('purple@another.com', '1'), 'purple_1', 'duplicate email usernames get a unique suffix');
+assert.equal(community.suggestHandle('first.last+news@example.com', ''), 'first_last_news');
+assert.equal(community.suggestHandle('123@example.com', ''), 'member_123', 'numeric-only names do not collide with numeric routes');
+assert.equal(community.suggestHandle('', ''), 'member');
+assert.ok(community.suggestHandle('a'.repeat(64) + '@example.com', '').length <= 30);
+assert.ok(community.isValidHandle(community.suggestHandle('x@example.com', '')));
 
 // --- URLs ------------------------------------------------------------------
 

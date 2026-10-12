@@ -40,7 +40,7 @@ try {
     const account = await root.collection('users').create({ email: `${name}@example.com`, password, passwordConfirm: password, verified: true, name, role: 'viewer' });
     const client = new PocketBase(url); client.autoCancellation(false);
     await client.collection('users').authWithPassword(`${name}@example.com`, password);
-    await send(client, '/api/community/me', { handle: name, displayName: name }, 'PATCH');
+    await send(client, '/api/community/me', { displayName: name }, 'PATCH');
     clients.push({ client, id: account.id, name });
   }
   const [a, b, c, d] = clients;

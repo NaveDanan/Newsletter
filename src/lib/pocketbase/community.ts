@@ -363,7 +363,7 @@ export async function fetchCommunitySession(): Promise<CommunitySession> {
   };
 }
 
-const PROFILE_TEXT_FIELDS = ['handle', 'displayName', 'bio', 'location', 'website', 'pinnedPostId'] as const;
+const PROFILE_TEXT_FIELDS = ['displayName', 'bio', 'location', 'website', 'pinnedPostId'] as const;
 
 export async function updateCommunityProfile(patch: CommunityProfilePatch): Promise<CommunityProfile> {
   const hasFiles = Boolean(patch.avatar || patch.banner);

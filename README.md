@@ -19,6 +19,7 @@
 ## ✨ Features
 
 - **Newsletter Management:** Curate and write professional newsletters with a built-in rich text editor.
+- **Community profiles:** New accounts receive an `@nickname` from the part of their email before `@` (for example, `purple@njlabs.com` becomes `@purple`). Unsupported characters are normalized to underscores; reserved or already-used nicknames receive a suffix. Existing nicknames are retained. Members cannot edit nicknames; a PocketBase administrator can change them directly in `community_profiles`.
 - **Projects & Goals:** Maintain progress across concurrent efforts. Track key milestones.
 - **Gantt Edior:** Powerful interactive timeline to organize project schedules at scale.
 - **Data Spreadsheets:** Advanced management grids to bulk-update and import tasks seamlessly.

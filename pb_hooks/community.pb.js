@@ -23,6 +23,13 @@ onRecordAfterUpdateSuccess(function (e) {
   return e.next();
 }, 'users');
 
+onRecordAfterUpdateSuccess(function (e) {
+  if (e.record.original().getString('handle') !== e.record.getString('handle')) {
+    require(__hooks + '/lib/community.js').syncProfileHandle(e.app, e.record);
+  }
+  return e.next();
+}, 'community_profiles');
+
 routerAdd('GET', '/api/community/profiles/{handle}', function (e) {
   return e.json(200, require(__hooks + '/lib/community.js').getProfile(e, e.request.pathValue('handle')));
 }, $apis.skipSuccessActivityLog());

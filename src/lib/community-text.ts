@@ -10,7 +10,7 @@ import type { CommunityEntity } from '@/types/community';
 // what counts as a word character.
 const WORD_CLASS = '0-9A-Za-z_\u00C0-\u024F\u0590-\u05FF\u0600-\u06FF';
 const HASHTAG_PATTERN = new RegExp('(^|[^' + WORD_CLASS + '#])#([' + WORD_CLASS + ']{1,80})', 'g');
-const MENTION_PATTERN = new RegExp('(^|[^' + WORD_CLASS + '@])@([0-9A-Za-z_]{3,30})', 'g');
+const MENTION_PATTERN = new RegExp('(^|[^' + WORD_CLASS + '@])@([0-9A-Za-z_]{1,30})', 'g');
 const URL_PATTERN = /\bhttps?:\/\/[^\s<>"']{4,2000}/gi;
 const SENTENCE_PUNCTUATION = '.,;:!?';
 
@@ -198,7 +198,7 @@ export function normalizeCommunityHandle(value: string): string {
 // a mention that the stored entities do not contain.
 export function isValidCommunityHandle(value: string): boolean {
   const handle = normalizeCommunityHandle(value);
-  if (handle.length < 3 || handle.length > 30) {
+  if (handle.length < 1 || handle.length > 30) {
     return false;
   }
   if (!/^[0-9A-Za-z_]+$/.test(handle)) {

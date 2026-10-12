@@ -22,7 +22,7 @@ if (!users.fields.some((f) => f.name === 'role')) await root.collections.update(
 // NOT reach moderation, and a manager who must.
 const ACCOUNTS = [['viewer', 'viewer'], ['second', 'viewer'], ['author', 'author'], ['manager', 'manager']];
 for (const [name, role] of ACCOUNTS) {
-  const email = `community-${name}@example.com`;
+  const email = `test_${name}@example.com`;
   try {
     const existing = await root.collection('users').getFirstListItem(`email = "${email}"`);
     if (existing.role !== role) await root.collection('users').update(existing.id, { role });
@@ -40,7 +40,7 @@ const clients = {};
 for (const [name] of ACCOUNTS) {
   const client = new PocketBase(url);
   client.autoCancellation(false);
-  await client.collection('users').authWithPassword(`community-${name}@example.com`, 'test-only-password-12345');
+  await client.collection('users').authWithPassword(`test_${name}@example.com`, 'test-only-password-12345');
   clients[name] = client;
 }
 const { viewer, second, author, manager } = clients;
@@ -61,23 +61,31 @@ assert.equal(sessions.author.canModerate, false, 'an author writes newsletters b
 assert.equal(sessions.manager.canModerate, true);
 assert.equal(sessions.viewer.unreadNotifications, 0);
 for (const name of ['viewer', 'second', 'author', 'manager']) assert.match(sessions[name].profile.handle, /^[0-9a-z_]{3,30}$/);
-assert.equal(new Set(Object.values(sessions).map((s) => s.profile.handle)).size, 4, 'suggestHandle must not hand two accounts the same handle');
+for (const name of ['viewer', 'second', 'author', 'manager']) assert.equal(sessions[name].profile.handle, `test_${name}`, 'nickname comes from the email, not the display name');
+assert.equal(new Set(Object.values(sessions).map((s) => s.profile.handle)).size, 4, 'different email usernames get different nicknames');
 assert.equal(sessions.viewer.profile.isSelf, true);
 assert.equal(sessions.viewer.profile.followerCount, 0);
 
-const viewerProfile = await patch(viewer, '/api/community/me', { handle: 'test_viewer', displayName: 'Test Viewer', bio: 'Bio line', location: 'Tel Aviv', website: 'example.com' });
+const viewerProfile = await patch(viewer, '/api/community/me', { displayName: 'Test Viewer', bio: 'Bio line', location: 'Tel Aviv', website: 'example.com' });
 assert.equal(viewerProfile.profile.handle, 'test_viewer');
 assert.equal(viewerProfile.profile.website, 'https://example.com', 'a bare host is normalized to an absolute https URL');
-await patch(second, '/api/community/me', { handle: 'test_second', displayName: 'Test Second' });
-await patch(author, '/api/community/me', { handle: 'test_author', displayName: 'Test Author' });
-await patch(manager, '/api/community/me', { handle: 'test_manager', displayName: 'Test Manager' });
+await patch(second, '/api/community/me', { displayName: 'Test Second' });
+await patch(author, '/api/community/me', { displayName: 'Test Author' });
+await patch(manager, '/api/community/me', { displayName: 'Test Manager' });
 await assert.rejects(patch(second, '/api/community/me', { handle: 'test_viewer' }), (e) => e.status === 400);
 for (const handle of ['ab', 'has-a-dash', 'has a space', '12345678', '1234567890123456789012345678901']) {
   await assert.rejects(patch(second, '/api/community/me', { handle }), (e) => e.status === 400);
 }
-// A leading @ is how a handle is written everywhere else in the UI, so it is
-// stripped rather than refused.
+// Older clients may still send the existing handle; they cannot change it.
 assert.equal((await patch(second, '/api/community/me', { handle: '@test_second' })).profile.handle, 'test_second');
+assert.equal((await get(second, '/api/community/me')).profile.handle, 'test_second', 'a rejected edit leaves the nickname intact');
+const duplicateAccount = await root.collection('users').create({ email: 'test_viewer@another.com', password: 'test-only-password-12345', passwordConfirm: 'test-only-password-12345', name: 'Not Test Viewer', verified: true });
+const duplicateClient = new PocketBase(url);
+await duplicateClient.collection('users').authWithPassword('test_viewer@another.com', 'test-only-password-12345');
+const duplicateProfile = (await get(duplicateClient, '/api/community/me')).profile;
+assert.equal(duplicateProfile.handle, 'test_viewer_1', 'a duplicate email username receives a unique nickname');
+await root.collection('community_profiles').delete(duplicateProfile.id);
+await root.collection('users').delete(duplicateAccount.id);
 await assert.rejects(patch(viewer, '/api/community/me', { website: 'javascript:alert(1)' }), (e) => e.status === 400);
 
 // --- Anonymous reads work, anonymous writes do not -------------------------
@@ -104,6 +112,13 @@ assert.equal(created.author.handle, 'test_viewer');
 assert.equal(created.isAuthor, true);
 assert.equal(created.depth, 0);
 assert.deepEqual(created.hashtags, ['newsletter', 'קהילה']);
+const storedProfile = await root.collection('community_profiles').getFirstListItem(`userId = "${viewer.authStore.record.id}"`);
+await root.collection('community_profiles').update(storedProfile.id, { handle: 'admin_viewer' });
+assert.equal((await get(anonymous, '/api/community/profiles/admin_viewer')).profile.handle, 'admin_viewer');
+assert.equal((await get(anonymous, `/api/community/posts/${created.id}`)).post.author.handle, 'admin_viewer', 'admin rename updates post bylines');
+await assert.rejects(patch(viewer, '/api/community/me', { handle: 'test_viewer' }), (e) => e.status === 400);
+await root.collection('community_profiles').update(storedProfile.id, { handle: 'test_viewer' });
+assert.equal((await get(anonymous, `/api/community/posts/${created.id}`)).post.author.handle, 'test_viewer');
 
 // src/lib/community-text.ts mirrors the hook scanner so the composer can
 // highlight before the post exists. The two must agree on every offset.
@@ -272,6 +287,9 @@ assert.deepEqual((await get(viewer, '/api/community/notifications?kind=reply')).
 const mentioned = await get(second, '/api/community/notifications?kind=mention');
 assert.equal(mentioned.items.length, 1, '@test_second was mentioned in the launch post');
 assert.equal(mentioned.items[0].postId, created.id);
+await root.collection('community_profiles').update(storedProfile.id, { handle: 'admin_viewer' });
+assert.equal((await get(second, '/api/community/notifications?kind=mention')).items[0].actorHandle, 'admin_viewer', 'admin rename updates notification bylines');
+await root.collection('community_profiles').update(storedProfile.id, { handle: 'test_viewer' });
 assert.equal((await get(second, '/api/community/notifications?kind=follow')).items.length, 1);
 
 assert.equal((await post(viewer, '/api/community/notifications/read', { ids: [inbox.items[0].id] })).updated, 1);

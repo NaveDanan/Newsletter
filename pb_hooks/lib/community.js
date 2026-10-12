@@ -1065,14 +1065,8 @@ function updateProfile(e) {
 
   if (Object.prototype.hasOwnProperty.call(body, 'handle')) {
     var handle = c.normalizeHandle(body.handle);
-    if (!c.isValidHandle(handle)) {
-      throw new BadRequestError('Handles use 3 to 30 letters, numbers or underscores and must contain a letter.');
-    }
     if (handle !== profile.getString('handle')) {
-      if (c.isHandleTaken(app, handle, String(profile.id))) {
-        throw new BadRequestError('That handle is already taken.');
-      }
-      profile.set('handle', handle);
+      throw new BadRequestError('Only a PocketBase administrator can change a nickname.');
     }
   }
 
@@ -1150,6 +1144,32 @@ function refreshAuthorSnapshots(app, profile) {
       });
     });
   } catch (_) {}
+}
+
+function syncProfileHandle(app, profile) {
+  var c = core();
+  var userId = profile.getString('userId');
+  var handle = profile.getString('handle');
+  [
+    { collection: 'community_posts', filter: 'authorId = {:userId}', field: 'authorHandle' },
+    { collection: 'community_notifications', filter: 'actorId = {:userId}', field: 'actorHandle' },
+  ].forEach(function (target) {
+    var offset = 0;
+    var records;
+    do {
+      records = app.findRecordsByFilter(target.collection, target.filter, 'created,id', 500, offset, { userId: userId });
+      app.runInTransaction(function (tx) {
+        records.forEach(function (record) {
+          var current = c.findByIdOrNull(tx, target.collection, String(record.id));
+          if (current) {
+            current.set(target.field, handle);
+            tx.save(current);
+          }
+        });
+      });
+      offset += records.length;
+    } while (records.length === 500);
+  });
 }
 
 // The account avatar is the one avatar the unified profile editor manages, so
@@ -1852,6 +1872,7 @@ module.exports = {
   getMe: getMe,
   getProfile: getProfile,
   updateProfile: updateProfile,
+  syncProfileHandle: syncProfileHandle,
   syncAccountAvatar: syncAccountAvatar,
   listProfilePosts: listProfilePosts,
   listProfileConnections: listProfileConnections,

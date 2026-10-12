@@ -38,7 +38,7 @@ export type CommunitySearchType = (typeof COMMUNITY_SEARCH_TYPES)[number];
 export const COMMUNITY_MAX_BODY_LENGTH = 5000;
 export const COMMUNITY_MAX_MEDIA_PER_POST = 4;
 export const COMMUNITY_MAX_HANDLE_LENGTH = 30;
-export const COMMUNITY_MIN_HANDLE_LENGTH = 3;
+export const COMMUNITY_MIN_HANDLE_LENGTH = 1;
 export const COMMUNITY_MAX_BIO_LENGTH = 500;
 export const COMMUNITY_MAX_DISPLAY_NAME_LENGTH = 120;
 export const COMMUNITY_MAX_LOCATION_LENGTH = 120;
@@ -255,7 +255,6 @@ export interface CommunityComposerDraft {
 }
 
 export interface CommunityProfilePatch {
-  handle?: string;
   displayName?: string;
   bio?: string;
   location?: string;

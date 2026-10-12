@@ -23,7 +23,6 @@ import { removeUserAvatar, updateUserName, uploadUserAvatar } from '@/lib/pocket
 import {
   COMMUNITY_MAX_BIO_LENGTH,
   COMMUNITY_MAX_DISPLAY_NAME_LENGTH,
-  COMMUNITY_MAX_HANDLE_LENGTH,
   COMMUNITY_MAX_LOCATION_LENGTH,
   type CommunityProfile,
   type CommunityProfilePatch,
@@ -112,7 +111,6 @@ export function ProfileIdentityEditor({ profile, onSave }: ProfileIdentityEditor
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
-  const [handle, setHandle] = useState(profile.handle);
   const [displayName, setDisplayName] = useState(() => profile.displayName || user?.name || '');
   const [bio, setBio] = useState(profile.bio);
   const [location, setLocation] = useState(profile.location);
@@ -229,9 +227,8 @@ export function ProfileIdentityEditor({ profile, onSave }: ProfileIdentityEditor
     setIsSaving(true);
     try {
       // The community profile goes first because the server validates the
-      // handle and website there; the account name only follows a valid save.
+      // website there; the account name only follows a valid save.
       await onSave({
-        handle: handle.trim().toLowerCase(),
         displayName: nextDisplayName,
         bio: bio.trim(),
         location: location.trim(),
@@ -328,13 +325,13 @@ export function ProfileIdentityEditor({ profile, onSave }: ProfileIdentityEditor
           </Label>
           <Input
             id="profile-handle"
-            value={handle}
+            value={`@${profile.handle}`}
             dir="ltr"
-            maxLength={COMMUNITY_MAX_HANDLE_LENGTH}
-            onChange={(event) => setHandle(event.target.value)}
-            className="h-10 rounded-full border-[var(--border-subtle)] bg-[var(--bg-input)] px-4 text-[var(--text-primary)]"
+            readOnly
+            aria-describedby="profile-handle-hint"
+            className="h-10 rounded-full border-[var(--border-subtle)] bg-[var(--bg-pill)] px-4 text-[var(--text-secondary)]"
           />
-          <p className="text-xs text-[var(--text-muted)]">{t('community.editor.handleHint')}</p>
+          <p id="profile-handle-hint" className="text-xs text-[var(--text-muted)]">{t('community.editor.handleHint')}</p>
         </div>
 
         <div className="space-y-2">

@@ -1053,7 +1053,7 @@ function App() {
               </div>
 
               {/* Right Sidebar Column */}
-              <div className="lg:col-span-4 sticky top-20">
+              <div className="lg:col-span-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto">
                 <Sidebar
                   publishedCount={publishedNewsletters.length}
                   onNavigate={navigateTo}

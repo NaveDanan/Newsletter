@@ -3,7 +3,7 @@ fullnameOverride: newsletter
 replicaCount: 1
 image:
   repository: artifactory.rafael.co.il/mems-docker-local-ww/danan/newsletter
-  tag: 1.0.25
+  tag: 1.0.25-20261012.081319-8c53702a
   pullPolicy: IfNotPresent
 imagePullSecrets:
   - name: nave-pull-secret

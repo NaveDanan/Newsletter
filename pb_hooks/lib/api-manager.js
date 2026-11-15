@@ -553,7 +553,9 @@ function canAccessProject(auth, record) {
   if (includes(PROJECT_ADMIN_ROLES, getRole(auth))) return true;
   var authId = getAuthId(auth);
   if (asString(getRecordValue(record, 'createdBy')) === authId) return true;
-  return includes(asStringArray(getRecordValue(record, 'allowedUserIds')), authId);
+  var allowed = asStringArray(getRecordValue(record, 'allowedUserIds'));
+  if (!allowed.length && typeof record.getString === 'function') allowed = asStringArray(record.getString('allowedUserIds'));
+  return includes(allowed, authId);
 }
 
 function readRecordJsonArray(record, field) {
@@ -1064,52 +1066,64 @@ function handleProjectTasks(e) {
   return e.json(200, { items: getProjectGantt(record).tasks });
 }
 
+// All task edits read and write the embedded Gantt within one transaction.
+// Concurrent integration requests therefore cannot overwrite each other's tasks.
+function mutateProjectGantt(e, change) {
+  var result;
+  e.app.runInTransaction(function (tx) {
+    var event = { app: tx, auth: e.auth };
+    var record = getProjectOrDeny(event, getPathValue(e, 'projectId'));
+    var gantt = getProjectGantt(record);
+    var changed = change(gantt, record);
+    var saved = saveProjectGantt(event, record, gantt);
+    result = changed && changed.taskId
+      ? saved.tasks.filter(function (task) { return task.id === changed.taskId; })[0]
+      : changed;
+  });
+  return result;
+}
+
 function handleProjectTaskCreate(e) {
-  var record = getProjectOrDeny(e, getPathValue(e, 'projectId'));
-  var gantt = getProjectGantt(record);
-  var task = normalizeTask(e.requestInfo().body || {}, { indentLevel: 0 });
-  gantt.tasks.push(task);
-  saveProjectGantt(e, record, gantt);
+  var task = mutateProjectGantt(e, function (gantt) {
+    var created = normalizeTask(e.requestInfo().body || {}, { indentLevel: 0 });
+    gantt.tasks.push(created);
+    return { taskId: created.id };
+  });
   return e.json(201, task);
 }
 
 function handleProjectTaskPatch(e) {
-  var record = getProjectOrDeny(e, getPathValue(e, 'projectId'));
-  var gantt = getProjectGantt(record);
-  var index = getTaskIndex(gantt.tasks, getPathValue(e, 'taskId'));
-  if (index === -1) throw new NotFoundError('Task not found.');
-  var task = normalizeTask(Object.assign({}, gantt.tasks[index], e.requestInfo().body || {}, { id: gantt.tasks[index].id }));
-  gantt.tasks[index] = task;
-  saveProjectGantt(e, record, gantt);
+  var task = mutateProjectGantt(e, function (gantt) {
+    var index = getTaskIndex(gantt.tasks, getPathValue(e, 'taskId'));
+    if (index === -1) throw new NotFoundError('Task not found.');
+    gantt.tasks[index] = normalizeTask(Object.assign({}, gantt.tasks[index], e.requestInfo().body || {}, { id: gantt.tasks[index].id }));
+    return { taskId: gantt.tasks[index].id };
+  });
   return e.json(200, task);
 }
 
 function handleProjectTaskStatus(e) {
-  var record = getProjectOrDeny(e, getPathValue(e, 'projectId'));
-  var gantt = getProjectGantt(record);
-  var index = getTaskIndex(gantt.tasks, getPathValue(e, 'taskId'));
-  if (index === -1) throw new NotFoundError('Task not found.');
-  var status = asString((e.requestInfo().body || {}).status);
-  assertStatus(status, PROJECT_STATUSES, 'task');
-  gantt.tasks[index].status = status;
-  if (status === 'completed') gantt.tasks[index].progress = 100;
-  saveProjectGantt(e, record, gantt);
-  return e.json(200, gantt.tasks[index]);
+  var task = mutateProjectGantt(e, function (gantt) {
+    var index = getTaskIndex(gantt.tasks, getPathValue(e, 'taskId'));
+    if (index === -1) throw new NotFoundError('Task not found.');
+    var status = asString((e.requestInfo().body || {}).status);
+    assertStatus(status, PROJECT_STATUSES, 'task');
+    gantt.tasks[index].status = status;
+    if (status === 'completed') gantt.tasks[index].progress = 100;
+    return { taskId: gantt.tasks[index].id };
+  });
+  return e.json(200, task);
 }
 
 function handleProjectTaskDelete(e) {
-  var record = getProjectOrDeny(e, getPathValue(e, 'projectId'));
-  var gantt = getProjectGantt(record);
-  var deletedIds = getDescendantIds(gantt.tasks, getPathValue(e, 'taskId'));
-  gantt.tasks = gantt.tasks
-    .filter(function (task) { return !deletedIds[task.id]; })
-    .map(function (task) {
-      return Object.assign({}, task, {
-        predecessorIds: task.predecessorIds.filter(function (predecessorId) { return !deletedIds[predecessorId]; }),
-      });
+  var result = mutateProjectGantt(e, function (gantt) {
+    var deleted = getDescendantIds(gantt.tasks, getPathValue(e, 'taskId'));
+    gantt.tasks = gantt.tasks.filter(function (task) { return !deleted[task.id]; }).map(function (task) {
+      return Object.assign({}, task, { predecessorIds: task.predecessorIds.filter(function (id) { return !deleted[id]; }) });
     });
-  saveProjectGantt(e, record, gantt);
-  return e.json(200, { status: 'deleted', deletedTaskIds: Object.keys(deletedIds) });
+    return { status: 'deleted', deletedTaskIds: Object.keys(deleted) };
+  });
+  return e.json(200, result);
 }
 
 function handleProjectSubtasks(e) {
@@ -1118,20 +1132,15 @@ function handleProjectSubtasks(e) {
 }
 
 function handleProjectSubtaskCreate(e) {
-  var record = getProjectOrDeny(e, getPathValue(e, 'projectId'));
-  var gantt = getProjectGantt(record);
-  var requestedTaskId = getPathValue(e, 'taskId');
-  var parentIndex = getTaskIndex(gantt.tasks, requestedTaskId);
-  if (parentIndex === -1) {
-    throw new NotFoundError('Task not found.');
-  }
-  var child = normalizeTask(e.requestInfo().body || {}, { indentLevel: gantt.tasks[parentIndex].indentLevel + 1 });
-  var insertIndex = parentIndex + 1;
-  while (insertIndex < gantt.tasks.length && gantt.tasks[insertIndex].indentLevel > gantt.tasks[parentIndex].indentLevel) {
-    insertIndex += 1;
-  }
-  gantt.tasks.splice(insertIndex, 0, child);
-  saveProjectGantt(e, record, gantt);
+  var child = mutateProjectGantt(e, function (gantt) {
+    var parentIndex = getTaskIndex(gantt.tasks, getPathValue(e, 'taskId'));
+    if (parentIndex === -1) throw new NotFoundError('Task not found.');
+    var created = normalizeTask(e.requestInfo().body || {}, { indentLevel: gantt.tasks[parentIndex].indentLevel + 1 });
+    var index = parentIndex + 1;
+    while (index < gantt.tasks.length && gantt.tasks[index].indentLevel > gantt.tasks[parentIndex].indentLevel) index++;
+    gantt.tasks.splice(index, 0, created);
+    return { taskId: created.id };
+  });
   return e.json(201, child);
 }
 
@@ -1141,70 +1150,133 @@ function handleProjectMilestones(e) {
 }
 
 function handleProjectMilestoneCreate(e) {
-  var record = getProjectOrDeny(e, getPathValue(e, 'projectId'));
-  var gantt = getProjectGantt(record);
-  var milestone = normalizeTask(e.requestInfo().body || {}, { indentLevel: 0, forceMilestone: true });
-  gantt.tasks.push(milestone);
-  saveProjectGantt(e, record, gantt);
+  var milestone = mutateProjectGantt(e, function (gantt) {
+    var created = normalizeTask(e.requestInfo().body || {}, { indentLevel: 0, forceMilestone: true });
+    gantt.tasks.push(created);
+    return { taskId: created.id };
+  });
   return e.json(201, milestone);
 }
 
+function projectProgress(record) {
+  var gantt = getProjectGantt(record), total = 0, done = 0;
+  gantt.tasks.forEach(function (task) {
+    var duration = task.milestone ? 0 : Math.max(1, task.durationDays);
+    var progress = task.status === 'completed' ? 100 : task.status === 'in-progress' ? (task.progress > 0 ? task.progress : 50) : 0;
+    total += duration;
+    done += duration * progress / 100;
+  });
+  return { projectId: record.id, status: getRecordValue(record, 'status'), progress: total ? Math.round(done / total * 100) : 0,
+    taskCount: gantt.tasks.length, completedTaskCount: gantt.tasks.filter(function (task) { return task.status === 'completed'; }).length, lastEditedAt: gantt.lastEditedAt };
+}
+
+function handleProjectProgress(e) {
+  return e.json(200, projectProgress(getProjectOrDeny(e, getPathValue(e, 'projectId'))));
+}
+
+function handleProjectProgressPatch(e) {
+  var body = e.requestInfo().body || {};
+  if (Object.keys(body).some(function (key) { return ['status', 'tasks'].indexOf(key) === -1; })) throw new BadRequestError('Update project status or task progress; overall progress is calculated from tasks.');
+  if (!body.status && (!Array.isArray(body.tasks) || body.tasks.length === 0)) throw new BadRequestError('Provide a project status or task progress updates.');
+  if (body.tasks !== undefined && !Array.isArray(body.tasks)) throw new BadRequestError('Tasks must be an array.');
+  var result;
+  e.app.runInTransaction(function (tx) {
+    var event = { app: tx, auth: e.auth }, record = getProjectOrDeny(event, getPathValue(e, 'projectId'));
+    var gantt = getProjectGantt(record), seen = Object.create(null);
+    (body.tasks || []).forEach(function (patch) {
+      if (!patch || typeof patch.id !== 'string' || seen[patch.id]) throw new BadRequestError('Provide unique task ids.');
+      seen[patch.id] = true;
+      if (Object.keys(patch).some(function (key) { return ['id', 'status', 'progress'].indexOf(key) === -1; })) throw new BadRequestError('Only task status and progress can be updated here.');
+      if (patch.progress !== undefined && (typeof patch.progress !== 'number' || !Number.isFinite(patch.progress) || patch.progress < 0 || patch.progress > 100)) throw new BadRequestError('Task progress must be a number between 0 and 100.');
+      var index = getTaskIndex(gantt.tasks, patch.id);
+      if (index === -1) throw new NotFoundError('Task not found.');
+      var values = Object.assign({}, patch);
+      if (values.progress !== undefined && values.status === undefined) values.status = values.progress === 100 ? 'completed' : values.progress > 0 ? 'in-progress' : 'pending';
+      gantt.tasks[index] = normalizeTask(Object.assign({}, gantt.tasks[index], values));
+      if (patch.status === 'completed') gantt.tasks[index].progress = 100;
+    });
+    if (body.status) { assertStatus(body.status, PROJECT_STATUSES, 'project'); record.set('status', body.status); }
+    saveProjectGantt(event, record, gantt);
+    result = projectProgress(record);
+  });
+  return e.json(200, result);
+}
+
+function handleAllProjectTasks(e) {
+  var items = [], projectCount = 0;
+  listRecords(e.app, 'projects', '', '-created', 0, 0).forEach(function (record) {
+    if (!canAccessProject(e.auth, record)) return;
+    projectCount++;
+    getProjectGantt(record).tasks.forEach(function (task) { items.push(Object.assign({}, task, { projectId: record.id, projectTitle: getRecordValue(record, 'title') })); });
+  });
+  return e.json(200, { items: items, totalItems: items.length, projectCount: projectCount });
+}
+
 function registerProjectRoutes(routerAdd, appApis) {
+  routerAdd('GET', '/api/projects/tasks', function (e) {
+    return require(__hooks + '/lib/api-manager.js').handleAllProjectTasks(e);
+  }, function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  routerAdd('GET', '/api/projects/{projectId}/progress', function (e) {
+    return require(__hooks + '/lib/api-manager.js').handleProjectProgress(e);
+  }, function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  routerAdd('PATCH', '/api/projects/{projectId}/progress', function (e) {
+    return require(__hooks + '/lib/api-manager.js').handleProjectProgressPatch(e);
+  }, appApis.bodyLimit(16384), function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
   routerAdd('GET', '/api/projects', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectList(e);
-  }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('POST', '/api/projects', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectCreate(e);
-  }, appApis.bodyLimit(0), appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, appApis.bodyLimit(0), function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('GET', '/api/projects/{projectId}', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectGet(e);
-  }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('PATCH', '/api/projects/{projectId}', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectPatch(e);
-  }, appApis.bodyLimit(0), appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, appApis.bodyLimit(0), function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('PATCH', '/api/projects/{projectId}/status', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectStatus(e);
-  }, appApis.bodyLimit(16384), appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, appApis.bodyLimit(16384), function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('GET', '/api/projects/{projectId}/tasks', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectTasks(e);
-  }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('POST', '/api/projects/{projectId}/tasks', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectTaskCreate(e);
-  }, appApis.bodyLimit(16384), appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, appApis.bodyLimit(16384), function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('PATCH', '/api/projects/{projectId}/tasks/{taskId}', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectTaskPatch(e);
-  }, appApis.bodyLimit(16384), appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, appApis.bodyLimit(16384), function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('PATCH', '/api/projects/{projectId}/tasks/{taskId}/status', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectTaskStatus(e);
-  }, appApis.bodyLimit(16384), appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, appApis.bodyLimit(16384), function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('DELETE', '/api/projects/{projectId}/tasks/{taskId}', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectTaskDelete(e);
-  }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('GET', '/api/projects/{projectId}/tasks/{taskId}/subtasks', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectSubtasks(e);
-  }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('POST', '/api/projects/{projectId}/tasks/{taskId}/subtasks', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectSubtaskCreate(e);
-  }, appApis.bodyLimit(16384), appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, appApis.bodyLimit(16384), function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('GET', '/api/projects/{projectId}/milestones', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectMilestones(e);
-  }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('POST', '/api/projects/{projectId}/milestones', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleProjectMilestoneCreate(e);
-  }, appApis.bodyLimit(16384), appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, appApis.bodyLimit(16384), function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateProjectRequest(e); }, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 }
 
 function registerApiManager(routerAdd, appApis) {
@@ -1237,6 +1309,9 @@ module.exports = {
   handleNewsletterDelete: handleNewsletterDelete,
   handleNewsletterMakePublic: handleNewsletterMakePublic,
   handleNewsletterMakeDraft: handleNewsletterMakeDraft,
+  handleAllProjectTasks: handleAllProjectTasks,
+  handleProjectProgress: handleProjectProgress,
+  handleProjectProgressPatch: handleProjectProgressPatch,
   handleProjectList: handleProjectList,
   handleProjectCreate: handleProjectCreate,
   handleProjectGet: handleProjectGet,

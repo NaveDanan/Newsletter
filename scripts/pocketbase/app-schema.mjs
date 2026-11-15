@@ -1,5 +1,6 @@
 import { autodate, bool, email, file, json, number, text } from './schema-fields.mjs';
 import { COMMUNITY_COLLECTION_SCHEMAS } from './community-schema.mjs';
+import { ACCESS_TOKENS_SCHEMA } from './access-token-schema.mjs';
 import { NOTIFICATION_COLLECTION_SCHEMAS } from './notification-schema.mjs';
 
 export const PROJECTS_SCHEMA = {
@@ -254,6 +255,7 @@ export const NEWSLETTER_IMPORTS_SCHEMA = {
 };
 
 export const APP_COLLECTION_SCHEMAS = [
+  ACCESS_TOKENS_SCHEMA,
   ...NOTIFICATION_COLLECTION_SCHEMAS,
   PROJECTS_SCHEMA,
   NEWSLETTERS_SCHEMA,

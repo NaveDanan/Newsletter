@@ -79,6 +79,7 @@ export function ApiTokensSettings() {
       <CardHeader>
         <CardTitle className="text-base font-bold text-[var(--text-primary)]">{t('apiTokens.title')}</CardTitle>
         <CardDescription className="text-[var(--text-secondary)]">{t('apiTokens.hint')}</CardDescription>
+        <a href="/docs/gantt-api.html" target="_blank" rel="noopener noreferrer" className="w-fit text-sm font-semibold text-[var(--primary-accent)] underline-offset-4 hover:underline">{t('apiTokens.docs')}</a>
       </CardHeader>
       <CardContent className="space-y-5">
         <form onSubmit={event => { void create(event); }} className="space-y-3">

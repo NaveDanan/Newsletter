@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gantt API reference</title>
+<meta name="description" content="Reference for the AI-BREAK Newsletter Gantt API: personal access tokens, permissions, endpoints, data model, progress rules, errors, and examples for people and AI agents.">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #f0f3f6;
+    --text: #14181f;
+    --text-2: #4b5563;
+    --border: #d8dee6;
+    --accent: #0b6e7f;
+    --code-bg: #0f1720;
+    --code-text: #e6edf3;
+    --code-line: #243241;
+    --note-bg: #eef6ff;
+    --note-edge: #3b82c4;
+    --warn-bg: #fff7e0;
+    --warn-edge: #d99a00;
+    --get: #0b6e7f;
+    --post: #17703c;
+    --patch: #8a5300;
+    --delete: #a12626;
+    --radius: 14px;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-2: #1c232c;
+      --text: #e6edf3;
+      --text-2: #9aa7b4;
+      --border: #2b3643;
+      --accent: #67e8f9;
+      --code-bg: #0a0e13;
+      --code-text: #e6edf3;
+      --code-line: #1f2a35;
+      --note-bg: #10233a;
+      --note-edge: #4a86c5;
+      --warn-bg: #2b2110;
+      --warn-edge: #b7791f;
+      --get: #67e8f9;
+      --post: #6ee7a0;
+      --patch: #f6c26b;
+      --delete: #fca5a5;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-2: #1c232c;
+    --text: #e6edf3;
+    --text-2: #9aa7b4;
+    --border: #2b3643;
+    --accent: #67e8f9;
+    --code-bg: #0a0e13;
+    --code-text: #e6edf3;
+    --code-line: #1f2a35;
+    --note-bg: #10233a;
+    --note-edge: #4a86c5;
+    --warn-bg: #2b2110;
+    --warn-edge: #b7791f;
+    --get: #67e8f9;
+    --post: #6ee7a0;
+    --patch: #f6c26b;
+    --delete: #fca5a5;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.65 var(--sans); }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--surface); padding: 8px 12px; border-radius: 8px; }
+  .skip:focus { left: 8px; z-index: 10; }
+
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; }
+  .topbar-inner { max-width: 1180px; margin: 0 auto; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+  .brand { font-weight: 800; letter-spacing: .01em; }
+  .brand span { font-weight: 500; color: var(--text-2); }
+
+  .shell { max-width: 1180px; margin: 0 auto; padding: 32px 24px 96px; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 48px; }
+  .toc { position: sticky; top: 84px; align-self: start; font-size: 14px; max-height: calc(100vh - 110px); overflow: auto; }
+  .toc-title { margin: 0 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-2); }
+  .toc ol { list-style: none; margin: 0; padding: 0; }
+  .toc li { margin: 2px 0; }
+  .toc ol ol { padding-inline-start: 14px; margin-top: 2px; }
+  .toc a { display: block; padding: 4px 8px; border-radius: 8px; color: var(--text-2); text-decoration: none; }
+  .toc a:hover { color: var(--text); background: var(--surface-2); }
+
+  main { min-width: 0; }
+  .hero h1 { font-size: clamp(2rem, 4vw, 2.6rem); line-height: 1.15; margin: 0 0 12px; letter-spacing: -.02em; }
+  .lead { font-size: 1.12rem; color: var(--text-2); margin: 0 0 20px; max-width: 70ch; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+  .chips span { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+  .chips code { font-size: 12.5px; }
+
+  h2 { font-size: 1.55rem; line-height: 1.25; margin: 56px 0 14px; padding-top: 24px; border-top: 1px solid var(--border); letter-spacing: -.01em; scroll-margin-top: 90px; }
+  h3 { font-size: 1.15rem; margin: 32px 0 10px; scroll-margin-top: 90px; }
+  h4 { font-size: 1rem; margin: 22px 0 6px; }
+  section[id], article[id] { scroll-margin-top: 90px; }
+  p, li { max-width: 74ch; }
+  ul, ol { padding-inline-start: 22px; }
+  li { margin: 4px 0; }
+  code { font-family: var(--mono); font-size: .9em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; }
+  pre code { background: none; border: 0; padding: 0; font-size: 13px; overflow-wrap: normal; }
+
+  .glance { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin: 24px 0; }
+  .glance dl { display: grid; grid-template-columns: minmax(150px, 210px) minmax(0, 1fr); gap: 10px 20px; margin: 0; }
+  .glance dt { font-weight: 650; color: var(--text-2); }
+  .glance dd { margin: 0; }
+
+  .agent-box { background: var(--surface); border: 1px solid var(--border); border-inline-start: 4px solid var(--accent); border-radius: var(--radius); padding: 20px 24px; }
+  .agent-box ol { margin: 0; }
+
+  .callout { border-inline-start: 4px solid var(--note-edge); background: var(--note-bg); border-radius: 10px; padding: 12px 16px; margin: 18px 0; max-width: 74ch; }
+  .callout.warn { border-color: var(--warn-edge); background: var(--warn-bg); }
+  .callout strong { display: block; margin-bottom: 2px; }
+  .callout p { margin: 0; }
+
+  .table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: start; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th { background: var(--surface-2); font-size: 12.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
+  tbody tr:last-child td { border-bottom: 0; }
+  td code, th code { white-space: nowrap; }
+
+  .endpoint { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin: 18px 0; }
+  .endpoint-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .endpoint-head h4 { margin: 0; font-size: 1.02rem; flex-basis: 100%; }
+  .method { font: 700 12px/1 var(--mono); letter-spacing: .05em; padding: 6px 9px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--border); }
+  .m-get { color: var(--get); } .m-post { color: var(--post); } .m-patch { color: var(--patch); } .m-delete { color: var(--delete); }
+  .path { font: 600 14px/1.4 var(--mono); word-break: break-all; }
+  .badge { font-size: 12px; color: var(--text-2); border: 1px dashed var(--border); border-radius: 999px; padding: 2px 9px; }
+  .endpoint h5 { margin: 16px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
+
+  .codebox { position: relative; margin: 10px 0; }
+  pre { position: relative; margin: 10px 0; background: var(--code-bg); color: var(--code-text); border: 1px solid var(--code-line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; font: 13px/1.55 var(--mono); direction: ltr; text-align: left; white-space: pre; }
+  pre .copy { position: sticky; float: right; margin: -2px -4px 6px 10px; font: 12px var(--sans); color: var(--code-text); background: var(--code-line); border: 1px solid #34465a; border-radius: 7px; padding: 3px 9px; cursor: pointer; }
+  pre .copy:hover { filter: brightness(1.15); }
+
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; margin: 10px 0; }
+  details summary { cursor: pointer; font-weight: 650; }
+  details[open] summary { margin-bottom: 8px; }
+
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text-2); font-size: 14px; }
+
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; gap: 16px; padding: 20px 16px 72px; }
+    .toc { position: static; max-height: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+    .toc > ol { columns: 2; column-gap: 18px; }
+    .toc ol ol { columns: 1; }
+    .toc li { break-inside: avoid; }
+    .glance dl { grid-template-columns: 1fr; gap: 2px; }
+    .glance dd { margin-bottom: 10px; }
+    .topbar-inner { padding: 12px 16px; }
+    .endpoint { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand">AI-BREAK <span>· Developer docs</span></span>
+    <a href="/profile">Back to profile</a>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="toc" aria-label="On this page">
+    <p class="toc-title">On this page</p>
+    <ol>
+      <li><a href="#agents">For AI agents</a></li>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#tokens">Create and manage tokens</a></li>
+      <li><a href="#authentication">Authentication</a></li>
+      <li><a href="#permissions">Permissions and scope</a></li>
+      <li><a href="#data-model">Data model</a></li>
+      <li><a href="#endpoints">Endpoint reference</a>
+        <ol>
+          <li><a href="#projects-api">Projects</a></li>
+          <li><a href="#tasks-api">Tasks</a></li>
+          <li><a href="#subtasks-api">Subtasks</a></li>
+          <li><a href="#milestones-api">Milestones</a></li>
+          <li><a href="#progress-api">Progress and status</a></li>
+        </ol>
+      </li>
+      <li><a href="#progress">Progress calculation</a></li>
+      <li><a href="#errors">Errors</a></li>
+      <li><a href="#examples">Examples</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+      <li><a href="#manifest">Machine-readable manifest</a></li>
+    </ol>
+  </nav>
+
+  <main id="content">
+    <section class="hero" id="top">
+      <h1>Gantt API</h1>
+      <p class="lead">Read and change Gantt tasks, milestones, subtasks, and project progress from scripts, integrations, and AI agents. Every request is authenticated with a personal access token that you create in your profile.</p>
+      <div class="chips">
+        <span>Base URL: <code data-origin>https://your-site</code></span>
+        <span>Auth: <code>Authorization: Bearer &lt;token&gt;</code></span>
+        <span>Format: JSON</span>
+        <span>Applies to Newsletter 1.0.30 and later</span>
+      </div>
+
+      <div class="glance">
+        <dl>
+          <dt>Who can create tokens</dt>
+          <dd>Managers, general managers, and administrators, under <strong>Profile → API access tokens</strong>.</dd>
+          <dt>Token format</dt>
+          <dd><code>nlpat_</code> followed by 48 random characters. Only a SHA-256 hash is stored.</dd>
+          <dt>Access levels</dt>
+          <dd><strong>Read</strong>: GET requests only. <strong>Write</strong>: GET plus the write requests listed below.</dd>
+          <dt>Lifetime</dt>
+          <dd>1 to 365 days. The profile offers 30, 90, or 365 days; the API default is 90.</dd>
+          <dt>Limit</dt>
+          <dd>20 tokens per account, counting expired tokens. Revoke unused tokens to free a slot.</dd>
+          <dt>Scope</dt>
+          <dd>Gantt tasks, subtasks, milestones, progress, and project status for projects you can access. Nothing else.</dd>
+          <dt>Working calendar</dt>
+          <dd>Sunday to Thursday. Friday and Saturday are rest days, so durations and end dates skip them.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section id="agents">
+      <h2>For AI agents</h2>
+      <div class="agent-box">
+        <ol>
+          <li><strong>Base URL.</strong> Use the site origin shown above. Every path in this document starts with <code>/api</code>.</li>
+          <li><strong>Authentication.</strong> Send <code>Authorization: Bearer &lt;token&gt;</code> on every request. Read the token from an environment variable such as <code>NEWSLETTER_API_TOKEN</code>. Never place it in a URL, query string, log, or chat message.</li>
+          <li><strong>Task identity.</strong> Identify a task with the pair <code>projectId</code> + <code>taskId</code>. Task ids are unique within a project, not across projects.</li>
+          <li><strong>Check access first.</strong> A read token gets <code>403</code> on any non-GET request. Ask the user for a write token before you attempt writes.</li>
+          <li><strong>Use the manifest.</strong> The JSON in <a href="#manifest">the manifest section</a> lists every allowed route, its access level, its body fields, and its success status.</li>
+          <li><strong>Prefer PATCH for changes.</strong> POST creates records. PATCH changes existing ones. DELETE removes a task and all of its subtasks.</li>
+          <li><strong>Handle errors deliberately.</strong> On <code>401</code>, the token is invalid, revoked, or expired: stop and ask the user for a new token rather than retrying. On <code>403</code>, the request is outside the token's scope or the owner's role: do not try other routes to get around it.</li>
+          <li><strong>Verify after a batch.</strong> After several writes, call <code>GET /api/projects/{projectId}/progress</code> to confirm the calculated state.</li>
+          <li><strong>Avoid retries that duplicate work.</strong> A POST that returns a network error may have succeeded. List the tasks again before creating a task a second time.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="overview">
+      <h2>Overview</h2>
+      <p>Each project holds an ordered list of Gantt tasks. A task can be a regular task, a milestone, or a subtask nested under another task. The API works on that list directly; the website shows the same data as a timeline.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Concept</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Project</strong></td><td>A container for tasks, with its own status and sharing settings. Its progress is calculated from its tasks.</td></tr>
+            <tr><td><strong>Task</strong></td><td>A unit of work with a start date, a duration in working days, a status, and a progress percentage.</td></tr>
+            <tr><td><strong>Milestone</strong></td><td>A zero-duration marker on a single date. It has no effect on calculated progress.</td></tr>
+            <tr><td><strong>Subtask</strong></td><td>A task nested under a parent. Deleting a parent deletes its subtasks.</td></tr>
+            <tr><td><strong>Predecessor</strong></td><td>A task that must finish before another one starts. Circular dependencies are rejected.</td></tr>
+            <tr><td><strong>Progress</strong></td><td>A calculated percentage for the whole project, weighted by task duration.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tokens">
+      <h2>Create and manage tokens</h2>
+      <h3>Create a token</h3>
+      <ol>
+        <li>Sign in to the website with your normal account.</li>
+        <li>Open <strong>Profile → API access tokens</strong>. If you do not see this section, your role does not allow tokens (see <a href="#troubleshooting">Troubleshooting</a>).</li>
+        <li>Enter a name of up to 80 characters so you can recognise the token later, such as <em>Weekly status script</em>.</li>
+        <li>Choose <strong>Read and write</strong> or <strong>Read only</strong>.</li>
+        <li>Choose an expiry of 30, 90, or 365 days, then select <strong>Create token</strong>.</li>
+        <li>Copy the token immediately. It is displayed once and cannot be recovered later.</li>
+      </ol>
+      <div class="callout warn">
+        <strong>The full token is shown once.</strong>
+        <p>If you lose it, revoke it and create a new one. The site stores only a hash of the secret, so it cannot show the token again.</p>
+      </div>
+
+      <h3>Access levels</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Access</th><th>Allowed requests</th><th>Typical use</th></tr></thead>
+          <tbody>
+            <tr><td><code>read</code></td><td>GET requests within scope</td><td>Dashboards, reports, sync checks</td></tr>
+            <tr><td><code>write</code></td><td>GET plus the POST, PATCH, and DELETE requests in <a href="#permissions">Permissions and scope</a></td><td>Automation that edits schedules or progress</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Revoke a token</h3>
+      <p>Select <strong>Revoke</strong> on the token row, then confirm. Revocation takes effect immediately. The token is then rejected with <code>401</code>, and any script still using it stops working.</p>
+
+      <h3>Lifetime and limits</h3>
+      <ul>
+        <li>The API accepts any whole number of days from 1 to 365. The profile offers 30, 90, and 365, with 90 selected by default.</li>
+        <li>Expired tokens remain in the list until you revoke them, and they count toward the limit of 20 per account.</li>
+        <li>Signing out of the website does not revoke tokens. They keep working until they expire or you revoke them.</li>
+        <li>Token management requires a normal signed-in website session. A token cannot create, list, or revoke tokens.</li>
+      </ul>
+    </section>
+
+    <section id="authentication">
+      <h2>Authentication</h2>
+      <p>Send the token in the <code>Authorization</code> header with the <code>Bearer</code> scheme. Do not put it in the URL.</p>
+      <pre><code>Authorization: Bearer nlpat_&lt;48 characters&gt;</code></pre>
+      <p>The same header works on the frontend origin and on the direct PocketBase origin, because both route to the same API.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Origin</th><th>Use</th></tr></thead>
+          <tbody>
+            <tr><td><code data-origin>https://your-site</code></td><td>Recommended. The website proxy used by the browser.</td></tr>
+            <tr><td><code>http://10.40.240.3:32290</code></td><td>Direct PocketBase API on the current MMEMS deployment.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <strong>Keep tokens out of URLs and logs.</strong>
+        <p>Query strings are recorded by proxies and access logs. Store the token in an environment variable or a secret manager. Use HTTPS wherever the site is configured for it.</p>
+      </div>
+    </section>
+
+    <section id="permissions">
+      <h2>Permissions and scope</h2>
+      <p>A token is limited in two ways. First, it can reach only the routes in the table below, whatever the owner's role. Second, it sees only the projects the owner can access right now. Access is evaluated on every request, so a change to the owner's role takes effect immediately.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Method</th><th>Route</th><th>Access needed</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET</code></td><td><code>/api/projects</code>, <code>/api/projects/tasks</code>, <code>/api/projects/{projectId}</code>, <code>/api/projects/{projectId}/tasks</code>, <code>/api/projects/{projectId}/tasks/{taskId}/subtasks</code>, <code>/api/projects/{projectId}/milestones</code>, <code>/api/projects/{projectId}/progress</code></td><td>read or write</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/projects/{projectId}/tasks</code>, <code>/api/projects/{projectId}/tasks/{taskId}/subtasks</code>, <code>/api/projects/{projectId}/milestones</code></td><td>write</td></tr>
+            <tr><td><code>PATCH</code></td><td><code>/api/projects/{projectId}/tasks/{taskId}</code>, <code>/api/projects/{projectId}/tasks/{taskId}/status</code>, <code>/api/projects/{projectId}/progress</code>, <code>/api/projects/{projectId}/status</code></td><td>write</td></tr>
+            <tr><td><code>DELETE</code></td><td><code>/api/projects/{projectId}/tasks/{taskId}</code></td><td>write</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Any other route returns <code>403</code>. Examples include creating or editing a project (<code>POST /api/projects</code>, <code>PATCH /api/projects/{projectId}</code>), sharing settings, newsletters, community posts, and every token route. There is no single-task GET route: to read one task, fetch the project's task list and select the item by <code>id</code>.</p>
+      <h3>Who sees which projects</h3>
+      <ul>
+        <li><strong>Managers</strong> see the projects they own and the projects shared with them.</li>
+        <li><strong>General managers and administrators</strong> see all projects.</li>
+        <li>An owner who is deleted, or whose role falls below manager, loses access for all of their tokens.</li>
+      </ul>
+    </section>
+
+    <section id="data-model">
+      <h2>Data model</h2>
+      <h3>Task object</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>string</td><td>Unique within its project. Generated by the server when omitted on create. Duplicate ids make later updates ambiguous, so let the server generate them where you can.</td></tr>
+            <tr><td><code>name</code></td><td>string</td><td>Display name.</td></tr>
+            <tr><td><code>startDate</code></td><td>YYYY-MM-DD</td><td>First working day. Omitting it uses today's working day. A date that falls on Friday or Saturday moves forward to Sunday.</td></tr>
+            <tr><td><code>durationDays</code></td><td>integer ≥ 1</td><td>Length in working days, Sunday to Thursday. Values are rounded and clamped to at least 1 for regular tasks. Milestones always have 0.</td></tr>
+            <tr><td><code>endDate</code></td><td>YYYY-MM-DD</td><td>Calculated from <code>startDate</code> and <code>durationDays</code>. Any value you send is replaced.</td></tr>
+            <tr><td><code>status</code></td><td>enum</td><td><code>pending</code>, <code>in-progress</code>, <code>completed</code>, or <code>delayed</code>. Any other value returns <code>400</code>.</td></tr>
+            <tr><td><code>progress</code></td><td>integer 0–100</td><td>Stored percentage. Values are rounded and clamped to the range.</td></tr>
+            <tr><td><code>predecessorIds</code></td><td>string[]</td><td>Ids of tasks in the same project that must finish first. Unknown references are dropped. A cycle returns <code>400</code>.</td></tr>
+            <tr><td><code>resourceId</code></td><td>string or null</td><td>Optional assignment to a resource used by the timeline.</td></tr>
+            <tr><td><code>indentLevel</code></td><td>integer ≥ 0</td><td>Depth in the hierarchy. New top-level tasks start at 0. Subtask creation sets this for you.</td></tr>
+            <tr><td><code>milestone</code></td><td>boolean</td><td><code>true</code> for milestones. Create them with the milestones endpoint rather than setting this flag yourself.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The all-tasks endpoint adds two fields to every task: <code>projectId</code> and <code>projectTitle</code>. Always send both the project id and the task id when you change a task.</p>
+
+      <h3>Task status</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Value</th><th>Meaning</th><th>Progress contribution</th></tr></thead>
+          <tbody>
+            <tr><td><code>pending</code></td><td>Not started</td><td>0%</td></tr>
+            <tr><td><code>in-progress</code></td><td>Under way</td><td>Stored progress if above 0, otherwise 50%</td></tr>
+            <tr><td><code>completed</code></td><td>Finished</td><td>100%</td></tr>
+            <tr><td><code>delayed</code></td><td>Behind schedule</td><td>0%</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Dates and working days</h3>
+      <p>Durations and end dates count only working days. For example, a task starting on Sunday 15 November 2026 with <code>durationDays: 2</code> ends on Monday 16 November 2026. A task starting on a Thursday with <code>durationDays: 2</code> ends on the following Sunday, because Friday and Saturday are skipped.</p>
+    </section>
+
+    <section id="endpoints">
+      <h2>Endpoint reference</h2>
+      <p>All bodies are JSON and need <code>Content-Type: application/json</code>. Examples use the shell variables <code>$BASE_URL</code> and <code>$NEWSLETTER_API_TOKEN</code>. Values such as <code>&lt;projectId&gt;</code> are placeholders. Ids in responses are examples; the server generates the real ones.</p>
+
+      <h3 id="projects-api">Projects</h3>
+
+      <article class="endpoint" id="ep-get-projects">
+        <div class="endpoint-head"><span class="method m-get">GET</span><span class="path">/api/projects</span><span class="badge">read</span></div>
+        <h4>List accessible projects</h4>
+        <p>Returns every project the token owner can access, including each project's Gantt data.</p>
+        <h5>Response · 200</h5>
+        <pre><code>{ "items": [ { "id": "&lt;projectId&gt;", "title": "Launch plan", "status": "in-progress", ... } ] }</code></pre>
+      </article>
+
+      <article class="endpoint" id="ep-get-project">
+        <div class="endpoint-head"><span class="method m-get">GET</span><span class="path">/api/projects/{projectId}</span><span class="badge">read</span></div>
+        <h4>Get one project</h4>
+        <p>Returns one project. Returns <code>403</code> if the owner cannot access it and <code>404</code> if it does not exist.</p>
+      </article>
+
+      <article class="endpoint" id="ep-get-all-tasks">
+        <div class="endpoint-head"><span class="method m-get">GET</span><span class="path">/api/projects/tasks</span><span class="badge">read</span></div>
+        <h4>List all tasks across accessible projects</h4>
+        <p>The most efficient way to read everything in one call. Each task includes <code>projectId</code> and <code>projectTitle</code>.</p>
+        <h5>Response · 200</h5>
+        <pre><code>{
+  "items": [ { "id": "...", "projectId": "...", "projectTitle": "Launch plan", "name": "...", "status": "pending", ... } ],
+  "totalItems": 42,
+  "projectCount": 3
+}</code></pre>
+        <h5>Example</h5>
+        <pre><code>curl -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  "$BASE_URL/api/projects/tasks"</code></pre>
+      </article>
+
+      <h3 id="tasks-api">Tasks</h3>
+
+      <article class="endpoint" id="ep-list-tasks">
+        <div class="endpoint-head"><span class="method m-get">GET</span><span class="path">/api/projects/{projectId}/tasks</span><span class="badge">read</span></div>
+        <h4>List a project's tasks</h4>
+        <p>Returns every task in one project, in stored order, including subtasks.</p>
+        <h5>Response · 200</h5>
+        <pre><code>{ "items": [ { "id": "...", "name": "...", "startDate": "...", ... } ] }</code></pre>
+      </article>
+
+      <article class="endpoint" id="ep-create-task">
+        <div class="endpoint-head"><span class="method m-post">POST</span><span class="path">/api/projects/{projectId}/tasks</span><span class="badge">write</span></div>
+        <h4>Add a task</h4>
+        <p>Adds a top-level task at the end of the project's list.</p>
+        <h5>Body fields</h5>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>name</code></td><td>Recommended</td><td>Display name.</td></tr>
+            <tr><td><code>startDate</code></td><td>No</td><td><code>YYYY-MM-DD</code>. Defaults to today's working day.</td></tr>
+            <tr><td><code>durationDays</code></td><td>No</td><td>Working days. Defaults to 1.</td></tr>
+            <tr><td><code>status</code></td><td>No</td><td>Defaults to <code>pending</code>.</td></tr>
+            <tr><td><code>progress</code></td><td>No</td><td>0–100. Defaults to 0.</td></tr>
+            <tr><td><code>predecessorIds</code></td><td>No</td><td>Task ids in the same project.</td></tr>
+            <tr><td><code>resourceId</code></td><td>No</td><td>Resource assignment.</td></tr>
+            <tr><td><code>id</code></td><td>No</td><td>Leave out so the server generates it.</td></tr>
+          </tbody>
+        </table></div>
+        <h5>Example</h5>
+        <pre><code>curl -X POST -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Prepare release","startDate":"2026-11-15","durationDays":2,"status":"pending"}' \
+  "$BASE_URL/api/projects/&lt;projectId&gt;/tasks"</code></pre>
+        <h5>Response · 201</h5>
+        <pre><code>{
+  "id": "&lt;taskId&gt;",
+  "name": "Prepare release",
+  "startDate": "2026-11-15",
+  "endDate": "2026-11-16",
+  "durationDays": 2,
+  "progress": 0,
+  "status": "pending",
+  "indentLevel": 0,
+  "predecessorIds": [],
+  "resourceId": null,
+  "milestone": false
+}</code></pre>
+      </article>
+
+      <article class="endpoint" id="ep-update-task">
+        <div class="endpoint-head"><span class="method m-patch">PATCH</span><span class="path">/api/projects/{projectId}/tasks/{taskId}</span><span class="badge">write</span></div>
+        <h4>Update a task</h4>
+        <p>Changes only the fields you send. Other fields keep their current values, and <code>endDate</code> is recalculated from the new start and duration. Send <code>status</code> changes through the status endpoint below, which also sets progress to 100 for completed tasks.</p>
+        <h5>Example</h5>
+        <pre><code>curl -X PATCH -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"durationDays":3,"predecessorIds":["&lt;otherTaskId&gt;"]}' \
+  "$BASE_URL/api/projects/&lt;projectId&gt;/tasks/&lt;taskId&gt;"</code></pre>
+        <h5>Response · 200</h5>
+        <p>The updated task object.</p>
+      </article>
+
+      <article class="endpoint" id="ep-task-status">
+        <div class="endpoint-head"><span class="method m-patch">PATCH</span><span class="path">/api/projects/{projectId}/tasks/{taskId}/status</span><span class="badge">write</span></div>
+        <h4>Change a task's status</h4>
+        <p>Sets <code>status</code>. Setting <code>completed</code> also sets progress to 100.</p>
+        <h5>Body</h5>
+        <pre><code>{ "status": "completed" }</code></pre>
+        <h5>Response · 200</h5>
+        <p>The updated task object.</p>
+      </article>
+
+      <article class="endpoint" id="ep-delete-task">
+        <div class="endpoint-head"><span class="method m-delete">DELETE</span><span class="path">/api/projects/{projectId}/tasks/{taskId}</span><span class="badge">write</span></div>
+        <h4>Remove a task and its subtasks</h4>
+        <p>Deletes the task and every descendant subtask. Predecessor references to any deleted task are removed from the remaining tasks. This cannot be undone through the API.</p>
+        <h5>Response · 200</h5>
+        <pre><code>{ "status": "deleted", "deletedTaskIds": ["&lt;taskId&gt;", "&lt;childTaskId&gt;"] }</code></pre>
+      </article>
+
+      <h3 id="subtasks-api">Subtasks</h3>
+
+      <article class="endpoint" id="ep-list-subtasks">
+        <div class="endpoint-head"><span class="method m-get">GET</span><span class="path">/api/projects/{projectId}/tasks/{taskId}/subtasks</span><span class="badge">read</span></div>
+        <h4>List direct subtasks</h4>
+        <p>Returns the immediate children of a task. Grandchildren are not included; query them through their own parent.</p>
+        <h5>Response · 200</h5>
+        <pre><code>{ "items": [ { "id": "...", "indentLevel": 1, ... } ] }</code></pre>
+      </article>
+
+      <article class="endpoint" id="ep-create-subtask">
+        <div class="endpoint-head"><span class="method m-post">POST</span><span class="path">/api/projects/{projectId}/tasks/{taskId}/subtasks</span><span class="badge">write</span></div>
+        <h4>Add a subtask</h4>
+        <p>Inserts the new task directly after the parent's existing subtree, one level deeper. Accepts the same body fields as <a href="#ep-create-task">Add a task</a>.</p>
+        <h5>Response · 201</h5>
+        <p>The new subtask object, with <code>indentLevel</code> set to the parent's level plus one.</p>
+      </article>
+
+      <h3 id="milestones-api">Milestones</h3>
+
+      <article class="endpoint" id="ep-list-milestones">
+        <div class="endpoint-head"><span class="method m-get">GET</span><span class="path">/api/projects/{projectId}/milestones</span><span class="badge">read</span></div>
+        <h4>List milestones</h4>
+        <h5>Response · 200</h5>
+        <pre><code>{ "items": [ { "id": "...", "name": "Go live", "milestone": true, "durationDays": 0, ... } ] }</code></pre>
+      </article>
+
+      <article class="endpoint" id="ep-create-milestone">
+        <div class="endpoint-head"><span class="method m-post">POST</span><span class="path">/api/projects/{projectId}/milestones</span><span class="badge">write</span></div>
+        <h4>Add a milestone</h4>
+        <p>Creates a zero-duration milestone on <code>startDate</code>. Accepts <code>name</code>, <code>startDate</code>, <code>status</code>, and <code>predecessorIds</code>. Any <code>durationDays</code> you send is ignored.</p>
+        <h5>Example</h5>
+        <pre><code>curl -X POST -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Go live","startDate":"2026-12-01"}' \
+  "$BASE_URL/api/projects/&lt;projectId&gt;/milestones"</code></pre>
+        <h5>Response · 201</h5>
+        <p>The new milestone object.</p>
+      </article>
+
+      <h3 id="progress-api">Progress and status</h3>
+
+      <article class="endpoint" id="ep-get-progress">
+        <div class="endpoint-head"><span class="method m-get">GET</span><span class="path">/api/projects/{projectId}/progress</span><span class="badge">read</span></div>
+        <h4>Read calculated progress</h4>
+        <p>Returns the project's status and its calculated progress. Progress cannot be set directly; see <a href="#progress">Progress calculation</a>.</p>
+        <h5>Response · 200</h5>
+        <pre><code>{
+  "projectId": "&lt;projectId&gt;",
+  "status": "in-progress",
+  "progress": 60,
+  "taskCount": 4,
+  "completedTaskCount": 2,
+  "lastEditedAt": "2026-11-15T10:00:00.000Z"
+}</code></pre>
+      </article>
+
+      <article class="endpoint" id="ep-patch-progress">
+        <div class="endpoint-head"><span class="method m-patch">PATCH</span><span class="path">/api/projects/{projectId}/progress</span><span class="badge">write</span></div>
+        <h4>Update several task percentages atomically</h4>
+        <p>Applies a list of task updates and, optionally, a new project status in one transaction. If any task id is missing or any value is invalid, nothing is saved.</p>
+        <h5>Body</h5>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>status</code></td><td>Optional project status: <code>pending</code>, <code>in-progress</code>, <code>completed</code>, or <code>delayed</code>.</td></tr>
+            <tr><td><code>tasks</code></td><td>Optional array of <code>{ "id", "status"?, "progress"? }</code>. Ids must be unique within the request. Only <code>id</code>, <code>status</code>, and <code>progress</code> are accepted per item.</td></tr>
+          </tbody>
+        </table></div>
+        <p>At least one of <code>status</code> or a non-empty <code>tasks</code> array is required.</p>
+        <h5>Example</h5>
+        <pre><code>curl -X PATCH -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"in-progress","tasks":[{"id":"&lt;taskId&gt;","progress":60}]}' \
+  "$BASE_URL/api/projects/&lt;projectId&gt;/progress"</code></pre>
+        <h5>Response · 200</h5>
+        <p>The same progress object as the GET endpoint, reflecting the saved state.</p>
+      </article>
+
+      <article class="endpoint" id="ep-project-status">
+        <div class="endpoint-head"><span class="method m-patch">PATCH</span><span class="path">/api/projects/{projectId}/status</span><span class="badge">write</span></div>
+        <h4>Change the project's status</h4>
+        <p>Sets the project status. This does not change task progress.</p>
+        <h5>Body</h5>
+        <pre><code>{ "status": "delayed" }</code></pre>
+        <h5>Response · 200</h5>
+        <p>The updated project object.</p>
+      </article>
+    </section>
+
+    <section id="progress">
+      <h2>Progress calculation</h2>
+      <p>Project progress is derived from tasks. It is not a separate value you can edit, so the same tasks always produce the same percentage, whether you read it on the website or through the API.</p>
+      <pre><code>weight(task)   = 0 for milestones, otherwise max(1, durationDays)
+percent(task)  = 100 if completed
+               = stored progress if in-progress and above 0, otherwise 50 when in-progress
+               = 0 otherwise                                  (pending, delayed)
+
+progress       = round( sum(weight × percent) / sum(weight) )
+               = 0 when the project has no tasks</code></pre>
+      <p>To change progress, update task percentages through <a href="#ep-patch-progress">PATCH progress</a>. When you send a percentage without a status, the status is derived: 100 becomes <code>completed</code>, any value above 0 becomes <code>in-progress</code>, and 0 becomes <code>pending</code>.</p>
+    </section>
+
+    <section id="errors">
+      <h2>Errors</h2>
+      <p>Errors return JSON with a <code>message</code> and a <code>status</code> code.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Status</th><th>When</th><th>Example message</th></tr></thead>
+          <tbody>
+            <tr><td><code>400</code></td><td>Invalid input or a rule violation</td><td><code>Task predecessor references create a circular dependency.</code> · <code>Only task status and progress can be updated here.</code> · <code>Task progress must be a number between 0 and 100.</code> · <code>Unknown task status.</code></td></tr>
+            <tr><td><code>401</code></td><td>Token missing, malformed, revoked, or expired</td><td><code>Invalid API token.</code> · <code>API token has expired.</code></td></tr>
+            <tr><td><code>403</code></td><td>Read-only token on a write, a route outside the token's scope, the owner's role no longer allows it, or the project is not accessible</td><td><code>This API token has read-only access.</code> · <code>This API token is limited to Gantt tasks and project progress.</code> · <code>The token owner no longer has manager access.</code></td></tr>
+            <tr><td><code>404</code></td><td>Project or task does not exist</td><td><code>Task not found.</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Creating a token can also return <code>400</code> for a missing name, an invalid access value, an expiry outside 1 to 365 days, or a 21st token: <code>Revoke an existing token before creating more than 20 tokens.</code></p>
+    </section>
+
+    <section id="examples">
+      <h2>Examples</h2>
+
+      <h3>Set the environment</h3>
+      <pre><code>export BASE_URL="<span data-origin>https://your-site</span>"
+export NEWSLETTER_API_TOKEN="nlpat_&lt;paste your token&gt;"</code></pre>
+
+      <h3>List every task as a table</h3>
+      <pre><code>curl -s -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  "$BASE_URL/api/projects/tasks" \
+  | jq -r '.items[] | [.projectTitle, .name, .status, .progress] | @tsv'</code></pre>
+
+      <h3>Add a task that depends on another</h3>
+      <pre><code>curl -X POST -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"QA sign-off","startDate":"2026-11-22","durationDays":3,"predecessorIds":["&lt;releaseTaskId&gt;"]}' \
+  "$BASE_URL/api/projects/&lt;projectId&gt;/tasks"</code></pre>
+
+      <h3>Mark a task complete and check the project</h3>
+      <pre><code>curl -X PATCH -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"completed"}' \
+  "$BASE_URL/api/projects/&lt;projectId&gt;/tasks/&lt;taskId&gt;/status"
+
+curl -s -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  "$BASE_URL/api/projects/&lt;projectId&gt;/progress"</code></pre>
+
+      <h3>Python (standard library only)</h3>
+      <pre><code>import json
+import os
+import urllib.request
+
+BASE_URL = os.environ["BASE_URL"]
+TOKEN = os.environ["NEWSLETTER_API_TOKEN"]
+
+def call(method, path, body=None):
+    data = json.dumps(body).encode() if body is not None else None
+    request = urllib.request.Request(
+        BASE_URL + path,
+        data=data,
+        method=method,
+        headers={
+            "Authorization": f"Bearer {TOKEN}",
+            "Content-Type": "application/json",
+        },
+    )
+    # urllib raises HTTPError for 4xx/5xx responses; catch it to read the message.
+    with urllib.request.urlopen(request) as response:
+        return json.load(response)
+
+tasks = call("GET", "/api/projects/tasks")["items"]
+open_tasks = [t for t in tasks if t["status"] != "completed"]
+print(f"{len(open_tasks)} of {len(tasks)} tasks are not completed")</code></pre>
+    </section>
+
+    <section id="troubleshooting">
+      <h2>Troubleshooting</h2>
+      <details open>
+        <summary>I don't see "API access tokens" in my profile</summary>
+        <p>The section is shown only to managers, general managers, and administrators. Signed-in members without a manager role will not see it. Ask an administrator to check your role.</p>
+      </details>
+      <details>
+        <summary>My script gets <code>401 Invalid API token.</code></summary>
+        <p>The token was revoked, deleted, or mistyped. Check that the header is exactly <code>Authorization: Bearer nlpat_…</code> with no line breaks or extra spaces. If the token is correct, create a new one.</p>
+      </details>
+      <details>
+        <summary>My script gets <code>401 API token has expired.</code></summary>
+        <p>The token passed its expiry date. Create a new one, choosing a longer lifetime if the integration needs it.</p>
+      </details>
+      <details>
+        <summary>Reads work but writes return <code>403</code></summary>
+        <p>The token is read only. Access cannot be changed on an existing token, so revoke it and create a new one with <strong>Read and write</strong>.</p>
+      </details>
+      <details>
+        <summary>I lost the token</summary>
+        <p>The full token is shown only once. Revoke the lost token so it cannot be used, then create a new one and store it in your secret manager.</p>
+      </details>
+      <details>
+        <summary>I can't create a token: the limit is reached</summary>
+        <p>Each account can hold 20 tokens, including expired ones. Revoke unused or expired tokens to free a slot.</p>
+      </details>
+      <details>
+        <summary>Deleting a task removed more than I expected</summary>
+        <p>Deleting a task also deletes all of its subtasks, and removes it from the predecessor lists of other tasks. The response lists every deleted id in <code>deletedTaskIds</code>. Check the list before deleting parents.</p>
+      </details>
+    </section>
+
+    <section id="manifest">
+      <h2>Machine-readable manifest</h2>
+      <p>The JSON below describes every route in this document, along with its access level, body fields, and success status. It is embedded for tools and AI agents; people can ignore it. It is the authoritative route list when this page and the code disagree, so update it together with any API change.</p>
+      <script type="application/json" id="api-manifest">
+{
+  "name": "AI-BREAK Newsletter Gantt API",
+  "applies_to": "Newsletter 1.0.30 and later",
+  "base_url": "Site origin, for example https://your-site. Paths start with /api.",
+  "auth": {
+    "scheme": "Bearer",
+    "header": "Authorization",
+    "token_prefix": "nlpat_",
+    "token_location": "Authorization header only"
+  },
+  "access_levels": {
+    "read": "GET requests within the owner's project scope",
+    "write": "All GET requests plus the write requests listed in endpoints"
+  },
+  "token_expiry_days": { "min": 1, "max": 365, "default": 90, "profile_options": [30, 90, 365] },
+  "max_tokens_per_account": 20,
+  "task_status_values": ["pending", "in-progress", "completed", "delayed"],
+  "project_status_values": ["pending", "in-progress", "completed", "delayed"],
+  "calendar": "Sunday to Thursday are working days; Friday and Saturday are rest days.",
+  "endpoints": [
+    { "method": "GET", "path": "/api/projects", "access": "read", "success": 200, "returns": "{items: project[]}", "anchor": "#ep-get-projects" },
+    { "method": "GET", "path": "/api/projects/{projectId}", "access": "read", "success": 200, "returns": "project", "anchor": "#ep-get-project" },
+    { "method": "GET", "path": "/api/projects/tasks", "access": "read", "success": 200, "returns": "{items: task[] with projectId and projectTitle, totalItems, projectCount}", "anchor": "#ep-get-all-tasks" },
+    { "method": "GET", "path": "/api/projects/{projectId}/tasks", "access": "read", "success": 200, "returns": "{items: task[]}", "anchor": "#ep-list-tasks" },
+    { "method": "POST", "path": "/api/projects/{projectId}/tasks", "access": "write", "success": 201, "body": ["name", "startDate", "durationDays", "status", "progress", "predecessorIds", "resourceId", "id"], "returns": "task", "anchor": "#ep-create-task" },
+    { "method": "PATCH", "path": "/api/projects/{projectId}/tasks/{taskId}", "access": "write", "success": 200, "body": ["name", "startDate", "durationDays", "status", "progress", "predecessorIds", "resourceId", "indentLevel"], "returns": "task", "anchor": "#ep-update-task" },
+    { "method": "PATCH", "path": "/api/projects/{projectId}/tasks/{taskId}/status", "access": "write", "success": 200, "body": ["status"], "returns": "task", "anchor": "#ep-task-status" },
+    { "method": "DELETE", "path": "/api/projects/{projectId}/tasks/{taskId}", "access": "write", "success": 200, "returns": "{status: 'deleted', deletedTaskIds: string[]}", "anchor": "#ep-delete-task" },
+    { "method": "GET", "path": "/api/projects/{projectId}/tasks/{taskId}/subtasks", "access": "read", "success": 200, "returns": "{items: task[]} (direct children)", "anchor": "#ep-list-subtasks" },
+    { "method": "POST", "path": "/api/projects/{projectId}/tasks/{taskId}/subtasks", "access": "write", "success": 201, "body": ["name", "startDate", "durationDays", "status", "progress", "predecessorIds", "resourceId"], "returns": "task", "anchor": "#ep-create-subtask" },
+    { "method": "GET", "path": "/api/projects/{projectId}/milestones", "access": "read", "success": 200, "returns": "{items: milestone[]}", "anchor": "#ep-list-milestones" },
+    { "method": "POST", "path": "/api/projects/{projectId}/milestones", "access": "write", "success": 201, "body": ["name", "startDate", "status", "predecessorIds"], "returns": "milestone", "anchor": "#ep-create-milestone" },
+    { "method": "GET", "path": "/api/projects/{projectId}/progress", "access": "read", "success": 200, "returns": "progress", "anchor": "#ep-get-progress" },
+    { "method": "PATCH", "path": "/api/projects/{projectId}/progress", "access": "write", "success": 200, "body": ["status?", "tasks?: [{id, status?, progress?}]"], "returns": "progress", "anchor": "#ep-patch-progress" },
+    { "method": "PATCH", "path": "/api/projects/{projectId}/status", "access": "write", "success": 200, "body": ["status"], "returns": "project", "anchor": "#ep-project-status" }
+  ],
+  "progress_object": ["projectId", "status", "progress", "taskCount", "completedTaskCount", "lastEditedAt"],
+  "errors": {
+    "400": "Invalid input or rule violation",
+    "401": "Token missing, malformed, revoked, or expired",
+    "403": "Read-only token on a write, route outside token scope, owner role insufficient, or project not accessible",
+    "404": "Project or task not found"
+  }
+}
+      </script>
+    </section>
+
+    <footer>
+      <p>Maintained with the Newsletter application. Source: <code>docs/gantt-api.md</code> and <code>pb_hooks/lib/access-tokens.js</code>. <a href="#top">Back to top</a></p>
+    </footer>
+  </main>
+</div>
+
+<script>
+  (function () {
+    // Show the site this page was loaded from in every example, so copied commands work as-is.
+    document.querySelectorAll('[data-origin]').forEach(function (el) {
+      el.textContent = location.origin;
+    });
+
+    // Add a copy button to every code block.
+    document.querySelectorAll('pre').forEach(function (pre) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'copy';
+      button.textContent = 'Copy';
+      button.addEventListener('click', function () {
+        var text = (pre.querySelector('code') || pre).textContent;
+        var done = function (label) {
+          button.textContent = label;
+          setTimeout(function () { button.textContent = 'Copy'; }, 1600);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { done('Copied'); }, function () { done('Select to copy'); });
+        } else {
+          done('Select to copy');
+        }
+      });
+      pre.insertBefore(button, pre.firstChild);
+    });
+  })();
+</script>
+</body>
+</html>

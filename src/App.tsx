@@ -27,11 +27,11 @@ import './App.css';
 import { queueComposeRequest } from './sections/community/compose-request';
 import { prefetchNewsletter } from './lib/pocketbase/newsletters';
 
-import { ManagerDashboard, GanttEditorPage, NewsletterViewer, ProfilePage, UnsubscribePage, PasswordResetPage, VerifyEmailPage, SignIn, SSOCallback, MigratePage, CommunityPage } from '@/lib/route-components';
+import { AboutPage, ManagerDashboard, GanttEditorPage, NewsletterViewer, ProfilePage, UnsubscribePage, PasswordResetPage, VerifyEmailPage, SignIn, SSOCallback, MigratePage, CommunityPage } from '@/lib/route-components';
 
 preloadRoute(window.location.pathname);
 
-export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'verify-email' | 'sso-callback' | 'gantt-editor' | 'migrate' | 'unsubscribe' | 'community' | 'profile';
+export type View = 'home' | 'manager' | 'article' | 'signin' | 'reset-password' | 'verify-email' | 'sso-callback' | 'gantt-editor' | 'migrate' | 'unsubscribe' | 'community' | 'profile' | 'about';
 
 const managerSections: ManagerTab[] = ['newsletters', 'projects', 'goals', 'gantt', 'spreadsheet', 'links', 'scheduled', 'community'];
 
@@ -108,6 +108,10 @@ function resolveRoute(pathname: string): RouteState {
 
   if (normalizedPathname === '/profile') {
     return { view: 'profile', pathname: '/profile' };
+  }
+
+  if (normalizedPathname === '/about') {
+    return { view: 'about', pathname: '/about' };
   }
 
   if (normalizedPathname === '/migrate') {
@@ -428,7 +432,7 @@ function App() {
       return;
     }
 
-    if (currentRoute.view === 'signin' || currentRoute.view === 'reset-password' || currentRoute.view === 'verify-email' || currentRoute.view === 'sso-callback' || currentRoute.view === 'migrate' || currentRoute.view === 'unsubscribe' || currentRoute.view === 'community') {
+    if (currentRoute.view === 'signin' || currentRoute.view === 'reset-password' || currentRoute.view === 'verify-email' || currentRoute.view === 'sso-callback' || currentRoute.view === 'migrate' || currentRoute.view === 'unsubscribe' || currentRoute.view === 'community' || currentRoute.view === 'about') {
       appReadyRef.current = true;
       bootLogger.markReady('app', 'Standalone route is ready', {
         pathname: currentRoute.pathname,
@@ -883,6 +887,24 @@ function App() {
         <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
           <Toaster position={toasterPosition} richColors />
           <ProfilePage onBack={handleProfileBack} onHomeClick={handleHomeClick} onProfileClick={handleProfileClick} onManagerClick={handleManagerClick} onSignOut={handleUserLogout} />
+        </div>
+      </AppStageShell>
+    );
+  }
+
+  if (currentRoute.view === 'about') {
+    return (
+      <AppStageShell
+        activeTab="home"
+        onHomeClick={handleHomeClick}
+        onCommunityClick={handleCommunityClick}
+        onCreateClick={handleCreateClick}
+        onProfileClick={handleProfileClick}
+        user={user}
+      >
+        <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+          <Toaster position={toasterPosition} richColors />
+          <AboutPage onBack={handleHomeClick} />
         </div>
       </AppStageShell>
     );

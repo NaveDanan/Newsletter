@@ -29,9 +29,12 @@ function directIconImports(): Plugin {
   }
 }
 
+const appVersion = (JSON.parse(readFileSync(path.resolve(__dirname, "package.json"), "utf8")) as { version: string }).version
+
 // https://vite.dev/config/
 export default defineConfig({
   base: "/",
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   plugins: [directIconImports(), react(), tailwindcss()],
   optimizeDeps: { exclude: ['@hugeicons/core-free-icons'] },
   build: {

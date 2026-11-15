@@ -5,6 +5,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useSubscriberCount } from '@/hooks/useSubscriberCount';
 import { subscribeToNewsletter } from '@/lib/pocketbase/subscribers';
 import { RecentActivity } from './RecentActivity';
+import { APP_VERSION } from '@/lib/app-version';
 
 interface SidebarProps {
   publishedCount: number;
@@ -16,6 +17,11 @@ export function Sidebar({ publishedCount, onNavigate }: SidebarProps) {
   const { subscriberCount, publishedNewsletterCount, refreshSubscriberCount } = useSubscriberCount();
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const footerLinks = [
+    { path: '/about', label: t('footer.about') },
+    { path: '/community', label: t('footer.community') },
+    { path: '/profile', label: t('footer.preferences') },
+  ];
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,11 +174,24 @@ export function Sidebar({ publishedCount, onNavigate }: SidebarProps) {
 
       {/* 5. Web Platform Footer Links */}
       <footer className="flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-[var(--text-muted)] pt-2 px-1">
-        <a href="#resources" className="hover:text-[var(--primary-accent)] transition-colors">About</a>
-        <a href="#workflows" className="hover:text-[var(--primary-accent)] transition-colors">Workflows</a>
-        <a href="/community" className="hover:text-[var(--primary-accent)] transition-colors">Community</a>
-        <a href="/unsubscribe" className="hover:text-[var(--primary-accent)] transition-colors">Preferences</a>
-        <span className="w-full text-[10px] opacity-70 mt-1">© 2026 AI-BREAK Studio. All rights reserved.</span>
+        {footerLinks.map(({ path, label }) => (
+          <a
+            key={path}
+            href={path}
+            onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+              event.preventDefault();
+              onNavigate(path);
+            }}
+            className="hover:text-[var(--primary-accent)] transition-colors"
+          >
+            {label}
+          </a>
+        ))}
+        <span className="w-full flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] opacity-70 mt-1">
+          <span>{t('footer.copyright', { year: new Date().getFullYear() })}</span>
+          <span dir="ltr">{t('footer.version', { version: APP_VERSION })}</span>
+        </span>
       </footer>
     </aside>
   );

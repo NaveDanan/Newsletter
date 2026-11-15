@@ -1,4 +1,4 @@
-import { ManagerDashboard, GanttEditorPage, NewsletterViewer, ProfilePage, UnsubscribePage, PasswordResetPage, VerifyEmailPage, SignIn, SSOCallback, MigratePage, CommunityPage } from './route-components';
+import { AboutPage, ManagerDashboard, GanttEditorPage, NewsletterViewer, ProfilePage, UnsubscribePage, PasswordResetPage, VerifyEmailPage, SignIn, SSOCallback, MigratePage, CommunityPage } from './route-components';
 import { prefetchNewsletter } from '@/lib/pocketbase/newsletters';
 import { prefetchCommunityFeed, prefetchCommunityThread, fetchCommunityProfile, fetchCommunityProfilePosts } from '@/lib/pocketbase/community';
 import { parseCommunityRoute } from '@/lib/community-routes';
@@ -35,4 +35,5 @@ export function preloadRoute(pathname: string): void {
   else if (path === '/sso-callback') SSOCallback.preload();
   else if (path === '/unsubscribe') UnsubscribePage.preload();
   else if (path === '/migrate') MigratePage.preload();
+  else if (path === '/about') AboutPage.preload();
 }

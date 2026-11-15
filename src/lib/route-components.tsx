@@ -12,3 +12,4 @@ export const SSOCallback = lazyComponent(() => import('@/components/auth/SSOCall
 export const MigratePage = lazyComponent(() => import('@/sections/MigratePage').then((module) => ({ default: module.MigratePage })));
 export const CommunityPage = lazyComponent(() => import('@/sections/community/CommunityPage').then((module) => ({ default: module.CommunityPage })));
 
+export const AboutPage = lazyComponent(() => import('@/sections/AboutPage').then((module) => ({ default: module.AboutPage })));

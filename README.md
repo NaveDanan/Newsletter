@@ -188,3 +188,9 @@ For a fresh Longhorn installation managed by ArgoCD with images and charts hoste
 Tailwind CSS v4 requires Safari 16.4+, Chrome 111+, or Firefox 128+. See the [Tailwind upgrade guide](https://tailwindcss.com/docs/upgrade-guide#browser-requirements) for browser compatibility.
 
 > Designed with modern aesthetics and performance built-in.
+
+## 📜 License
+
+Copyright © 2026 NJ-Labs. This project is the exclusive intellectual property of [NJ-Labs](https://nj-labs.com) ([GitHub](https://github.com/NJ-Labs/)).
+
+Newsletter is licensed under the [GNU General Public License v3.0](LICENSE) (`GPL-3.0-only`). The NJ-Labs and Newsletter names and logos are not licensed for use in modified or redistributed versions without direct consent from NJ-Labs.

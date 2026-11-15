@@ -106,7 +106,7 @@ export function SignIn({ onBack, onSuccess }: SignInProps) {
   const handleSSO = async () => {
     setIsLoading(true);
     try {
-      await initiateSSO('oidc');
+      await initiateSSO();
     } finally {
       setIsLoading(false);
     }

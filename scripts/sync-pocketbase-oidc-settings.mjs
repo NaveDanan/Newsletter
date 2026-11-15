@@ -1,4 +1,5 @@
 import PocketBase from 'pocketbase';
+import { resolveOidcEndpoints } from './pocketbase/oidc-config.mjs';
 import { loadProjectEnv, resolvePocketBaseUrl } from './pocketbase/load-env.mjs';
 
 function requireEnvValue(env, keys) {
@@ -69,9 +70,7 @@ async function main() {
   const displayName = readOptionalValue(env, 'POCKETBASE_SSO_OIDC_DISPLAY_NAME') || 'Single Sign-On';
   const clientId = requireOidcValue(env, 'POCKETBASE_SSO_OIDC_CLIENT_ID');
   const clientSecret = requireOidcValue(env, 'POCKETBASE_SSO_OIDC_CLIENT_SECRET');
-  const authURL = requireOidcValue(env, 'POCKETBASE_SSO_OIDC_AUTH_URL');
-  const tokenURL = requireOidcValue(env, 'POCKETBASE_SSO_OIDC_TOKEN_URL');
-  const userInfoURL = requireOidcValue(env, 'POCKETBASE_SSO_OIDC_USER_INFO_URL');
+  const { authURL, tokenURL, userInfoURL } = await resolveOidcEndpoints(env);
   const pkce = readOptionalBoolean(env, 'POCKETBASE_SSO_OIDC_PKCE') ?? true;
 
   const pb = new PocketBase(pocketbaseUrl);
@@ -89,7 +88,7 @@ async function main() {
     tokenURL,
     userInfoURL,
     pkce,
-    extra: {},
+    extra: currentProviders.find((provider) => provider.name === providerName)?.extra || {},
   };
   const nextProviders = [
     ...currentProviders.filter((provider) => provider.name !== providerName),

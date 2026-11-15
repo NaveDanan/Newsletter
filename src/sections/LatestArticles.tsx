@@ -1,6 +1,9 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Heart, Message01Icon, PlayIcon, Share02Icon } from "@hugeicons/core-free-icons";
-import { memo, useState } from 'react';
+import { memo, useEffect, useRef } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useTheme } from '@/context/ThemeContext';
+import type { NewsletterFeedTab } from '@/lib/pocketbase/newsletter-feed';
 import { useLocale } from '@/contexts/LocaleContext';
 import { UserAvatarCircle } from '@/components/UserAvatarCircle';
 import { cn } from '@/lib/utils';
@@ -8,52 +11,40 @@ import type { Newsletter } from '../types/newsletter';
 
 interface LatestArticlesProps {
   newsletters: Newsletter[];
-  currentUserId?: string;
+  activeTab: NewsletterFeedTab;
+  onTabChange: (tab: NewsletterFeedTab) => void;
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  error: string | null;
+  onLoadMore: () => void;
+  onRetry: () => void;
+  emptyMessage?: string;
   onArticleClick?: (newsletter: Newsletter) => void;
   onArticleIntent?: (newsletter: Newsletter) => void;
 }
 
-export const LatestArticles = memo(function LatestArticles({ newsletters, currentUserId, onArticleClick, onArticleIntent }: LatestArticlesProps) {
+export const LatestArticles = memo(function LatestArticles({ newsletters, activeTab, onTabChange, isLoading, isLoadingMore, hasMore, error, onLoadMore, onRetry, emptyMessage, onArticleClick, onArticleIntent }: LatestArticlesProps) {
   const { formatDate, formatNumber, isRTL, t } = useLocale();
-  const tabs = [
-    { key: 'Latest', label: t('latest.tab.latest') },
-    { key: 'Top', label: t('latest.tab.top') },
-    { key: 'Discussions', label: t('latest.tab.discussions') },
-    { key: 'Bookmarks', label: t('latest.tab.bookmarks') },
+  const { deviceMode } = useTheme();
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const tabs: { key: NewsletterFeedTab; label: string }[] = [
+    { key: 'latest', label: t('latest.tab.latest') },
+    { key: 'top', label: t('latest.tab.top') },
+    { key: 'discussions', label: t('latest.tab.discussions') },
+    { key: 'bookmarks', label: t('latest.tab.bookmarks') },
   ];
-  const [activeTab, setActiveTab] = useState('Latest');
-
-  // Filter articles based on active tab
-  const filteredArticles = (() => {
-    switch (activeTab) {
-      case 'Top':
-        return [...newsletters].sort((a, b) =>
-          (b.likes + b.comments + b.shares) - (a.likes + a.comments + a.shares)
-        );
-      case 'Discussions':
-        return [...newsletters].sort((a, b) => b.comments - a.comments);
-      case 'Bookmarks':
-        return currentUserId
-          ? newsletters.filter((a) => a.bookmarkedByUserIds.includes(currentUserId))
-          : [];
-      case 'Latest':
-      default:
-        return newsletters;
-    }
-  })();
-
-  if (newsletters.length === 0) {
-    return (
-      <section id="workflows">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-[var(--text-primary)]">{t('latest.title')}</h2>
-        </div>
-        <div className="text-center py-12 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-subtle)]">
-          <p className="text-[var(--text-secondary)]">{t('latest.empty')}</p>
-        </div>
-      </section>
-    );
-  }
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !hasMore || isLoading || isLoadingMore || error || typeof IntersectionObserver === 'undefined') return;
+    const container = node.closest('#app-inner-scroll');
+    const root = container && /(auto|scroll)/.test(window.getComputedStyle(container).overflowY) ? container : null;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) onLoadMore();
+    }, { root, rootMargin: '0px 0px 600px 0px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [activeTab, deviceMode, error, hasMore, isLoading, isLoadingMore, newsletters.length, onLoadMore]);
 
   return (
     <section id="workflows" className="space-y-6">
@@ -63,7 +54,8 @@ export const LatestArticles = memo(function LatestArticles({ newsletters, curren
           {tabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => onTabChange(tab.key)}
+              aria-pressed={activeTab === tab.key}
               className={`tab-button text-xs sm:text-sm whitespace-nowrap ${activeTab === tab.key ? 'active' : ''}`}
             >
               {tab.label}
@@ -74,12 +66,23 @@ export const LatestArticles = memo(function LatestArticles({ newsletters, curren
 
       {/* Articles Feed */}
       <div className="space-y-6">
-        {filteredArticles.length === 0 && activeTab === 'Bookmarks' ? (
+        {isLoading && newsletters.length === 0 ? (
+          <div role="status" aria-label={t('latest.loading')} className="space-y-6">
+            {[0, 1, 2].map(index => (
+              <div key={index} className="feed-post-card space-y-4" aria-hidden="true">
+                <Skeleton className="h-10 w-40" />
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-48 w-full rounded-2xl" />
+              </div>
+            ))}
+          </div>
+        ) : newsletters.length === 0 && !error ? (
           <div className="text-center py-12 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-subtle)]">
-            <p className="text-[var(--text-secondary)]">{t('latest.noBookmarks')}</p>
+            <p className="text-[var(--text-secondary)]">{emptyMessage ?? t(activeTab === 'bookmarks' ? 'latest.noBookmarks' : 'latest.empty')}</p>
           </div>
         ) : (
-          filteredArticles.map((article) => (
+          newsletters.map((article) => (
             <article
               key={article.id}
               className="feed-post-card group cursor-pointer transition-all [content-visibility:auto] [contain-intrinsic-size:auto_600px]"
@@ -206,6 +209,20 @@ export const LatestArticles = memo(function LatestArticles({ newsletters, curren
           ))
         )}
       </div>
+      <div ref={sentinelRef} aria-hidden="true" className="h-px" />
+      {isLoadingMore ? (
+        <p role="status" className="py-4 text-center text-sm text-[var(--text-secondary)]">{t('latest.loadingMore')}</p>
+      ) : null}
+      {error ? (
+        <div role="alert" className="space-y-3 py-4 text-center">
+          <p className="text-sm text-[var(--text-secondary)]">{t('latest.loadFailed')}</p>
+          <button type="button" className="btn-hire-me text-xs py-2 px-5" onClick={onRetry}>{t('latest.retry')}</button>
+        </div>
+      ) : hasMore && !isLoading && !isLoadingMore ? (
+        <div className="py-4 text-center">
+          <button type="button" className="btn-hire-me text-xs py-2 px-5" onClick={onLoadMore}>{t('latest.loadMore')}</button>
+        </div>
+      ) : null}
     </section>
   );
 });

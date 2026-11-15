@@ -10,6 +10,9 @@ export const ACCENT_PRESETS = ['red', 'yellow', 'lime', 'cyan', 'purple', 'pink'
 // Each sync merges these over whatever is stored, keeping the field id so
 // PocketBase updates the column in place instead of dropping and re-adding it.
 export const USER_FIELDS = [
+  // OIDC identities are linked by the provider subject, even if the realm does
+  // not issue an email claim. The manual sign-up form still requires email.
+  { name: 'email', type: 'email', required: false, hidden: false },
   { name: 'role', type: 'select', required: false, hidden: false, maxSelect: 1, values: USER_ROLES },
   { name: 'locale', type: 'select', required: false, hidden: false, maxSelect: 1, values: USER_LOCALES },
   { name: 'themePreference', type: 'select', required: false, hidden: false, maxSelect: 1, values: THEME_PREFERENCES },

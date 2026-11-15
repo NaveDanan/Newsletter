@@ -1,201 +1,110 @@
-# Configuring OpenID Connect (OIDC) Login with Active Directory
+# Keycloak and OIDC sign-in
 
-This guide explains how to set up Single Sign-On (SSO) using OpenID Connect backed by **Azure Active Directory (Microsoft Entra ID)** for the AI-Break Newsletter application.
+Newsletter uses PocketBase's authorization-code flow with PKCE. PocketBase exchanges the code with the configured identity provider and reads the provider's authenticated user-info response. Newsletter then uses a PocketBase token for its own requests.
 
-## Overview
+## Automatic sign-in and manual login
 
-The application uses **PocketBase v0.36.x** as its backend. PocketBase supports OAuth2/OIDC providers natively through a per-collection auth configuration. When the user clicks **"Sign in with Active Directory"** on the sign-in page, the app initiates an OIDC authorization code flow (with PKCE) through PocketBase against your Azure AD tenant.
+When an unsigned-in user opens the site, Newsletter checks for an existing Keycloak session in a hidden iframe using `prompt=none`. A successful check signs the user in without showing a Keycloak login page or leaving the page they opened. Each page load makes at most one automatic attempt.
 
-### How the Flow Works
+If the user has no Keycloak session, the provider is unavailable, or the browser blocks iframe cookies, the site stays usable and manual login remains available. The background attempt times out after 15 seconds. Newsletter never opens a visible Keycloak login page automatically.
 
-```
-User clicks "Sign in with Active Directory"
-  → App calls PocketBase listAuthMethods()
-  → PocketBase returns the OIDC provider's authUrl
-  → Browser redirects to Azure AD login
-  → User authenticates with their AD credentials
-  → Azure AD redirects back to the app's /sso-callback
-  → App exchanges the code via PocketBase authWithOAuth2Code()
-  → PocketBase creates/links the user record
-  → User is signed in
-```
+- Open `/sign-in?manual=1` to use email and password without automatic SSO.
+- The **Sign in with SSO** button is available for an explicit, full-page provider login. Successful login returns to the original page when a `returnTo` value was provided.
+- Password reset, email verification, unsubscribe, migration, and SSO callback routes do not start automatic SSO.
+- **Sign out** clears the Newsletter token and cancels this page's pending SSO work. It keeps the Keycloak session. Refreshing a normal site URL can sign the user back in automatically. Refreshing `/sign-in?manual=1` continues to bypass SSO.
 
-## Prerequisites
+The callback bridge verifies the message's origin and iframe window. The login controller requires the saved `state` and PKCE verifier, expires attempts after 10 minutes, and consumes each attempt once. Temporary values use `sessionStorage`, so separate tabs cannot overwrite each other's login attempts. The callback code is removed from the URL before the exchange; startup logs omit URL query values.
 
-- Access to the [Azure Portal](https://portal.azure.com) with permissions to register applications in your Azure AD (Entra ID) tenant.
-- Administrative (superuser) access to your PocketBase instance (`/_/` admin panel).
-- The PocketBase **Application URL** must be set correctly in **Settings → Application** (e.g., `http://localhost:8090` for development, or your production URL).
+## Keycloak client
 
----
+Create an OpenID Connect client in the company realm:
 
-## Step 1 — Register an Application in Azure AD
+- **Client ID:** for example, `newsletter`.
+- **Client authentication:** enabled; PocketBase keeps the client secret on the server.
+- **Standard flow:** enabled.
+- **PKCE method:** `S256`.
+- **Valid redirect URI:** the public **frontend** origin followed by `/sso-callback`, for example `https://newsletter.example.com/sso-callback`.
+- **Web origins:** the frontend origin, for example `https://newsletter.example.com`.
+- Include the `openid`, `profile`, and `email` scopes and the usual user-info mappings. App roles are assigned by Newsletter, not by Keycloak role claims.
 
-1. Open **Azure Portal → Microsoft Entra ID → App registrations → New registration**.
-2. Fill in the registration form:
-   - **Name**: `AI-Break Newsletter` (or any display name).
-   - **Supported account types**: Choose based on your needs:
-     - *Single tenant* — recommended for internal/corporate use.
-     - *Multi-tenant* — if users from multiple Azure AD tenants need access.
-   - **Redirect URI**: Select platform **Web** and enter:
+Register the exact callback for every supported frontend origin. Production uses HTTPS. Keep the same callback in the browser authorization request and PocketBase code exchange. The app uses `/sso-callback` directly; `/api/oauth2-redirect` belongs to PocketBase's separate popup/realtime helper and is not used by this flow.
 
-     | Environment | Redirect URI |
-     |---|---|
-     | Production | `https://<YOUR_POCKETBASE_URL>/api/oauth2-redirect` |
-     | Local dev  | `http://localhost:8090/api/oauth2-redirect` |
+Use a stable public frontend origin, with `/api/*` proxied to PocketBase through the included Nginx configuration. A separate public PocketBase address is not needed for browser login.
 
-3. Click **Register**.
-4. From the **Overview** page, copy:
-   - **Application (client) ID** — you'll need this as the _Client ID_ in PocketBase.
-   - **Directory (tenant) ID** — used to construct the endpoint URLs below.
+## Helm configuration
 
-## Step 2 — Create a Client Secret
+Non-secret settings belong in the deployment values. The client secret belongs in the Kubernetes Secret referenced by `credentials.existingSecret` under the key `POCKETBASE_SSO_OIDC_CLIENT_SECRET`.
 
-1. In your app registration, go to **Certificates & secrets → Client secrets → New client secret**.
-2. Add a description (e.g., "PocketBase OIDC") and choose an expiry period.
-3. Click **Add** and **immediately copy the secret Value** — it will not be shown again.
+```yaml
+credentials:
+  existingSecret: newsletter-env
 
-> **Tip:** Set a calendar reminder to rotate the secret before it expires.
-
-## Step 3 — Configure API Permissions (Optional)
-
-By default, the app registration includes `User.Read` permission. For OIDC login you need at minimum:
-
-- `openid` — required for OIDC
-- `email` — to retrieve the user's email address
-- `profile` — to retrieve the user's display name
-
-These are usually granted by default. If not, go to **API permissions → Add a permission → Microsoft Graph → Delegated permissions** and add `openid`, `email`, and `profile`.
-
-## Step 4 — Note the OIDC Endpoints
-
-Your tenant's OpenID Connect endpoints follow this pattern (replace `{tenant-id}` with your **Directory (tenant) ID**):
-
-| Field in PocketBase   | Azure AD Endpoint URL                                                           |
-|-----------------------|---------------------------------------------------------------------------------|
-| **Auth URL**          | `https://login.microsoftonline.com/{tenant-id}/oauth2/v2.0/authorize`           |
-| **Token URL**         | `https://login.microsoftonline.com/{tenant-id}/oauth2/v2.0/token`               |
-| **User info URL**     | `https://graph.microsoft.com/oidc/userinfo`                                     |
-
-> You can also find these endpoints at:
-> `https://login.microsoftonline.com/{tenant-id}/v2.0/.well-known/openid-configuration`
-
----
-
-## Step 5 — Configure PocketBase
-
-For Kubernetes deployments, you can configure the same OIDC provider through Helm values instead of the PocketBase admin panel. Set `env.pocketbaseSsoOidcEnabled: true`, fill the OIDC endpoint/client values, and provide `POCKETBASE_SSO_OIDC_CLIENT_SECRET` in the chart secret. See `helm/newsletter/values.production.example.yaml`.
-
-### 5.1 — Open the Users Collection Settings
-
-1. Log in to the PocketBase admin panel at `http://localhost:8090/_/` (or your production URL).
-2. Go to **Collections** and click the **users** collection.
-3. Click the **Edit collection** (gear icon) button next to the collection name.
-4. Switch to the **Options** tab.
-
-You will see the available auth methods: Identity/Password, OAuth2, OTP, and MFA.
-
-![PocketBase auth methods — Options tab showing OAuth2 Disabled](assets/pb-auth-methods.png)
-
-### 5.2 — Enable OAuth2 and Add the OIDC Provider
-
-1. Expand the **OAuth2** section by clicking on it.
-2. Toggle the **Enable** switch to ON.
-3. Click **+ Add provider**.
-4. In the provider search dialog, type `oidc` to filter. Select **OpenID Connect** (the one labeled `oidc`).
-
-![Search for the OpenID Connect provider](assets/pb-search-oidc-provider.png)
-
-### 5.3 — Fill in the Provider Configuration
-
-The OIDC provider configuration form will open. Fill in the fields using the values from Steps 1–4:
-
-![OpenID Connect provider configuration form](assets/pb-oidc-config-top.png)
-
-| Field              | Value                                                                           |
-|--------------------|---------------------------------------------------------------------------------|
-| **Client ID**      | The Application (client) ID from Azure AD (Step 1)                              |
-| **Client secret**  | The client secret value you copied (Step 2)                                     |
-| **Display name**   | `Active Directory` (or any label — shown in the admin panel only)               |
-| **Auth URL**       | `https://login.microsoftonline.com/{tenant-id}/oauth2/v2.0/authorize`           |
-| **Token URL**      | `https://login.microsoftonline.com/{tenant-id}/oauth2/v2.0/token`               |
-| **User info URL**  | `https://graph.microsoft.com/oidc/userinfo`                                     |
-| **Support PKCE**   | ✅ Checked (enabled by default — keep it on for better security)                |
-
-5. Click **Set provider config** to save the provider.
-6. Back on the Edit collection panel, click **Save changes**.
-
-> **Important**: The provider name **must** remain `oidc` (this is set automatically by PocketBase when you select "OpenID Connect"). The application code calls `initiateSSO('oidc')` and PocketBase matches this name when listing available auth methods.
-
-### 5.4 — Optional: Map User Fields
-
-Click **Optional users create fields map** (below the provider list) if you want to map Azure AD claims to PocketBase user fields. For example, to auto-populate the `name` field:
-
-```json
-{
-  "name": "{{oauth2.user.name}}"
-}
+env:
+  appPublicUrl: https://newsletter.example.com
+  pocketbasePublicUrl: ""
+  newsletterSsoAutoLogin: true
+  pocketbaseSsoOidcEnabled: true
+  pocketbaseSsoOidcProviderName: oidc
+  pocketbaseSsoOidcDisplayName: Company SSO
+  pocketbaseSsoOidcIssuerUrl: https://keycloak.example.com/realms/company
+  pocketbaseSsoOidcClientId: newsletter
+  pocketbaseSsoOidcPkce: true
+  pocketbaseSsoOidcAutoRegister: true
 ```
 
----
+The issuer is the realm URL, not the admin console or the discovery-document URL. On startup, the sync script reads `<issuer>/.well-known/openid-configuration`, verifies its issuer, and obtains the authorization, token, and user-info endpoints. Discovery and production provider endpoints require HTTPS; localhost HTTP is supported for tests.
 
-## Step 6 — Verify the Redirect URI in the App
+For providers without discovery, leave the issuer blank and set all three existing endpoint values:
 
-The application constructs the SSO callback URL automatically:
-
+```yaml
+env:
+  pocketbaseSsoOidcAuthUrl: https://provider.example.com/authorize
+  pocketbaseSsoOidcTokenUrl: https://provider.example.com/token
+  pocketbaseSsoOidcUserInfoUrl: https://provider.example.com/userinfo
 ```
-{window.location.origin}/sso-callback
+
+When an issuer is supplied, its discovered endpoints take precedence. Provider synchronization preserves other providers and existing provider `extra` settings. Put managed settings in deployment configuration so a later restart reproduces them.
+
+`pocketbaseSsoOidcEnabled: false` skips provider synchronization; it does not delete a provider already stored in PocketBase. The committed MMEMS values currently skip synchronization because no production realm/client settings have been supplied. Automatic login safely does nothing if the configured provider is absent.
+
+## New users and viewer access
+
+With `pocketbaseSsoOidcAutoRegister: true`, every new identity authenticated by the configured OIDC provider may join. There is no email-domain allowlist. An email claim is optional; the provider subject identifies the account. The manual sign-up form still requires email. A server hook assigns `role: viewer` and `featuredWriter: false`, regardless of provider role claims or browser `createData`. New users do not need a separate registration form or manual approval.
+
+Existing accounts retain their app-assigned roles. Repeat SSO uses the existing external identity/account link instead of creating another user. Setting auto-registration to `false` rejects new SSO accounts while allowing existing accounts to sign in. This setting controls SSO registration; existing manual registration rules still apply.
+
+Viewers can like, reply/comment, repost, quote, bookmark, and share community posts. Community profiles are created when first needed. Moderation requires a manager or admin role; newsletter editing retains its existing role requirements. A raw browser-supplied JWT cannot create an account or grant privileges.
+
+PocketBase tokens have their own lifetime. Ending a Keycloak session does not by itself revoke an already-issued PocketBase token.
+
+## Docker and runtime settings
+
+The equivalent environment variables are:
+
+```dotenv
+NEWSLETTER_SSO_AUTO_LOGIN=1
+POCKETBASE_SSO_OIDC_ENABLED=1
+POCKETBASE_SSO_OIDC_PROVIDER_NAME=oidc
+POCKETBASE_SSO_OIDC_ISSUER_URL=https://keycloak.example.com/realms/company
+POCKETBASE_SSO_OIDC_CLIENT_ID=newsletter
+POCKETBASE_SSO_OIDC_CLIENT_SECRET=<server-side secret>
+POCKETBASE_SSO_OIDC_PKCE=1
+POCKETBASE_SSO_OIDC_AUTO_REGISTER=1
 ```
 
-This is the URL the browser returns to **after** Azure AD authenticates the user. The flow is:
+The container publishes only `SSO_AUTO_LOGIN` and `SSO_PROVIDER` to `app-config.js`. It never publishes the client secret or server credentials. The defaults enable background attempts and viewer auto-registration; a configured provider is still required.
 
-1. App redirects to Azure AD's authorize endpoint.
-2. Azure AD authenticates the user and redirects to PocketBase's `{POCKETBASE_URL}/api/oauth2-redirect`.
-3. PocketBase exchanges the code for tokens and redirects to the app's `/sso-callback`.
-4. The `SSOCallback` component in the app completes the login.
+## Microsoft Entra ID
 
-Make sure:
-- The **PocketBase Application URL** (in Settings → Application) matches the actual PocketBase URL.
-- The **Redirect URI** in Azure AD matches `{POCKETBASE_URL}/api/oauth2-redirect` exactly.
-- The **app's origin** (e.g., `http://localhost:5173`) is where the `/sso-callback` page will load.
+The same flow can use Entra ID. Register a **Web** application with `https://newsletter.example.com/sso-callback`, create a server-side client secret, and use your tenant's authorize/token endpoints plus `https://graph.microsoft.com/oidc/userinfo`. Keep the provider name `oidc`, or set the same configured provider name in the deployment and PocketBase. Request `openid`, `profile`, and `email` scopes.
 
----
+## Validation
 
-## Testing
+- Existing Keycloak session: open a community post; the browser stays on that post and signs in without a visible provider page.
+- No Keycloak session or blocked cookies: the site stays usable and email/password login works.
+- New SSO identity: a single viewer account is created; liking, commenting and reposting work; moderation is denied.
+- Existing manager/admin identity: its role remains unchanged.
+- Sign out: the current page remains signed out; refreshing a normal URL silently reconnects when the Keycloak session remains active.
+- Missing/mismatched `state`, expired attempts, and invalid codes fail without creating an account.
 
-1. Start the application and navigate to the **Sign In** page (`/sign-in`).
-2. Click **"Sign in with Active Directory"**.
-3. You should be redirected to Microsoft's login page.
-4. Authenticate with your Azure AD credentials.
-5. After authenticating, you will be redirected back through `/sso-callback` and signed in automatically.
-6. PocketBase will create a new user record (or link to an existing one if the email matches).
-
-> **Note:** New users created via OIDC are assigned the `viewer` role by default. To promote a user to `author`, `manager`, or `admin`, use the PocketBase admin panel or run:
-> ```bash
-> node scripts/set-pocketbase-user-role.mjs <user-email> <role>
-> ```
-
----
-
-## Troubleshooting
-
-| Problem                                    | Cause & Solution                                                                             |
-|--------------------------------------------|----------------------------------------------------------------------------------------------|
-| **"oidc login is not configured"**         | The OIDC provider is not set up or not enabled in PocketBase. Verify that OAuth2 is enabled and the provider name is `oidc` in the users collection Options tab. |
-| **AADSTS50011: reply URL does not match**  | The redirect URI in Azure AD does not match what PocketBase sends. Ensure it is exactly `{POCKETBASE_URL}/api/oauth2-redirect` (including protocol and port). |
-| **"Invalid state parameter"**              | The CSRF state token mismatch. Clear `sso_provider`, `sso_state`, and `sso_code_verifier` from browser localStorage and try again. |
-| **"Missing authorization code"**           | Azure AD did not return a `code` parameter. Check the Azure AD app registration for configuration issues. |
-| **"Authentication session expired"**       | The `sso_provider` key was not found in localStorage. This happens if the user waited too long or opened the callback in a different browser/tab. |
-| **User created but wrong role**            | New OIDC users default to `viewer`. Promote via PocketBase admin or `scripts/set-pocketbase-user-role.mjs`. |
-| **Token/secret expired**                   | Rotate the client secret in Azure AD and update it in the PocketBase OIDC provider config.   |
-| **"Failed to initiate SSO"**               | PocketBase may be unreachable or the OIDC provider config is incomplete. Check the browser console and PocketBase logs. |
-
----
-
-## Security Notes
-
-- **Never commit the client secret** to source control. Use environment variables or a secrets manager.
-- **Use HTTPS in production** for both the application and PocketBase.
-- **Keep PKCE enabled** (the default). PKCE prevents authorization code interception attacks.
-- **Restrict to single tenant** unless you explicitly need multi-tenant access. This prevents users from other Azure AD organizations from signing in.
-- **Rotate client secrets** before they expire and update PocketBase immediately.
-- **Review token lifetimes** in PocketBase under Edit collection → Options → Tokens options. The default auth token duration may need adjustment for your security requirements.
+Run `npm run test:sso` for the browser-flow checks. Run `SSO_TEST_PB_BINARY=/path/to/pocketbase npm run test:sso-api` against a local PocketBase 0.36.9 binary for real OIDC exchange, account provisioning, and community permission checks. This test creates and removes its own database under `.tmp`.

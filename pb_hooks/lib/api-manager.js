@@ -724,13 +724,43 @@ function newsletterListData(e) {
   }
 
   var filter = filters.join(' && ') || 'id != ""';
+  var sqlFilter = filter.replace(/&&/g, ' AND ').replace(/\|\|/g, ' OR ');
+  var params = {};
+  var feed = getQueryValue(e, 'feed', '');
+  if (feed && ['latest', 'top', 'discussions', 'bookmarks'].indexOf(feed) === -1) throw new BadRequestError('Unknown newsletter feed.');
+  if (feed) sort = (feed === 'discussions' ? '-comments,' : '') + '-publishedAt,-created,-id';
+  var search = String(getQueryValue(e, 'q', '')).replace(/\s+/g, ' ').trim().slice(0, 500);
+  if (search) {
+    search.split(' ').forEach(function (term, index) {
+      var name = 'search' + index;
+      params[name] = term;
+      filter += ' && (' + ['title', 'subtitle', 'author', 'tags', 'searchText'].map(function (field) { return field + ' ~ {:' + name + '}'; }).join(' || ') + ')';
+      var searchable = ['title', 'subtitle', 'author', 'tags', 'searchText'].map(function (field) { return "COALESCE(" + field + ", '')"; }).join(" || ' ' || ");
+      sqlFilter += ' AND INSTR(LOWER(' + searchable + '), LOWER({:' + name + '})) > 0';
+    });
+  }
+  if (feed === 'bookmarks') {
+    params.bookmarkUser = getAuthId(e.auth);
+    filter += ' && bookmarkedByUserIds ?= {:bookmarkUser}';
+    sqlFilter += " AND EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(bookmarkedByUserIds) THEN bookmarkedByUserIds ELSE '[]' END) WHERE value = {:bookmarkUser})";
+    if (!e.auth) { filter += ' && id = ""'; sqlFilter += " AND id = ''"; }
+  }
   // These predicates are constructed above from validated statuses and record
   // IDs. Record filters use &&/||; dbx expressions use SQL AND/OR.
-  var total = e.app.countRecords('newsletters', $dbx.exp(filter.replace(/&&/g, ' AND ').replace(/\|\|/g, ' OR ')));
+  var total = e.app.countRecords('newsletters', $dbx.exp(sqlFilter, params));
   var summary = getQueryValue(e, 'view', '') === 'summary';
-  var rows = summary ? listNewsletterSummaries(e.app, filter, sort, perPage, (page - 1) * perPage)
-    : listRecords(e.app, 'newsletters', filter, sort, perPage, (page - 1) * perPage);
+  var rows = summary ? listNewsletterSummaries(e.app, filter, sort, perPage, (page - 1) * perPage, sqlFilter, params, feed === 'top', getQueryValue(e, 'compact', '') === '1')
+    : e.app.findRecordsByFilter('newsletters', filter, sort, perPage, (page - 1) * perPage, params);
   var items = rows.map(summary ? serializeNewsletterSummary : serializeRecord);
+  if (summary && getQueryValue(e, 'compact', '') === '1') items.forEach(function (item) {
+    // Full search text and engagement identities are used on the server. Cards
+    // need only the short excerpt and counts, not entire article text or polls.
+    delete item.searchText;
+    delete item.likedByUserIds;
+    delete item.bookmarkedByUserIds;
+    delete item.poll;
+    delete item.event;
+  });
   return {
     page: page,
     perPage: perPage,
@@ -754,13 +784,13 @@ function readableNewsletterText(content) {
   return fragments.join(' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function listNewsletterSummaries(app, filter, sort, limit, offset) {
-  if (typeof app.recordQuery !== 'function') return listRecords(app, 'newsletters', filter, sort, limit, offset);
+function listNewsletterSummaries(app, filter, sort, limit, offset, sqlFilter, params, rankEngagement, compact) {
+  if (typeof app.recordQuery !== 'function') return app.findRecordsByFilter('newsletters', filter, sort, limit, offset, params);
   try {
     var collection = app.findCollectionByNameOrId('newsletters');
-    if (!collection.fields.getByName('searchText')) return listRecords(app, 'newsletters', filter, sort, limit, offset);
+    if (!collection.fields.getByName('searchText')) return app.findRecordsByFilter('newsletters', filter, sort, limit, offset, params);
     var columns = ['id', 'created', 'updated', 'title', 'subtitle', 'author', 'authorAvatar', 'createdById', 'publishedAt', 'textAlignment', 'searchText', 'status', 'tags', 'likes', 'comments', 'shares', 'likedByUserIds', 'bookmarkedByUserIds', 'poll', 'event', 'hasAudio', 'audioDuration'];
-    columns = columns.filter(function (name) { return name === 'id' || Boolean(collection.fields.getByName(name)); });
+    columns = columns.filter(function (name) { return (name === 'id' || Boolean(collection.fields.getByName(name))) && (!compact || ['likedByUserIds', 'bookmarkedByUserIds', 'poll', 'event'].indexOf(name) === -1); });
     var embeddedCover = ['png', 'jpeg', 'jpg', 'gif', 'webp', 'avif'].map(function (type) {
       var prefix = 'data:image/' + type + ';base64,';
       return "lower(substr(coverImage, 1, " + prefix.length + ")) = '" + prefix + "'";
@@ -773,7 +803,8 @@ function listNewsletterSummaries(app, filter, sort, limit, offset) {
     });
     var records = arrayOf(new Record(collection));
     var query = app.recordQuery(collection);
-    query.select.apply(query, columns).andWhere($dbx.exp(filter.replace(/&&/g, ' AND ').replace(/\|\|/g, ' OR ')));
+    if (rankEngagement) order.unshift('COALESCE(likes, 0) + COALESCE(comments, 0) + COALESCE(shares, 0) DESC');
+    query.select.apply(query, columns).andWhere($dbx.exp(sqlFilter, params));
     query.orderBy.apply(query, order).limit(limit).offset(offset).all(records);
     return records;
   } catch (error) {

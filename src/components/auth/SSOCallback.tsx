@@ -1,15 +1,13 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-import { CancelCircleIcon, CheckmarkCircle02Icon, Loading02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from '@hugeicons/react';
+import { CancelCircleIcon, CheckmarkCircle02Icon, Loading02Icon } from '@hugeicons/core-free-icons';
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { LanguageToggleButton } from '@/components/LanguageToggleButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
-import type { SSOProvider } from '@/lib/pocketbase/client';
 
 interface SSOCallbackProps {
-  onFinish: () => void;
-  onRetry: () => void;
+  onFinish: (returnTo: string) => void;
+  onRetry: (returnTo: string) => void;
 }
 
 export function SSOCallback({ onFinish, onRetry }: SSOCallbackProps) {
@@ -17,92 +15,53 @@ export function SSOCallback({ onFinish, onRetry }: SSOCallbackProps) {
   const { t } = useLocale();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [errorMessage, setErrorMessage] = useState('');
+  const [returnTo, setReturnTo] = useState('/');
 
   useEffect(() => {
-    const processCallback = async () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get('code');
-      const state = searchParams.get('state');
-      const error = searchParams.get('error');
-      const errorDescription = searchParams.get('error_description');
-
-      if (error) {
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    void handleSSOCallback().then((result) => {
+      if (!active) return;
+      if (result.status === 'manual') { onRetry(result.returnTo); return; }
+      setReturnTo(result.returnTo);
+      if (result.status === 'error') {
+        setErrorMessage(t('sso.' + result.error));
         setStatus('error');
-        setErrorMessage(errorDescription || error);
-        toast.error(t('sso.failed', { message: errorDescription || error }));
         return;
       }
-
-      if (!code) {
-        setStatus('error');
-        setErrorMessage('Missing authorization code');
-        toast.error(t('sso.invalidResponse'));
-        return;
-      }
-
-      const provider = localStorage.getItem('sso_provider') as SSOProvider | null;
-      const storedState = localStorage.getItem('sso_state');
-
-      if (state && state !== storedState) {
-        setStatus('error');
-        setErrorMessage('Invalid state parameter');
-        toast.error(t('sso.securityFailed'));
-        return;
-      }
-
-      if (!provider) {
-        setStatus('error');
-        setErrorMessage('No SSO provider found');
-        toast.error(t('sso.sessionExpired'));
-        return;
-      }
-
-      const success = await handleSSOCallback(code, provider);
-      if (success) {
-        setStatus('success');
-        window.setTimeout(onFinish, 1500);
-        return;
-      }
-
-      setStatus('error');
-      setErrorMessage('Failed to complete authentication');
+      setStatus('success');
+      timer = setTimeout(() => onFinish(result.returnTo), 500);
+    });
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
     };
-
-    void processCallback();
-  }, [handleSSOCallback, onFinish, t]);
+  }, [handleSSOCallback, onFinish, onRetry, t]);
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
-      <div className="space-y-4 text-center">
-        <div className="flex justify-end">
-          <LanguageToggleButton compact />
-        </div>
-        {status === 'processing' && (
-          <>
-            <HugeiconsIcon icon={Loading02Icon} className="w-16 h-16 animate-spin text-[#D93A3A] mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-[#171717]">{t('sso.processingTitle')}</h2>
-            <p className="text-gray-600">{t('sso.processingDescription')}</p>
-          </>
-        )}
-
-        {status === 'success' && (
-          <>
-            <HugeiconsIcon icon={CheckmarkCircle02Icon} className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-[#171717]">{t('sso.successTitle')}</h2>
-            <p className="text-gray-600">{t('sso.successDescription')}</p>
-          </>
-        )}
-
-        {status === 'error' && (
-          <>
-            <HugeiconsIcon icon={CancelCircleIcon} className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-[#171717]">{t('sso.errorTitle')}</h2>
-            <p className="text-gray-600">{errorMessage || t('sso.errorFallback')}</p>
-            <button onClick={onRetry} className="text-[#D93A3A] hover:underline font-medium">
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] flex items-center justify-center p-4 transition-colors">
+      <div className="w-full max-w-md space-y-4 text-center">
+        <div className="flex justify-end"><LanguageToggleButton compact /></div>
+        <div role="status" aria-live="polite" className="space-y-4">
+          {status === 'processing' && <>
+            <HugeiconsIcon icon={Loading02Icon} className="w-12 h-12 animate-spin motion-reduce:animate-none text-[var(--primary-accent)] mx-auto" aria-hidden="true" />
+            <h2 className="text-2xl font-bold">{t('sso.processingTitle')}</h2>
+            <p className="text-[var(--text-secondary)]">{t('sso.processingDescription')}</p>
+          </>}
+          {status === 'success' && <>
+            <HugeiconsIcon icon={CheckmarkCircle02Icon} className="w-12 h-12 text-[var(--primary-accent)] mx-auto" aria-hidden="true" />
+            <h2 className="text-2xl font-bold">{t('sso.successTitle')}</h2>
+            <p className="text-[var(--text-secondary)]">{t('sso.successDescription')}</p>
+          </>}
+          {status === 'error' && <>
+            <HugeiconsIcon icon={CancelCircleIcon} className="w-12 h-12 text-[var(--primary-accent)] mx-auto" aria-hidden="true" />
+            <h2 className="text-2xl font-bold">{t('sso.errorTitle')}</h2>
+            <p className="text-[var(--text-secondary)] break-words">{errorMessage || t('sso.errorFallback')}</p>
+            <button type="button" onClick={() => onRetry(returnTo)} className="text-[var(--text-primary)] underline underline-offset-4 font-medium focus-visible:outline-2 focus-visible:outline-offset-4">
               {t('sso.backToSignIn')}
             </button>
-          </>
-        )}
+          </>}
+        </div>
       </div>
     </div>
   );

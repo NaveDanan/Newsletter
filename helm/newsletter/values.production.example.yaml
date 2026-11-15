@@ -18,7 +18,7 @@ env:
   pocketbaseAppName: AI-BREAK
   pocketbaseMailSenderName: AI-BREAK
   pocketbaseMailSenderAddress: newsletter@example.com
-  pocketbasePublicUrl: https://pb.example.com
+  pocketbasePublicUrl: ""
   pocketbaseSmtpEnabled: true
   pocketbaseSmtpHost: smtp.example.com
   pocketbaseSmtpPort: 587
@@ -26,13 +26,13 @@ env:
   pocketbaseSmtpTls: false
   pocketbaseSmtpInsecureSkipVerify: false
   pocketbaseSmtpLocalName: ""
+  newsletterSsoAutoLogin: true
+  pocketbaseSsoOidcAutoRegister: true
+  pocketbaseSsoOidcIssuerUrl: https://keycloak.example.com/realms/company
   pocketbaseSsoOidcEnabled: true
   pocketbaseSsoOidcProviderName: oidc
   pocketbaseSsoOidcDisplayName: Company SSO
-  pocketbaseSsoOidcClientId: your-entra-application-client-id
-  pocketbaseSsoOidcAuthUrl: https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/authorize
-  pocketbaseSsoOidcTokenUrl: https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/token
-  pocketbaseSsoOidcUserInfoUrl: https://graph.microsoft.com/oidc/userinfo
+  pocketbaseSsoOidcClientId: newsletter
   pocketbaseSsoOidcPkce: true
   pocketbaseRecreateCollections: false
   newsletterTelemetry: false
@@ -59,7 +59,7 @@ ingress:
         hosts:
           - newsletter.example.com
   pocketbase:
-    enabled: true
+    enabled: false
     className: nginx
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod

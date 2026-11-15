@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
-import type { PocketBaseUser, SSOProvider } from '@/lib/pocketbase/client';
+import type { PocketBaseUser } from '@/lib/pocketbase/client';
+import type { SsoCompletion } from '@/lib/auth/sso';
 
 export interface AuthContextType {
   user: PocketBaseUser | null;
@@ -8,8 +9,8 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   register: (email: string, password: string, name: string) => Promise<boolean>;
   logout: () => void;
-  initiateSSO: (provider: SSOProvider) => Promise<void>;
-  handleSSOCallback: (code: string, provider: SSOProvider) => Promise<boolean>;
+  initiateSSO: () => Promise<void>;
+  handleSSOCallback: () => Promise<SsoCompletion>;
   requestPasswordReset: (email: string) => Promise<boolean>;
   confirmPasswordReset: (token: string, newPassword: string) => Promise<boolean>;
   requestEmailVerification: (email: string) => Promise<boolean>;

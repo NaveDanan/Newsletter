@@ -18,6 +18,7 @@
 
 ## ✨ Features
 
+- **Fast article feed:** The home page starts with the 10 newest published previews and loads another 10 when scrolling within 600 pixels of the end. Full articles load separately; search, Top, Discussions, and Bookmarks query the complete archive in batches. Cached previews speed up return visits.
 - **Newsletter Management:** Curate and write professional newsletters with a built-in rich text editor.
 - **Community profiles:** New accounts receive an `@nickname` from the part of their email before `@` (for example, `purple@njlabs.com` becomes `@purple`). Unsupported characters are normalized to underscores; reserved or already-used nicknames receive a suffix. Existing nicknames are retained. Members cannot edit nicknames; a PocketBase administrator can change them directly in `community_profiles`.
 - **Projects & Goals:** Maintain progress across concurrent efforts. Track key milestones.
@@ -117,7 +118,8 @@ Notes:
 - The container Nginx proxies `/api/*` and `/_/` to the PocketBase process on port `8090`, so browser traffic can use the same public origin as the frontend.
 - Destructive collection recreation is disabled by default. Set `POCKETBASE_RECREATE_COLLECTIONS=1` only if you intentionally want startup to drop and recreate the app collections.
 - Safe collection schema sync, mail settings sync, users schema sync, and optional app-admin bootstrap run on every start.
-- Optional OIDC/SSO provider sync runs on every start when `POCKETBASE_SSO_OIDC_ENABLED=1`.
+- Optional OIDC/SSO provider sync runs on every start when `POCKETBASE_SSO_OIDC_ENABLED=1`. A Keycloak issuer URL supplies the provider endpoints through discovery.
+- Background SSO uses an existing provider session; `/sign-in?manual=1` keeps manual login available. New SSO identities can automatically join as viewers. See [OIDC setup](docs/oidc-login.md).
 - Set `APP_PUBLIC_URL` to the public frontend URL. It is used for newsletter article links and the frontend password reset page.
 - Leave `POCKETBASE_PUBLIC_URL` empty when you want the frontend to use the same public origin as the app through the built-in Nginx proxy. Set it only if you intentionally expose PocketBase on a separate public address.
 - SMTP is configured with the `POCKETBASE_MAIL_*` and `POCKETBASE_SMTP_*` environment variables.
@@ -156,6 +158,9 @@ Relevant environment variables:
 - `POCKETBASE_SMTP_TLS`
 - `POCKETBASE_SMTP_INSECURE_SKIP_VERIFY`
 - `POCKETBASE_SMTP_LOCAL_NAME`
+- `NEWSLETTER_SSO_AUTO_LOGIN`
+- `POCKETBASE_SSO_OIDC_AUTO_REGISTER`
+- `POCKETBASE_SSO_OIDC_ISSUER_URL`
 - `POCKETBASE_SSO_OIDC_ENABLED`
 - `POCKETBASE_SSO_OIDC_PROVIDER_NAME`
 - `POCKETBASE_SSO_OIDC_DISPLAY_NAME`

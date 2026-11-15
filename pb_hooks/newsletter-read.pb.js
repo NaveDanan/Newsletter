@@ -10,7 +10,8 @@ onBootstrap(function (e) {
     changed = true;
   }
   var indexes = Array.from(collection.indexes || []);
-  ['CREATE INDEX idx_newsletters_read_status ON newsletters (status, created DESC)',
+  ['CREATE INDEX idx_newsletters_feed_latest ON newsletters (status, publishedAt DESC, created DESC, id DESC)',
+    'CREATE INDEX idx_newsletters_read_status ON newsletters (status, created DESC)',
     'CREATE INDEX idx_newsletters_read_owner ON newsletters (createdById, created DESC)'].forEach(function (index) {
     if (!indexes.some(function (current) { return current.indexOf(index.split(' ')[2]) !== -1; })) { indexes.push(index); changed = true; }
   });

@@ -24,7 +24,7 @@ function hookHarness(file, exportName, mocks, initialProps) {
   };
   const exports = {};
   vm.runInNewContext(ts.transpileModule(readFileSync(file, 'utf8'), { fileName: file, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, } }).outputText, {
-    exports, console: { ...console, error() {} }, require(name) {
+    exports, Error, console: { ...console, error() {} }, require(name) {
       if (name === 'react') return react;
       if (name === 'sonner') return { toast: { error() {} } };
       if (name.endsWith('bootLogger')) return { bootLogger: { once: (_, fn) => fn(), step() {}, success() {}, error() {}, warn() {} } };
@@ -285,4 +285,104 @@ test('stored feed summaries omit heavy bodies and preserve covers that cannot us
   assert.equal(cached[0].searchText, 'Searchable text'); assert.equal(cached[0].commentItems.length, 0);
   assert.equal(cached[0].coverImage, '/api/newsletters/0/cover?v=1');
   assert.equal(cached[1].coverImage, covers[1]); assert.equal(cached[2].coverImage, covers[2]);
+});
+
+function newsletterFeedHarness(query = {}, initial) {
+  let scope = 'alice';
+  const reads = [], cached = new Map();
+  const key = value => JSON.stringify([value.tab ?? 'latest', value.search ?? '']);
+  if (initial) cached.set(scope + key(query), initial);
+  const h = hookHarness('src/hooks/useNewsletterFeed.ts', 'useNewsletterFeed', {
+    '@/lib/pocketbase/newsletter-feed': {
+      newsletterFeedKey: key,
+      getCachedNewsletterFeed: value => cached.get(scope + key(value)),
+      rememberNewsletterFeed: (value, page) => cached.set(scope + key(value), page),
+      fetchNewsletterPage: (value, page, force) => { const task = deferred(); reads.push({ query: value, page, force, ...task }); return task.promise; },
+    },
+    '@/lib/pocketbase/read-cache': { readScope: () => scope },
+  }, [query]);
+  return { h, reads, cached, changeScope(next) { scope = next; h.change([query]); } };
+}
+const feedPage = (start = 0, count = 10, hasMore = true, nextPage = 2) => ({ items: Array.from({ length: count }, (_, i) => article(String(start + i), false)), hasMore, nextPage, totalItems: 24 });
+
+test('newsletter feed loads one batch, guards concurrent scroll events, deduplicates appended rows, and stops at the end', async () => {
+  const a = newsletterFeedHarness();
+  assert.equal(a.h.value.isLoading, true);
+  assert.equal(a.reads.length, 1); assert.equal(a.reads[0].page, 1);
+  a.reads[0].resolve(feedPage()); await a.h.flush();
+  assert.equal(a.h.value.newsletters.length, 10); assert.equal(a.h.value.isLoading, false);
+  assert.equal(a.reads.length, 1, 'later pages wait for the reader');
+  a.h.value.loadMore(); a.h.value.loadMore();
+  assert.equal(a.reads.length, 2, 'scroll events before a render share one pending request');
+  assert.equal(a.reads[1].page, 2);
+  a.reads[1].resolve(feedPage(9, 10, true, 3)); await a.h.flush();
+  assert.equal(a.h.value.newsletters.length, 19, 'overlapping rows are appended once');
+  a.h.value.loadMore(); a.reads[2].resolve(feedPage(19, 5, false, 4)); await a.h.flush();
+  assert.equal(a.h.value.newsletters.length, 24);
+  a.h.value.loadMore(); assert.equal(a.reads.length, 3);
+  a.h.unmount();
+});
+
+test('a failed next batch retains visible articles, pauses automatic retries, and retries the same page', async () => {
+  const a = newsletterFeedHarness(); a.h.value;
+  a.reads[0].resolve(feedPage()); await a.h.flush();
+  a.h.value.loadMore(); a.reads[1].reject(new Error('Offline')); await a.h.flush();
+  assert.equal(a.h.value.newsletters.length, 10);
+  assert.equal(a.h.value.error, 'Offline'); assert.equal(a.h.value.isLoadingMore, false);
+  a.h.value.loadMore(); assert.equal(a.reads.length, 2, 'observer cannot create a retry loop');
+  const retry = a.h.value.retry();
+  assert.equal(a.reads[2].page, 2); assert.equal(a.reads[2].force, true);
+  a.reads[2].resolve(feedPage(10, 10, true, 3)); await retry; await a.h.flush();
+  assert.equal(a.h.value.error, null); assert.equal(a.h.value.newsletters.length, 20);
+  a.h.unmount();
+});
+
+test('newsletter search and account changes reset pagination and ignore stale requests', async () => {
+  const a = newsletterFeedHarness(); a.h.value;
+  a.h.change([{ search: 'older article', tab: 'bookmarks' }]);
+  a.reads[0].resolve(feedPage()); await a.h.flush();
+  assert.equal(a.h.value.newsletters.length, 0, 'the old query cannot populate search');
+  assert.equal(a.reads[1].query.search, 'older article'); assert.equal(a.reads[1].page, 1);
+  a.reads[1].resolve(feedPage(90, 1, false, 2)); await a.h.flush();
+  assert.equal(a.h.value.newsletters[0].id, '90');
+  a.changeScope('bob');
+  assert.equal(a.h.value.newsletters.length, 0, 'cached bookmarks stay with their account');
+  a.reads[2].resolve(feedPage(100, 1, false, 2)); await a.h.flush();
+  assert.equal(a.h.value.newsletters[0].id, '100');
+  a.h.unmount();
+});
+
+test('newsletter feed Back restores loaded pages while validating the first batch and cancels unrelated-route reads', async () => {
+  const a = newsletterFeedHarness({}, feedPage(0, 20, true, 3));
+  assert.equal(a.h.value.newsletters.length, 20); assert.equal(a.h.value.isLoading, false);
+  a.h.change([{}, false]);
+  a.reads[0].resolve(feedPage(100)); await a.h.flush();
+  assert.equal(a.h.value.newsletters[0].id, '0', 'a cancelled request cannot replace the feed');
+  a.h.change([{}, true]); assert.equal(a.h.value.newsletters.length, 20);
+  a.reads[1].resolve(feedPage()); await a.h.flush();
+  assert.equal(a.h.value.newsletters.length, 20, 'a stable first batch preserves subsequent pages');
+  a.h.value.loadMore(); assert.equal(a.reads[2].page, 3);
+  a.reads[2].resolve(feedPage(20, 4, false, 4)); await a.h.flush(); a.h.unmount();
+});
+
+test('newly published articles reset stale pagination; first-page failures retry page one', async () => {
+  const a = newsletterFeedHarness({}, feedPage(0, 20, true, 3)); a.h.value;
+  a.reads[0].reject(new Error('Unavailable')); await a.h.flush();
+  const retry = a.h.value.retry(); assert.equal(a.reads[1].page, 1);
+  a.reads[1].resolve(feedPage(100)); await retry; await a.h.flush();
+  assert.equal(a.h.value.newsletters.length, 10); assert.equal(a.h.value.newsletters[0].id, '100');
+  a.h.value.loadMore(); assert.equal(a.reads[2].page, 2);
+  a.reads[2].resolve(feedPage(110, 10, true, 3)); await a.h.flush(); a.h.unmount();
+});
+
+test('a disconnected scroll observer cannot restart an obsolete query after search changes', async () => {
+  const a = newsletterFeedHarness(); a.h.value;
+  a.reads[0].resolve(feedPage()); await a.h.flush();
+  const oldScrollHandler = a.h.value.loadMore;
+  a.h.change([{ search: 'new search' }]);
+  a.reads[1].resolve(feedPage(50, 1, false, 2)); await a.h.flush();
+  oldScrollHandler();
+  assert.equal(a.reads.length, 2, 'an old observer callback must not load page two of the previous query');
+  assert.equal(a.h.value.newsletters[0].id, '50'); assert.equal(a.h.value.isLoadingMore, false);
+  a.h.unmount();
 });

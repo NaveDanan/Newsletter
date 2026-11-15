@@ -110,6 +110,12 @@ spec:
               value: {{ ternary "1" "0" .Values.env.pocketbaseSmtpInsecureSkipVerify | quote }}
             - name: POCKETBASE_SMTP_LOCAL_NAME
               value: {{ .Values.env.pocketbaseSmtpLocalName | quote }}
+            - name: NEWSLETTER_SSO_AUTO_LOGIN
+              value: {{ ternary "true" "false" .Values.env.newsletterSsoAutoLogin | quote }}
+            - name: POCKETBASE_SSO_OIDC_AUTO_REGISTER
+              value: {{ ternary "true" "false" .Values.env.pocketbaseSsoOidcAutoRegister | quote }}
+            - name: POCKETBASE_SSO_OIDC_ISSUER_URL
+              value: {{ .Values.env.pocketbaseSsoOidcIssuerUrl | quote }}
             - name: POCKETBASE_SSO_OIDC_ENABLED
               value: {{ ternary "1" "0" .Values.env.pocketbaseSsoOidcEnabled | quote }}
             - name: POCKETBASE_SSO_OIDC_PROVIDER_NAME

@@ -5,13 +5,13 @@ import { bootLogger } from '@/lib/bootLogger';
 import { disableBrowserNotifications } from '@/lib/browser-notifications';
 import {
   getPocketBase,
-  getSSOCallbackUrl,
   normalizeUserRole,
   resetPocketBase,
   type PocketBaseUser,
-  type SSOProvider,
 } from '@/lib/pocketbase/client';
 import { AuthContext } from '@/contexts/AuthContext';
+import { getSsoAuth } from '@/lib/auth/sso';
+import { useLocale } from '@/contexts/LocaleContext';
 
 function mapAuthUser(model: Record<string, unknown>, avatarUrl?: string): PocketBaseUser {
   const email = typeof model.email === 'string' ? model.email : '';
@@ -30,6 +30,8 @@ function mapAuthUser(model: Record<string, unknown>, avatarUrl?: string): Pocket
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pb = getPocketBase();
+  const sso = getSsoAuth();
+  const { t } = useLocale();
   const [user, setUser] = useState<PocketBaseUser | null>(() => {
     const model = pb.authStore.model as Record<string, unknown> | null;
     return model && pb.authStore.isValid ? mapAuthUser(model, avatarUrlFor(pb, model)) : null;
@@ -122,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     try {
       setIsLoading(true);
+      sso.suppressAutomaticLogin();
       bootLogger.step('auth', 'Password login started', { email });
       const authData = await pb.collection('users').authWithPassword(email, password);
       if (!authData.token) {
@@ -141,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [pb]);
+  }, [pb, sso]);
 
   const register = useCallback(async (email: string, password: string, name: string) => {
     try {
@@ -184,79 +187,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     toast.success('Signed out');
     bootLogger.step('auth', 'User logged out');
-  }, []);
+    sso.signOut();
+  }, [sso]);
 
-  const initiateSSO = useCallback(async (provider: SSOProvider) => {
+  useEffect(() => {
+    if (!isLoading && !user) void sso.tryAutomaticLogin();
+  }, [isLoading, user, sso]);
+
+  const initiateSSO = useCallback(async () => {
     try {
-      bootLogger.step('auth', 'SSO login started', { provider });
-      type OAuthProviderInfo = {
-        name: string;
-        state: string;
-        authURL?: string;
-        authUrl?: string;
-        codeVerifier: string;
-      };
-      const authMethods = await pb.collection('users').listAuthMethods();
-      const authMethodsPayload = authMethods as unknown as {
-        authProviders?: OAuthProviderInfo[] | null;
-        oauth2?: {
-          providers?: OAuthProviderInfo[];
-        };
-      };
-      const providers = authMethodsPayload.oauth2?.providers || authMethodsPayload.authProviders || [];
-      const oauthProvider = providers.find((entry) => entry.name === provider);
-      const authUrl = oauthProvider?.authURL || oauthProvider?.authUrl;
-
-      if (!oauthProvider || !authUrl) {
-        toast.error(`${provider} login is not configured`);
-        return;
-      }
-
-      localStorage.setItem('sso_provider', provider);
-      localStorage.setItem('sso_state', oauthProvider.state);
-      localStorage.setItem('sso_code_verifier', oauthProvider.codeVerifier);
-
-      bootLogger.step('auth', 'Redirecting browser to SSO provider', {
-        provider,
-      });
-      window.location.href = authUrl + getSSOCallbackUrl();
-    } catch (error) {
-      console.error('SSO initiation error:', error);
-      bootLogger.error('auth', 'SSO initiation failed', normalizeBootError(error));
-      const message = error instanceof Error ? error.message : 'Failed to initiate SSO';
-      toast.error(message);
+      const result = await sso.start();
+      if (result === 'unavailable') toast.error(t('sso.notConfigured'));
+    } catch {
+      toast.error(t('sso.startFailed'));
     }
-  }, [pb]);
+  }, [sso, t]);
 
-  const handleSSOCallback = useCallback(async (code: string, provider: SSOProvider) => {
-    try {
-      setIsLoading(true);
-      bootLogger.step('auth', 'Processing SSO callback', { provider });
-      const codeVerifier = localStorage.getItem('sso_code_verifier');
-
-      if (!codeVerifier) {
-        toast.error('Invalid SSO session');
-        return false;
-      }
-
-      await pb.collection('users').authWithOAuth2Code(provider, code, codeVerifier, getSSOCallbackUrl());
-
-      localStorage.removeItem('sso_provider');
-      localStorage.removeItem('sso_state');
-      localStorage.removeItem('sso_code_verifier');
-      toast.success('Welcome!');
-      bootLogger.success('auth', 'SSO callback succeeded', { provider });
-      return true;
-    } catch (error) {
-      console.error('SSO callback error:', error);
-      bootLogger.error('auth', 'SSO callback failed', normalizeBootError(error));
-      const message = error instanceof Error ? error.message : 'SSO authentication failed';
-      toast.error(message);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [pb]);
+  const handleSSOCallback = useCallback(() => sso.complete(), [sso]);
 
   const requestPasswordReset = useCallback(async (email: string) => {
     try {

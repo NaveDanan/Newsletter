@@ -34,7 +34,7 @@ function createClientId(): string {
 export function useNewsletters({ currentUser, currentUserRole, enabled = true, articleId }: UseNewslettersOptions) {
   const scope = readScope();
   const [newsletters, commitNewsletters] = useState<Newsletter[]>(() => {
-    const list = getCachedNewsletters() ?? [];
+    const list = enabled && !articleId ? getCachedNewsletters() ?? [] : [];
     const article = articleId ? getCachedNewsletter(articleId) : undefined;
     return article ? [article, ...list.filter((item) => item.id !== article.id)] : list;
   });
@@ -44,7 +44,7 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true, a
   const [isLoading, setIsLoading] = useState(enabled && newsletters.length === 0);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
-  const [hasList, setHasList] = useState(() => Boolean(getCachedNewsletters()));
+  const [hasList, setHasList] = useState(() => enabled && !articleId && Boolean(getCachedNewsletters()));
   const [error, setError] = useState<string | null>(null);
   const currentUserId = currentUser?.id;
 
@@ -54,9 +54,9 @@ export function useNewsletters({ currentUser, currentUserRole, enabled = true, a
     setLastScope(scope);
     setHasLoaded(false);
     setLoadedFor(null);
-    setHasList(Boolean(getCachedNewsletters()));
+    setHasList(enabled && !articleId && Boolean(getCachedNewsletters()));
     setError(null);
-    setNewsletters(getCachedNewsletters() ?? []);
+    setNewsletters(enabled && !articleId ? getCachedNewsletters() ?? [] : []);
     setIsLoading(enabled);
   }
 

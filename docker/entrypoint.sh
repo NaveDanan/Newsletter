@@ -37,11 +37,14 @@ const pocketbasePublicUrl = (process.env.POCKETBASE_PUBLIC_URL || '').trim();
 const appPublicUrl = (process.env.APP_PUBLIC_URL || '').trim();
 const telemetryRaw = (process.env.NEWSLETTER_TELEMETRY || 'false').trim().toLowerCase();
 const telemetry = telemetryRaw === 'true' || telemetryRaw === '1';
+const ssoAutoRaw = (process.env.NEWSLETTER_SSO_AUTO_LOGIN || 'true').trim().toLowerCase();
+const ssoAutoLogin = ['true', '1', 'yes', 'on'].includes(ssoAutoRaw);
+const ssoProvider = (process.env.POCKETBASE_SSO_OIDC_PROVIDER_NAME || 'oidc').trim();
 const resolvedPocketBaseUrlExpression = JSON.stringify(pocketbasePublicUrl || appPublicUrl) + ' || window.location.origin';
 
 fs.writeFileSync(
   outputPath,
-  `window.__APP_CONFIG__ = Object.freeze({ VITE_POCKETBASE_URL: ${resolvedPocketBaseUrlExpression}, NEWSLETTER_TELEMETRY: ${JSON.stringify(telemetry)} });\n`,
+  `window.__APP_CONFIG__ = Object.freeze({ VITE_POCKETBASE_URL: ${resolvedPocketBaseUrlExpression}, NEWSLETTER_TELEMETRY: ${JSON.stringify(telemetry)}, SSO_AUTO_LOGIN: ${JSON.stringify(ssoAutoLogin)}, SSO_PROVIDER: ${JSON.stringify(ssoProvider)} });\n`,
   'utf8',
 );
 EOF

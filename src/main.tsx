@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { deliverSilentSsoCallback } from './lib/auth/sso'
 import { BootErrorBoundary } from './components/BootErrorBoundary.tsx'
 import { ThemeProvider } from './context/ThemeProvider.tsx'
 import { AuthProvider } from './contexts/AuthProvider.tsx'
@@ -9,85 +10,89 @@ import { LocaleProvider } from './contexts/LocaleProvider.tsx'
 import { NavigationDataProvider } from './contexts/NavigationDataContext.tsx'
 import { NotificationsProvider } from './contexts/NotificationsContext.tsx'
 import { bootLogger } from './lib/bootLogger.ts'
-import { fetchNewsletter, fetchNewsletters } from './lib/pocketbase/newsletters'
+import { fetchNewsletter } from './lib/pocketbase/newsletters'
+import { fetchNewsletterPage } from './lib/pocketbase/newsletter-feed'
 
-// Start route data before React mounts. The hook shares these pending reads.
-if (window.location.pathname === '/') void fetchNewsletters({ summary: true, force: true }).catch(() => {})
-else if (window.location.pathname.startsWith('/article/')) {
-  try { void fetchNewsletter(decodeURIComponent(window.location.pathname.split('/')[2])).catch(() => {}) } catch { /* The router handles malformed paths. */ }
+if (!deliverSilentSsoCallback()) {
+  // Start route data before React mounts. The hook shares these pending reads.
+  if (window.location.pathname === '/') void fetchNewsletterPage({ search: new URLSearchParams(window.location.search).get('search') ?? '' }).catch(() => {})
+  else if (window.location.pathname.startsWith('/article/')) {
+    try { void fetchNewsletter(decodeURIComponent(window.location.pathname.split('/')[2])).catch(() => {}) } catch { /* The router handles malformed paths. */ }
+  }
+
+  bootLogger.once('bootstrap:module-evaluated', () => {
+    bootLogger.step('bootstrap', 'main.tsx evaluated', {
+      mode: import.meta.env.MODE,
+      url: window.location.origin + window.location.pathname,
+      pathname: window.location.pathname,
+      language: navigator.language,
+      online: navigator.onLine,
+      userAgent: navigator.userAgent,
+    })
+  })
+
+  const rootElement = document.getElementById('root')
+
+  if (!rootElement) {
+    bootLogger.fatal('bootstrap', 'Root element #root was not found in the document')
+    throw new Error('Root element #root was not found')
+  }
+
+  bootLogger.step('bootstrap', 'Root element located', {
+    id: rootElement.id,
+  })
+
+  const root = createRoot(rootElement, {
+    onCaughtError(error, errorInfo) {
+      bootLogger.fatal('react', 'React caught an error during rendering', {
+        error,
+        componentStack: errorInfo.componentStack,
+      })
+    },
+    onRecoverableError(error, errorInfo) {
+      bootLogger.warn('react', 'React reported a recoverable error', {
+        error,
+        componentStack: errorInfo.componentStack,
+      })
+    },
+    onUncaughtError(error, errorInfo) {
+      bootLogger.fatal('react', 'React reported an uncaught error', {
+        error,
+        componentStack: errorInfo.componentStack,
+      })
+    },
+  })
+
+  bootLogger.step('bootstrap', 'React root created')
+
+  root.render(
+    <StrictMode>
+      <BootErrorBoundary>
+        <ThemeProvider>
+          <LocaleProvider>
+            <AuthProvider>
+              <NavigationDataProvider>
+                <NotificationsProvider><App /></NotificationsProvider>
+              </NavigationDataProvider>
+            </AuthProvider>
+          </LocaleProvider>
+        </ThemeProvider>
+      </BootErrorBoundary>
+    </StrictMode>,
+  )
+
+  bootLogger.step('bootstrap', 'React render requested')
+
+  queueMicrotask(() => {
+    bootLogger.once('bootstrap:first-microtask', () => {
+      bootLogger.step('bootstrap', 'First microtask after render request completed')
+    })
+  })
+
+  requestAnimationFrame(() => {
+    bootLogger.once('bootstrap:first-frame', () => {
+      bootLogger.step('bootstrap', 'First animation frame after render request completed')
+    })
+  })
+
 }
-
-bootLogger.once('bootstrap:module-evaluated', () => {
-  bootLogger.step('bootstrap', 'main.tsx evaluated', {
-    mode: import.meta.env.MODE,
-    url: window.location.href,
-    pathname: window.location.pathname,
-    language: navigator.language,
-    online: navigator.onLine,
-    userAgent: navigator.userAgent,
-  })
-})
-
-const rootElement = document.getElementById('root')
-
-if (!rootElement) {
-  bootLogger.fatal('bootstrap', 'Root element #root was not found in the document')
-  throw new Error('Root element #root was not found')
-}
-
-bootLogger.step('bootstrap', 'Root element located', {
-  id: rootElement.id,
-})
-
-const root = createRoot(rootElement, {
-  onCaughtError(error, errorInfo) {
-    bootLogger.fatal('react', 'React caught an error during rendering', {
-      error,
-      componentStack: errorInfo.componentStack,
-    })
-  },
-  onRecoverableError(error, errorInfo) {
-    bootLogger.warn('react', 'React reported a recoverable error', {
-      error,
-      componentStack: errorInfo.componentStack,
-    })
-  },
-  onUncaughtError(error, errorInfo) {
-    bootLogger.fatal('react', 'React reported an uncaught error', {
-      error,
-      componentStack: errorInfo.componentStack,
-    })
-  },
-})
-
-bootLogger.step('bootstrap', 'React root created')
-
-root.render(
-  <StrictMode>
-    <BootErrorBoundary>
-      <ThemeProvider>
-        <LocaleProvider>
-          <AuthProvider>
-            <NavigationDataProvider>
-              <NotificationsProvider><App /></NotificationsProvider>
-            </NavigationDataProvider>
-          </AuthProvider>
-        </LocaleProvider>
-      </ThemeProvider>
-    </BootErrorBoundary>
-  </StrictMode>,
-)
-
-bootLogger.step('bootstrap', 'React render requested')
-
-queueMicrotask(() => {
-  bootLogger.once('bootstrap:first-microtask', () => {
-    bootLogger.step('bootstrap', 'First microtask after render request completed')
-  })
-})
-
-requestAnimationFrame(() => {
-  bootLogger.once('bootstrap:first-frame', () => {
-    bootLogger.step('bootstrap', 'First animation frame after render request completed')
-  })
-})

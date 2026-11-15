@@ -1,3 +1,4 @@
+import { manualSignInUrl, safeSsoReturnTo } from '@/lib/auth/sso';
 import { preloadRoute } from '@/lib/preload-route';
 import { warmHomeNavigation } from '@/lib/navigation-warmup';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -10,6 +11,8 @@ import { Sidebar } from './sections/Sidebar';
 import type { Tab as ManagerTab } from './sections/ManagerDashboard';
 import { useAuth } from './contexts/AuthContext';
 import { useLocale } from './contexts/LocaleContext';
+import { useNewsletterFeed } from './hooks/useNewsletterFeed';
+import { getCachedNewsletterFeed, type NewsletterFeedTab } from './lib/pocketbase/newsletter-feed';
 import { useNewsletters } from './hooks/useNewsletters';
 import { canAccessManagerTab, hasManagerAccess } from './lib/auth/permissions';
 import { parseCommunityRoute } from './lib/community-routes';
@@ -58,37 +61,6 @@ function slugify(value: string): string {
 
 function getArticlePath(newsletter: Newsletter): string {
   return `/article/${encodeURIComponent(newsletter.id)}/${slugify(newsletter.title)}`;
-}
-
-function normalizeSearchValue(value: string): string {
-  return value
-    .replace(/<img\b[^>]*>/gi, ' ')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
-function matchesNewsletterSearch(newsletter: Newsletter, query: string): boolean {
-  const normalizedQuery = normalizeSearchValue(query);
-
-  if (!normalizedQuery) {
-    return true;
-  }
-
-  const searchableText = normalizeSearchValue([
-    newsletter.title,
-    newsletter.subtitle,
-    newsletter.excerpt,
-    newsletter.author,
-    newsletter.tags.join(' '),
-    newsletter.searchText ?? newsletter.content,
-  ].join(' '));
-
-  return normalizedQuery
-    .split(' ')
-    .every((term) => searchableText.includes(term));
 }
 
 function isManagerSection(value: string): value is ManagerTab {
@@ -235,7 +207,7 @@ function App() {
     newsletters,
     hasNewsletterList,
     loadNewsletter,
-    isLoaded: areNewslettersLoaded,
+    isLoaded: isArticleOrManagerLoaded,
     refreshNewsletters,
     addNewsletter,
     upsertDraftNewsletter,
@@ -252,25 +224,33 @@ function App() {
   } = useNewsletters({
     currentUser: user,
     currentUserRole: userRole,
-    enabled: currentRoute.view === 'home' || currentRoute.view === 'article' || (currentRoute.view === 'manager' && currentRoute.managerSection === 'newsletters'),
+    enabled: currentRoute.view === 'article' || (currentRoute.view === 'manager' && currentRoute.managerSection === 'newsletters'),
     articleId: currentRoute.view === 'article' ? currentRoute.articleId : undefined,
   });
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get('search') ?? '');
+  const [feedTab, setFeedTab] = useState<NewsletterFeedTab>('latest');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery.trim());
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 250);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+  const feed = useNewsletterFeed({ search: debouncedSearch, tab: feedTab }, currentRoute.view === 'home');
+  const areNewslettersLoaded = currentRoute.view === 'home' ? !feed.isLoading : isArticleOrManagerLoaded;
+  const recentNewsletters = useMemo(() => feedTab === 'latest' && !debouncedSearch ? feed.newsletters : getCachedNewsletterFeed()?.items ?? [], [debouncedSearch, feed.newsletters, feedTab]);
+
   const managerToastRouteRef = useRef<string | null>(null);
   const appReadyRef = useRef(false);
   const toasterPosition = isRTL ? 'top-left' : 'top-right';
-  const publishedNewsletters = useMemo(() => newsletters
+  const publishedNewsletters = useMemo(() => (currentRoute.view === 'home' ? recentNewsletters : newsletters)
     .filter((newsletter) => newsletter.status === 'published')
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()), [newsletters]);
+    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()), [currentRoute.view, newsletters, recentNewsletters]);
   const featuredArticleId = publishedNewsletters[0]?.id;
   useEffect(() => {
     if (currentRoute.view !== 'home' || !areNewslettersLoaded || !featuredArticleId) return;
     return warmHomeNavigation(featuredArticleId);
   }, [currentRoute.view, areNewslettersLoaded, featuredArticleId, user?.id, userRole]);
   const trimmedSearchQuery = searchQuery.trim();
-  const filteredNewsletters = trimmedSearchQuery
-    ? publishedNewsletters.filter((newsletter) => matchesNewsletterSearch(newsletter, trimmedSearchQuery))
-    : publishedNewsletters;
+  const filteredNewsletters = feed.newsletters;
   const isSearchActive = trimmedSearchQuery.length > 0;
   const selectedArticle = useMemo(() => (
     currentRoute.view === 'article' && currentRoute.articleId
@@ -279,7 +259,9 @@ function App() {
   ), [currentRoute.articleId, currentRoute.view, newsletters]);
 
   const navigateTo = useCallback((pathname: string, { replace = false }: { replace?: boolean } = {}) => {
-    const nextRoute = resolveRoute(pathname);
+    const suffixIndex = pathname.search(/[?#]/);
+    const suffix = suffixIndex < 0 ? '' : pathname.slice(suffixIndex);
+    const nextRoute = resolveRoute(suffixIndex < 0 ? pathname : pathname.slice(0, suffixIndex));
     preloadRoute(nextRoute.pathname);
     const historyMethod = replace ? 'replaceState' : 'pushState';
 
@@ -291,7 +273,7 @@ function App() {
 
     // Pushed entries are tagged so a page's Back button can tell whether
     // history.back() would stay inside the app.
-    window.history[historyMethod](replace ? window.history.state : { appNavigation: true }, '', nextRoute.pathname);
+    window.history[historyMethod](replace ? window.history.state : { appNavigation: true }, '', nextRoute.pathname + suffix);
     window.dispatchEvent(new Event('app:navigate'));
   }, []);
 
@@ -333,7 +315,7 @@ function App() {
         from: window.location.pathname,
         to: canonicalArticlePath,
       });
-      window.history.replaceState({}, '', canonicalArticlePath);
+      window.history.replaceState({}, '', canonicalArticlePath + window.location.search + window.location.hash);
       window.dispatchEvent(new Event('app:navigate'));
     }
   }, [areNewslettersLoaded, currentRoute.articleId, currentRoute.view, navigateTo, selectedArticle]);
@@ -352,7 +334,7 @@ function App() {
       bootLogger.warn('router', 'Manager route requires authentication, redirecting to sign-in', {
         pathname: currentRoute.pathname,
       });
-      navigateTo('/sign-in', { replace: true });
+      navigateTo('/sign-in?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search + window.location.hash), { replace: true });
       return;
     }
 
@@ -395,7 +377,7 @@ function App() {
     bootLogger.warn('router', 'Profile route requires authentication, redirecting to sign-in', {
       pathname: currentRoute.pathname,
     });
-    navigateTo('/sign-in', { replace: true });
+    navigateTo('/sign-in?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search + window.location.hash), { replace: true });
   }, [currentRoute.pathname, currentRoute.view, isAuthLoading, isUserAuthenticated, navigateTo]);
 
   useEffect(() => {
@@ -531,9 +513,18 @@ function App() {
     handleQuickCompose();
   };
 
-  const handleAuthSuccess = () => {
-    navigateTo('/', { replace: true });
-  };
+  const handleAuthSuccess = useCallback((returnTo?: string) => {
+    const requested = returnTo ?? new URLSearchParams(window.location.search).get('returnTo') ?? '/';
+    navigateTo(safeSsoReturnTo(requested, window.location.origin), { replace: true });
+  }, [navigateTo]);
+
+  const handleSsoRetry = useCallback((returnTo: string) => {
+    navigateTo(manualSignInUrl(returnTo), { replace: true });
+  }, [navigateTo]);
+
+  useEffect(() => {
+    if (currentRoute.view === 'signin' && !isAuthLoading && isUserAuthenticated) handleAuthSuccess();
+  }, [currentRoute.view, isAuthLoading, isUserAuthenticated, handleAuthSuccess]);
 
   const handlePasswordResetSuccess = () => {
     navigateTo('/sign-in', { replace: true });
@@ -864,7 +855,7 @@ function App() {
           <Toaster position={toasterPosition} richColors />
           <SSOCallback
             onFinish={handleAuthSuccess}
-            onRetry={() => navigateTo('/sign-in', { replace: true })}
+            onRetry={handleSsoRetry}
           />
         </div>
       </AppStageShell>
@@ -998,7 +989,7 @@ function App() {
                       {t('app.search.label')}
                     </p>
                     <h2 className="mt-1 text-xl sm:text-2xl font-extrabold text-[var(--text-primary)]">
-                      {t('app.search.results', { count: filteredNewsletters.length })}
+                      {feed.isLoading || trimmedSearchQuery !== debouncedSearch ? t('latest.loading') : t('app.search.results', { count: feed.totalItems })}
                     </h2>
                   </div>
                   <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
@@ -1025,32 +1016,26 @@ function App() {
                 )}
 
                 {filteredNewsletters.length > 0 ? (
-                  <>
-                    <PopularArticles
-                      newsletters={filteredNewsletters}
-                      onArticleClick={handleArticleClick}
-                      onArticleIntent={handleArticleIntent}
-                    />
-                    <LatestArticles
-                      newsletters={filteredNewsletters}
-                      currentUserId={user?.id}
-                      onArticleClick={handleArticleClick}
-                      onArticleIntent={handleArticleIntent}
-                    />
-                  </>
-                ) : (
-                  <section className="rounded-3xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-12 text-center shadow-xs">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--primary-accent)]">
-                      {t('app.search.noMatchesLabel')}
-                    </p>
-                    <h2 className="mt-3 text-xl sm:text-2xl font-extrabold text-[var(--text-primary)]">
-                      {t('app.search.noMatchesTitle')}
-                    </h2>
-                    <p className="mt-2 text-xs sm:text-sm text-[var(--text-secondary)]">
-                      {t('app.search.noMatchesDescription')}
-                    </p>
-                  </section>
-                )}
+                  <PopularArticles
+                    newsletters={filteredNewsletters}
+                    onArticleClick={handleArticleClick}
+                    onArticleIntent={handleArticleIntent}
+                  />
+                ) : null}
+                <LatestArticles
+                  newsletters={filteredNewsletters}
+                  activeTab={feedTab}
+                  onTabChange={setFeedTab}
+                  isLoading={feed.isLoading || trimmedSearchQuery !== debouncedSearch}
+                  isLoadingMore={feed.isLoadingMore}
+                  hasMore={feed.hasMore}
+                  error={feed.error}
+                  onLoadMore={feed.loadMore}
+                  onRetry={feed.retry}
+                  emptyMessage={isSearchActive ? t('app.search.noMatchesTitle') : undefined}
+                  onArticleClick={handleArticleClick}
+                  onArticleIntent={handleArticleIntent}
+                />
               </div>
 
               {/* Right Sidebar Column */}

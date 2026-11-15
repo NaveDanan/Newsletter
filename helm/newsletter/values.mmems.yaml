@@ -27,6 +27,8 @@ env:
   pocketbasePublicUrl: http://10.40.240.3:32290
   pocketbaseRecreateCollections: false
   pocketbaseSmtpEnabled: false
+  newsletterSsoAutoLogin: true
+  pocketbaseSsoOidcAutoRegister: true
   pocketbaseSsoOidcEnabled: false
 resources:
   requests:

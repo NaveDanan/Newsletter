@@ -136,26 +136,26 @@ For local/dev SMTP servers with self-signed certificates, set `env.pocketbaseSmt
 
 ## SSO / OIDC
 
-The chart can sync the PocketBase `users` collection OIDC provider at pod startup.
-Set the non-secret provider values under `env` and keep the client secret in `credentials.ssoOidcClientSecret` or in the existing secret key `POCKETBASE_SSO_OIDC_CLIENT_SECRET`.
+The chart can synchronize PocketBase's OIDC provider at startup. Use one Keycloak realm issuer URL and keep the client secret in the existing Secret under `POCKETBASE_SSO_OIDC_CLIENT_SECRET`.
 
 ```yaml
 env:
+  newsletterSsoAutoLogin: true
   pocketbaseSsoOidcEnabled: true
   pocketbaseSsoOidcProviderName: oidc
-  pocketbaseSsoOidcDisplayName: Company SSO
-  pocketbaseSsoOidcClientId: your-entra-application-client-id
-  pocketbaseSsoOidcAuthUrl: https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/authorize
-  pocketbaseSsoOidcTokenUrl: https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/token
-  pocketbaseSsoOidcUserInfoUrl: https://graph.microsoft.com/oidc/userinfo
+  pocketbaseSsoOidcIssuerUrl: https://keycloak.example.com/realms/company
+  pocketbaseSsoOidcClientId: newsletter
   pocketbaseSsoOidcPkce: true
+  pocketbaseSsoOidcAutoRegister: true
 ```
 
-The identity provider redirect URI must match the public PocketBase URL:
+Register the exact public frontend callback in Keycloak:
 
 ```text
-https://pb.example.com/api/oauth2-redirect
+https://newsletter.example.com/sso-callback
 ```
+
+Background SSO uses an existing Keycloak session without showing a login page. Manual login remains available at `/sign-in?manual=1`. New SSO users are assigned viewer access on the server. See [the OIDC guide](oidc-login.md) for callback settings, browser-cookie behavior, registration controls, and logout semantics.
 
 ## Port Forwarding
 

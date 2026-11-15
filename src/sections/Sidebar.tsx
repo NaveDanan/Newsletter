@@ -13,7 +13,7 @@ interface SidebarProps {
 
 export function Sidebar({ publishedCount, onNavigate }: SidebarProps) {
   const { formatNumber, locale, t } = useLocale();
-  const { subscriberCount, refreshSubscriberCount } = useSubscriberCount();
+  const { subscriberCount, publishedNewsletterCount, refreshSubscriberCount } = useSubscriberCount();
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -72,7 +72,7 @@ export function Sidebar({ publishedCount, onNavigate }: SidebarProps) {
 
           <div className="profile-hero-row">
             <div className="stat-group stat-left">
-              <span className="stat-value">{formatNumber(publishedCount)}</span>
+              <span className="stat-value">{formatNumber(publishedNewsletterCount ?? publishedCount)}</span>
               <span className="stat-label">{t('sidebar.published')}</span>
             </div>
 

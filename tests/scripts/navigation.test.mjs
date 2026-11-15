@@ -8,14 +8,17 @@ import { enUS } from 'date-fns/locale/en-US';
 
 // Execute the actual App -> dashboard -> shell callbacks with deterministic hooks.
 // Unrelated views and the editor are boundary doubles; routing and guards are real.
-function appHarness({ navigationOnly = false, realEditor = false, gantt = false, authLoading = false, ganttTasks = [], update } = {}) {
+function appHarness({ navigationOnly = false, realEditor = false, gantt = false, authLoading = false, ganttTasks = [], update, initialPath, authenticated = true } = {}) {
   const hooks = new Map(), modules = new Map(), stubs = new Map();
   let current, cursor, nodes = [], mounted = new Set();
   const newsletter = { id: 'published-one', title: 'Published', subtitle: '', content: '<p>Published content</p>', author: 'Admin', coverImage: '', status: 'published', tags: [], ownerId: 'admin' };
+  const newsletterRequests = [], feedQueries = [];
   const editor = { dirty: true, prepares: 0, saves: 0 };
-  const location = { pathname: gantt ? '/gantt-editor/project-one' : '/manager', hash: '' };
-  const window = { location, history: { state: null, pushState(state, _, path) { this.state = state; location.pathname = path; location.hash = ''; }, replaceState(state, _, path) { this.state = state; location.pathname = path; location.hash = ''; } }, dispatchEvent() {}, setTimeout, addEventListener() {}, removeEventListener() {} };
-  const user = { id: 'admin', role: 'admin', name: 'Admin' };
+  const initialUrl = new URL(initialPath || (gantt ? '/gantt-editor/project-one' : '/manager'), 'https://newsletter.example');
+  const location = { pathname: initialUrl.pathname, search: initialUrl.search, hash: initialUrl.hash, origin: initialUrl.origin };
+  const changeLocation = (path) => { const url = new URL(path, location.origin); location.pathname = url.pathname; location.search = url.search; location.hash = url.hash; };
+  const window = { location, history: { state: null, pushState(state, _, path) { this.state = state; changeLocation(path); }, replaceState(state, _, path) { this.state = state; changeLocation(path); } }, dispatchEvent() {}, setTimeout, addEventListener() {}, removeEventListener() {} };
+  const user = authenticated ? { id: 'admin', role: 'admin', name: 'Admin' } : null;
   const react = {
     useState(initial) { const index = cursor++; current[index] ??= { value: typeof initial === 'function' ? initial() : initial }; const slot = current[index]; return [slot.value, (next) => { slot.value = typeof next === 'function' ? next(slot.value) : next; }]; },
     useRef(initial) { const index = cursor++; current[index] ??= { current: initial }; return current[index]; },
@@ -58,8 +61,11 @@ function appHarness({ navigationOnly = false, realEditor = false, gantt = false,
     const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
     const require = (name) => {
       if (name === 'react') return react;
+      if (name.endsWith('/useNewsletterFeed')) return { useNewsletterFeed: (query, enabled) => { feedQueries.push({ query, enabled }); return { newsletters: [newsletter], totalItems: 1, isLoading: false }; } };
+      if (name.endsWith('pocketbase/newsletter-feed')) return { getCachedNewsletterFeed: () => undefined };
       if (name.endsWith('navigation-warmup')) return { warmHomeNavigation: () => () => {} };
       if (name.endsWith('pocketbase/client')) return { getPocketBase: () => ({ authStore: { isValid: false } }) };
+      if (name.endsWith('/auth/sso')) return load('src/lib/auth/sso.ts');
       if (name.endsWith('preload-route')) return load('src/lib/preload-route.ts');
       if (name.endsWith('route-components')) return load('src/lib/route-components.tsx');
       if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'fragment' };
@@ -91,11 +97,11 @@ function appHarness({ navigationOnly = false, realEditor = false, gantt = false,
       if (realEditor && name.endsWith('NewsletterEditor')) return load('src/sections/manager/NewsletterEditor.tsx');
       if (name.endsWith('/Navigation')) return load('src/components/Navigation.tsx');
       if (name.endsWith('/navigation-link')) return load('src/types/navigation-link.ts');
-      if (name.endsWith('AuthContext')) return { useAuth: () => ({ isAuthenticated: true, isLoading: authLoading, user, logout() {} }) };
+      if (name.endsWith('AuthContext')) return { useAuth: () => ({ isAuthenticated: authenticated, isLoading: authLoading, user, logout() {} }) };
       if (name.endsWith('LocaleContext')) return { useLocale: () => locale };
       if (name.endsWith('ThemeContext')) return { useTheme: () => ({ deviceMode: 'mobile' }) };
       if (name.endsWith('NavigationDataContext')) return { useNavigationData: () => ({ dropdowns: [], links: [managed] }) };
-      if (name.endsWith('useNewsletters')) return { useNewsletters: () => data };
+      if (name.endsWith('useNewsletters')) return { useNewsletters: options => { newsletterRequests.push(options); return data; } };
       if (name.endsWith('useProjects')) return { useProjects: () => ({ isLoading: false, projects: [{ id: 'project-one', title: 'Project', department: '', gantt: { tasks: ganttTasks, resources: [], roles: [], zoom: 'day', lastEditedAt: null } }], updateProjectGantt: update ?? (() => Promise.resolve({ id: 'project-one' })) }) };
       if (name.endsWith('useSubscriberCount')) return { useSubscriberCount: () => ({ subscriberCount: 0, publishedNewsletterCount: 1 }) };
       if (name.endsWith('useCollapsingLabels')) return { useCollapsingLabels() {} };
@@ -106,7 +112,7 @@ function appHarness({ navigationOnly = false, realEditor = false, gantt = false,
       if (name === 'sonner') return { Toaster: stub('Toaster'), toast: { error() {}, success() {} } };
       return new Proxy({}, { get: (_, key) => stub(String(key)) });
     };
-    vm.runInNewContext(code, { exports, require, window, Event, setInterval: () => 1, clearInterval() {}, setTimeout, clearTimeout, console });
+    vm.runInNewContext(code, { exports, require, window, URL, URLSearchParams, AbortController, Event, setInterval: () => 1, clearInterval() {}, setTimeout, clearTimeout, console });
     return exports;
   }
   const app = navigationOnly ? load('src/components/Navigation.tsx').Navigation : load('src/App.tsx').default;
@@ -142,7 +148,7 @@ function appHarness({ navigationOnly = false, realEditor = false, gantt = false,
     } else { button(title).props.onClick(); render(); }
   }
   render();
-  return { render, navigate, find, named, button, textButton, nodes: () => nodes, location, editor, data, openEditor() { named('NewsletterList').props.onEdit(newsletter); render(); render(); assert.ok(named('NewsletterEditor')); }, editGantt() { textButton('ganttEditor.weekly').props.onClick(); render(); } };
+  return { render, navigate, find, named, button, textButton, nodes: () => nodes, location, editor, data, newsletterRequests, feedQueries, openEditor() { named('NewsletterList').props.onEdit(newsletter); render(); render(); assert.ok(named('NewsletterEditor')); }, editGantt() { textButton('ganttEditor.weekly').props.onClick(); render(); } };
 }
 
 for (const [title, target, hash] of [['Feed', '/', ''], ['Explore Topics', '/', '#topics'], ['Notifications', '/community/notifications', ''], ['Profile', '/profile', '']]) {
@@ -307,4 +313,47 @@ test('the Gantt route fills its viewport without the surrounding newsletter gutt
   const frame = app.find((node) => typeof node.props?.className === 'string' && node.props.className.split(/\s+/).includes('app-stage-full'));
   assert.ok(frame, 'The editor owns the full viewport frame');
   assert.doesNotMatch(frame.props.className, /(?:^|\s)(?:\w+:)*(?:px|py)-\d/, 'Responsive newsletter gutters must not constrain the editor');
+});
+
+
+test('SSO fallback keeps the manual-login query and its original return destination', () => {
+  const app = appHarness({ initialPath: '/sso-callback', authenticated: false });
+  app.named('SSOCallback').props.onRetry('/community/post/one?sort=latest#reply');
+  app.render();
+  assert.equal(app.location.pathname, '/sign-in');
+  const query = new URLSearchParams(app.location.search);
+  assert.equal(query.get('manual'), '1');
+  assert.equal(query.get('returnTo'), '/community/post/one?sort=latest#reply');
+});
+
+test('SSO success preserves the destination query and hash', () => {
+  const app = appHarness({ initialPath: '/sso-callback' });
+  app.named('SSOCallback').props.onFinish('/community/post/one?sort=latest#reply');
+  app.render();
+  assert.equal(app.location.pathname, '/community/post/one');
+  assert.equal(app.location.search, '?sort=latest');
+  assert.equal(app.location.hash, '#reply');
+});
+
+test('signed-out protected routes preserve where the user entered', () => {
+  const app = appHarness({ initialPath: '/manager?tab=week#tasks', authenticated: false });
+  assert.equal(app.location.pathname, '/sign-in');
+  assert.equal(new URLSearchParams(app.location.search).get('returnTo'), '/manager?tab=week#tasks');
+});
+
+test('background login on the sign-in route returns an authenticated user to the entry page', () => {
+  const app = appHarness({ initialPath: '/sign-in?returnTo=%2Fcommunity%3Fsort%3Dlatest%23reply' });
+  assert.equal(app.location.pathname, '/community');
+  assert.equal(app.location.search, '?sort=latest');
+  assert.equal(app.location.hash, '#reply');
+});
+
+test('opening the home feed and an archive search enables bounded feed loading without the manager archive request', () => {
+  for (const initialPath of ['/', '/?search=older%20article']) {
+    const app = appHarness({ initialPath });
+    assert.equal(app.newsletterRequests.at(-1).enabled, false, 'home must not start the all-newsletters request');
+    assert.equal(app.feedQueries.at(-1).enabled, true);
+    assert.equal(app.feedQueries.at(-1).query.search, initialPath === '/' ? '' : 'older article');
+    assert.equal(app.feedQueries.at(-1).query.tab, 'latest');
+  }
 });

@@ -60,6 +60,9 @@ env:
   pocketbaseSmtpTls: false
   pocketbaseSmtpInsecureSkipVerify: false
   pocketbaseSmtpLocalName: ""
+  newsletterSsoAutoLogin: true
+  pocketbaseSsoOidcAutoRegister: true
+  pocketbaseSsoOidcIssuerUrl: ""
   pocketbaseSsoOidcEnabled: false
   pocketbaseSsoOidcProviderName: "oidc"
   pocketbaseSsoOidcDisplayName: "Company SSO"

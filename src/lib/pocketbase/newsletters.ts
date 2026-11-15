@@ -365,7 +365,7 @@ export function prefetchNewsletter(id: string): void {
 
 export function invalidateNewsletterReads(): void {
   invalidateReads();
-  try { sessionStorage.removeItem(SESSION_KEY + readScope()); } catch { /* Optional storage. */ }
+  try { sessionStorage.removeItem(SESSION_KEY + readScope()); sessionStorage.removeItem('newsletter:public-feed:v2:' + readScope()); } catch { /* Optional storage. */ }
 }
 
 function rememberMutatedNewsletter(record: RecordModel, scope: string): Newsletter {

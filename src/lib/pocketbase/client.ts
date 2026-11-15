@@ -29,8 +29,6 @@ export interface PocketBaseUser {
   updated: string;
 }
 
-export type SSOProvider = 'oidc' | 'microsoft' | 'custom';
-
 type AuthRecordListener = (record: RecordModel | null) => void;
 
 // Signing out replaces the client (resetPocketBase), which strands any
@@ -101,10 +99,6 @@ export function resetPocketBase(): void {
   pb = null;
   localStorage.removeItem(AUTH_STORAGE_KEY);
   bootLogger.step('pocketbase', 'PocketBase client reset and auth cache cleared');
-}
-
-export function getSSOCallbackUrl(): string {
-  return `${window.location.origin}/sso-callback`;
 }
 
 function normalizeBootError(error: unknown) {

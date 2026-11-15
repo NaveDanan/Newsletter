@@ -53,3 +53,15 @@ export function isTelemetryEnabled(): boolean {
 
   return false;
 }
+export interface SsoConfig {
+  autoLogin: boolean;
+  provider: string;
+}
+
+export function getSsoConfig(): SsoConfig {
+  const enabled = runtimeConfig['SSO_AUTO_LOGIN'];
+  return {
+    autoLogin: enabled === undefined ? true : enabled === true || enabled === 'true' || enabled === '1',
+    provider: typeof runtimeConfig['SSO_PROVIDER'] === 'string' && runtimeConfig['SSO_PROVIDER'].trim() ? runtimeConfig['SSO_PROVIDER'].trim() : 'oidc',
+  };
+}

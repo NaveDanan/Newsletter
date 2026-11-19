@@ -92,7 +92,7 @@ function detectMediaKind(file, requested) {
 function createMedia(e) {
   var c = core();
   var app = e.app;
-  var profile = c.requireProfile(app, e.auth);
+  var profile = c.requireProfile(e);
   var ownerId = profile.getString('userId');
 
   c.enforceRateLimit(app, 'media', ownerId);
@@ -260,7 +260,7 @@ function serializeLinkPreview(record) {
   };
 }
 
-function fetchLinkPreview(app, rawUrl) {
+function fetchLinkPreview(app, rawUrl, cacheOnly) {
   var c = core();
   var url = c.normalizeUrl(rawUrl);
   if (!url || !c.isFetchableUrl(url)) {
@@ -275,6 +275,8 @@ function fetchLinkPreview(app, rawUrl) {
       return serializeLinkPreview(cached);
     }
   }
+
+  if (cacheOnly) return null;
 
   var parsed = { title: '', description: '', imageUrl: '', siteName: c.getUrlHost(url) };
   var status = 'ok';
@@ -330,7 +332,7 @@ function fetchLinkPreview(app, rawUrl) {
 
 function handleLinkPreview(e) {
   var c = core();
-  var profile = c.requireProfile(e.app, e.auth);
+  var profile = c.requireProfile(e);
   c.enforceRateLimit(e.app, 'preview', profile.getString('userId'));
 
   var body = e.requestInfo().body || {};

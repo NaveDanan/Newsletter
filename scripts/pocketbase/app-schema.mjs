@@ -33,6 +33,7 @@ export const PROJECTS_SCHEMA = {
 const HAS_NEWSLETTER_AUTHOR_ROLE = `(${['author', 'manager', 'general_manager', 'admin']
   .map((role) => `@request.auth.role = "${role}"`)
   .join(' || ')})`;
+const CAN_READ_NEWSLETTER = `status = "published" || @request.auth.role = "admin" || (createdById = @request.auth.id && ${HAS_NEWSLETTER_AUTHOR_ROLE})`;
 
 export const NEWSLETTERS_SCHEMA = {
   name: 'newsletters',
@@ -76,8 +77,8 @@ export const NEWSLETTERS_SCHEMA = {
     text('notificationSentAt', 255, { hidden: true }),
     number('notificationRecipientCount', 0, { hidden: true, onlyInt: true }),
   ],
-  listRule: '',
-  viewRule: '',
+  listRule: CAN_READ_NEWSLETTER,
+  viewRule: CAN_READ_NEWSLETTER,
   createRule: HAS_NEWSLETTER_AUTHOR_ROLE,
   updateRule: `@request.auth.role = "admin" || (createdById = @request.auth.id && ${HAS_NEWSLETTER_AUTHOR_ROLE})`,
   deleteRule: '@request.auth.role = "admin"',

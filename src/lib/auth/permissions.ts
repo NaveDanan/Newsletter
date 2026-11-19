@@ -53,6 +53,6 @@ export function canDeleteNewsletter(role: UserRole | null | undefined): boolean 
   return role === 'admin';
 }
 
-export function canManageApiAccessTokens(role: UserRole | null | undefined): boolean {
+export function canCreateGanttApiToken(role: UserRole | null | undefined): boolean {
   return role === 'manager' || role === 'general_manager' || role === 'admin';
 }

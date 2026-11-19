@@ -1,6 +1,6 @@
 # Gantt API access tokens
 
-Managers, general managers, and administrators can open **Profile → API access tokens** to create and revoke personal tokens. Choose a name, read-only or read-and-write access, and an expiry of 30, 90, or 365 days. The full token appears once; copy it before choosing **Done**.
+Managers, general managers, and administrators can open **Profile → API access tokens** and choose the **Gantt** scope. Choose a name, read-only or read-and-write access, and an expiry of 30, 90, or 365 days. The full token appears once. Copy it before choosing **Done**. See the [Newsletter and community API reference](../public/docs/site-api.html) for article and community integrations.
 
 Tokens inherit their owner's current project permissions. Managers access their own and shared projects; general managers and administrators retain access to all projects. Expired or revoked tokens fail immediately. A deleted account or an account downgraded below manager cannot use its tokens. Signing out of the website does not revoke integration tokens.
 

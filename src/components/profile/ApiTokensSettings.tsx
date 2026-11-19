@@ -6,18 +6,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { createApiAccessToken, fetchApiAccessTokens, revokeApiAccessToken, type ApiAccessToken, type ApiTokenAccess } from '@/lib/pocketbase/access-tokens';
+import { createApiAccessToken, fetchApiAccessTokens, revokeApiAccessToken, type ApiAccessToken, type ApiTokenAccess, type ApiTokenScope } from '@/lib/pocketbase/access-tokens';
 
 const fieldClass = 'h-10 w-full rounded-full border-[var(--border-subtle)] bg-[var(--bg-input)] px-4 text-[var(--text-primary)]';
 const buttonClass = 'rounded-full border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]';
 
-export function ApiTokensSettings() {
+export function ApiTokensSettings({ canCreateGanttToken }: { canCreateGanttToken: boolean }) {
   const { t, formatDate } = useLocale();
   const [tokens, setTokens] = useState<ApiAccessToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const [name, setName] = useState('');
-  const [access, setAccess] = useState<ApiTokenAccess>('write');
+  const [scope, setScope] = useState<ApiTokenScope>('site');
+  const [access, setAccess] = useState<ApiTokenAccess>('read');
   const [expiresInDays, setExpiresInDays] = useState(90);
   const [busy, setBusy] = useState(false);
   const [issued, setIssued] = useState<{ token: string; id: string } | null>(null);
@@ -41,7 +42,7 @@ export function ApiTokensSettings() {
     if (busy || loading || issued || !name.trim()) return;
     setBusy(true); setError(''); setNotice(''); setIssued(null);
     try {
-      const result = await createApiAccessToken({ name: name.trim(), access, expiresInDays });
+      const result = await createApiAccessToken({ name: name.trim(), scope, access, expiresInDays });
       if (!activeRef.current) return;
       setTokens(current => [result.item, ...current]);
       setIssued({ token: result.token, id: result.item.id }); setName('');
@@ -79,15 +80,30 @@ export function ApiTokensSettings() {
       <CardHeader>
         <CardTitle className="text-base font-bold text-[var(--text-primary)]">{t('apiTokens.title')}</CardTitle>
         <CardDescription className="text-[var(--text-secondary)]">{t('apiTokens.hint')}</CardDescription>
-        <a href="/docs/gantt-api.html" target="_blank" rel="noopener noreferrer" className="w-fit text-sm font-semibold text-[var(--primary-accent)] underline-offset-4 hover:underline">{t('apiTokens.docs')}</a>
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold text-[var(--primary-accent)]">
+          <a href="/docs/site-api.html" target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">{t('apiTokens.siteDocs')}</a>
+          {canCreateGanttToken ? <a href="/docs/gantt-api.html" target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">{t('apiTokens.ganttDocs')}</a> : null}
+        </div>
       </CardHeader>
       <CardContent className="space-y-5">
         <form onSubmit={event => { void create(event); }} className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className={canCreateGanttToken ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3 sm:grid-cols-3'}>
             <div className="space-y-2">
               <Label htmlFor="api-token-name" className="text-[var(--text-primary)]">{t('apiTokens.name')}</Label>
               <Input id="api-token-name" value={name} onChange={event => setName(event.target.value)} maxLength={80} required disabled={busy} autoComplete="off" placeholder={t('apiTokens.namePlaceholder')} className={fieldClass} />
             </div>
+            {canCreateGanttToken ? (
+              <div className="space-y-2">
+                <Label htmlFor="api-token-scope" className="text-[var(--text-primary)]">{t('apiTokens.scope')}</Label>
+                <Select value={scope} onValueChange={value => setScope(value === 'gantt' ? 'gantt' : 'site')} disabled={busy}>
+                  <SelectTrigger id="api-token-scope" className={fieldClass}><SelectValue /></SelectTrigger>
+                  <SelectContent className="border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)]">
+                    <SelectItem value="site">{t('apiTokens.site')}</SelectItem>
+                    <SelectItem value="gantt">{t('apiTokens.gantt')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Label htmlFor="api-token-access" className="text-[var(--text-primary)]">{t('apiTokens.access')}</Label>
               <Select value={access} onValueChange={value => setAccess(value === 'read' ? 'read' : 'write')} disabled={busy}>
@@ -133,6 +149,7 @@ export function ApiTokensSettings() {
                   <p className="break-words text-sm font-semibold text-[var(--text-primary)]">{item.name}</p>
                   <p className="text-xs text-[var(--text-secondary)]">
                     <span dir="ltr" className="font-mono">{item.prefix}…</span>{' · '}
+                    {t(item.scope === 'site' ? 'apiTokens.site' : 'apiTokens.gantt')}{' · '}
                     {t(item.access === 'read' ? 'apiTokens.read' : 'apiTokens.write')}{' · '}
                     {t(item.expired ? 'apiTokens.expired' : 'apiTokens.expires', { date: formatDate(item.expiresAt) })}
                   </p>

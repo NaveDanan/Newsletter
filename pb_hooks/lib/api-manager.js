@@ -704,24 +704,24 @@ function handleNewsletterList(e) {
   return e.json(200, newsletterListData(e));
 }
 
-function newsletterListData(e) {
-  var requestedStatus = getQueryValue(e, 'status', '');
+function newsletterListData(e, publishedOnly) {
+  var requestedStatus = publishedOnly ? 'published' : getQueryValue(e, 'status', '');
   if (requestedStatus) {
     assertStatus(requestedStatus, NEWSLETTER_STATUSES, 'newsletter');
   }
 
   var page = Math.max(1, parseInt(getQueryValue(e, 'page', '1'), 10) || 1);
   var perPage = Math.max(1, Math.min(100, parseInt(getQueryValue(e, 'perPage', '50'), 10) || 50));
-  var sort = getQueryValue(e, 'sort', '-created');
+  var sort = publishedOnly ? '-publishedAt,-created,-id' : getQueryValue(e, 'sort', '-created');
   var filters = [];
 
   if (requestedStatus) {
     filters.push('status = "' + requestedStatus + '"');
   }
 
-  if (!e.auth) {
+  if (!publishedOnly && !canCreateNewsletter(e.auth)) {
     filters.push('status = "published"');
-  } else if (getRole(e.auth) !== 'admin') {
+  } else if (!publishedOnly && getRole(e.auth) !== 'admin') {
     filters.push('(status = "published" || createdById = "' + getAuthId(e.auth) + '")');
   }
 
@@ -750,11 +750,12 @@ function newsletterListData(e) {
   // These predicates are constructed above from validated statuses and record
   // IDs. Record filters use &&/||; dbx expressions use SQL AND/OR.
   var total = e.app.countRecords('newsletters', $dbx.exp(sqlFilter, params));
-  var summary = getQueryValue(e, 'view', '') === 'summary';
-  var rows = summary ? listNewsletterSummaries(e.app, filter, sort, perPage, (page - 1) * perPage, sqlFilter, params, feed === 'top', getQueryValue(e, 'compact', '') === '1')
+  var summary = publishedOnly || getQueryValue(e, 'view', '') === 'summary';
+  var compact = publishedOnly || getQueryValue(e, 'compact', '') === '1';
+  var rows = summary ? listNewsletterSummaries(e.app, filter, sort, perPage, (page - 1) * perPage, sqlFilter, params, feed === 'top', compact)
     : e.app.findRecordsByFilter('newsletters', filter, sort, perPage, (page - 1) * perPage, params);
   var items = rows.map(summary ? serializeNewsletterSummary : serializeRecord);
-  if (summary && getQueryValue(e, 'compact', '') === '1') items.forEach(function (item) {
+  if (summary && compact) items.forEach(function (item) {
     // Full search text and engagement identities are used on the server. Cards
     // need only the short excerpt and counts, not entire article text or polls.
     delete item.searchText;
@@ -1301,6 +1302,7 @@ module.exports = {
   handleNewsletterRecordUpdateRequest: handleNewsletterRecordUpdateRequest,
   buildProjectPayload: buildProjectPayload,
   handleNewsletterList: handleNewsletterList,
+  listPublishedNewsletters: function (e) { return newsletterListData(e, true); },
   handleNewsletterCreate: handleNewsletterCreate,
   handleNewsletterGet: handleNewsletterGet,
   handleNewsletterCover: handleNewsletterCover,

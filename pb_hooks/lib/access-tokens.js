@@ -1,33 +1,35 @@
 var COLLECTION = 'access_tokens';
 var PREFIX = 'nlpat_';
 var MANAGER_ROLES = ['manager', 'general_manager', 'admin'];
+var SITE_TOKEN_CONTEXT = 'newsletter.siteToken';
 
+function isMember(user) {
+  return Boolean(user && user.collection().name === 'users');
+}
 function isManager(user) {
-  return Boolean(user && user.collection().name === 'users' && MANAGER_ROLES.indexOf(user.getString('role')) !== -1);
+  return isMember(user) && MANAGER_ROLES.indexOf(user.getString('role')) !== -1;
 }
 function timestamp(value) { return Date.parse(String(value || '').replace(' ', 'T')); }
 function publicToken(record) {
   return {
     id: record.id, name: record.getString('name'), prefix: record.getString('prefix'),
-    access: record.getString('access'), createdAt: record.getString('created'),
+    access: record.getString('access'), scope: record.getString('scope') || 'gantt', createdAt: record.getString('created'),
     expiresAt: record.getString('expiresAt'), lastUsedAt: record.getString('lastUsedAt'),
     expired: timestamp(record.getString('expiresAt')) <= Date.now(),
   };
 }
-function requireManagerSession(e) {
-  if (!isManager(e.auth)) throw new ForbiddenError('Only managers and administrators can manage API tokens.');
-}
 function list(e) {
-  requireManagerSession(e);
   var records = e.app.findRecordsByFilter(COLLECTION, 'ownerId = {:owner}', '-created', 20, 0, { owner: e.auth.id });
   e.response.header().set('Cache-Control', 'no-store');
   return e.json(200, { items: records.map(publicToken) });
 }
 function create(e) {
-  requireManagerSession(e);
   var body = e.requestInfo().body || {};
   var name = typeof body.name === 'string' ? body.name.trim() : '';
-  var access = body.access === undefined ? 'write' : body.access;
+  var scope = body.scope === undefined ? 'gantt' : body.scope;
+  if (['gantt', 'site'].indexOf(scope) === -1) throw new BadRequestError('Choose a valid API token scope.');
+  if (scope === 'gantt' && !isManager(e.auth)) throw new ForbiddenError('Only managers and administrators can create Gantt API tokens.');
+  var access = body.access === undefined ? (scope === 'gantt' ? 'write' : 'read') : body.access;
   var days = body.expiresInDays === undefined ? 90 : body.expiresInDays;
   if (!name || name.length > 80) throw new BadRequestError('Provide a token name of 1 to 80 characters.');
   if (['read', 'write'].indexOf(access) === -1) throw new BadRequestError('Choose read or write access.');
@@ -43,6 +45,7 @@ function create(e) {
     record.set('tokenHash', $security.sha256(secret));
     record.set('prefix', secret.slice(0, 12));
     record.set('access', access);
+    record.set('scope', scope);
     record.set('expiresAt', new Date(Date.now() + days * 86400000).toISOString());
     tx.save(record);
   });
@@ -50,7 +53,6 @@ function create(e) {
   return e.json(201, { token: secret, item: publicToken(record) });
 }
 function revoke(e) {
-  requireManagerSession(e);
   var record;
   try { record = e.app.findRecordById(COLLECTION, e.request.pathValue('tokenId')); }
   catch (_) { throw new NotFoundError('Token not found.'); }
@@ -67,9 +69,8 @@ function allowedTokenRoute(method, path) {
   return false;
 }
 
-// Registered only on project routes, before PocketBase's requireAuth middleware.
-// A personal token cannot become a general PocketBase session or mint tokens.
-function authenticateProjectRequest(e) {
+// Bind this only to integration routes, before PocketBase's requireAuth middleware.
+function authenticateRequest(e, scope) {
   var authorization = String(e.request.header.get('Authorization') || '').trim();
   var raw = authorization.replace(/^Bearer\s+/i, '');
   if (raw.indexOf(PREFIX) !== 0) return e.next();
@@ -81,11 +82,18 @@ function authenticateProjectRequest(e) {
   var user;
   try { user = e.app.findRecordById('users', record.getString('ownerId')); }
   catch (_) { throw new UnauthorizedError('API token account is unavailable.'); }
-  if (!isManager(user)) throw new ForbiddenError('The token owner no longer has manager access.');
+  if ((record.getString('scope') || 'gantt') !== scope) throw new ForbiddenError('This API token is for a different API scope.');
   var method = e.request.method.toUpperCase();
-  if (!allowedTokenRoute(method, e.request.url.path)) throw new ForbiddenError('This API token is limited to Gantt tasks and project progress.');
+  if (scope === 'gantt') {
+    if (!isManager(user)) throw new ForbiddenError('The token owner no longer has manager access.');
+    if (!allowedTokenRoute(method, e.request.url.path)) throw new ForbiddenError('This API token is limited to Gantt tasks and project progress.');
+  }
   if (method !== 'GET' && record.getString('access') !== 'write') throw new ForbiddenError('This API token has read-only access.');
   e.auth = user;
+  if (scope === 'site') {
+    e.set(SITE_TOKEN_CONTEXT, true);
+    e.response.header().set('Cache-Control', 'private, no-store');
+  }
   // Record activity at most once per minute; token material is never persisted.
   if (!record.getString('lastUsedAt') || Date.now() - timestamp(record.getString('lastUsedAt')) > 60000) {
     try { e.app.db().newQuery('UPDATE access_tokens SET lastUsedAt = {:now} WHERE id = {:id}').bind({ now: new Date().toISOString().replace('T', ' '), id: record.id }).execute(); } catch (_) { /* Usage metadata does not block the request. */ }
@@ -93,4 +101,10 @@ function authenticateProjectRequest(e) {
   return e.next();
 }
 
-module.exports = { list: list, create: create, revoke: revoke, authenticateProjectRequest: authenticateProjectRequest, allowedTokenRoute: allowedTokenRoute };
+module.exports = {
+  list: list, create: create, revoke: revoke,
+  authenticateProjectRequest: function (e) { return authenticateRequest(e, 'gantt'); },
+  authenticateSiteRequest: function (e) { return authenticateRequest(e, 'site'); },
+  isSiteTokenRequest: function (e) { return e.get(SITE_TOKEN_CONTEXT) === true; },
+  allowedTokenRoute: allowedTokenRoute,
+};

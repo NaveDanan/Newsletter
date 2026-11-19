@@ -54,7 +54,7 @@ try {
   }
   for (const name of ['author', 'viewer']) {
     await assert.rejects(send(clients[name], '/api/access-tokens', 'POST', { name: 'denied' }), denied(403));
-    await assert.rejects(send(clients[name], '/api/access-tokens'), denied(403));
+    assert.deepEqual((await send(clients[name], '/api/access-tokens')).items, []);
   }
   await assert.rejects(send(new PocketBase(origin), '/api/access-tokens'), denied(401));
   const created = await send(clients.manager, '/api/access-tokens', 'POST', { name: 'Gantt integration', access: 'write', expiresInDays: 90, ownerId: accounts.admin.id });
@@ -62,12 +62,14 @@ try {
   assert.equal(created.item.access, 'write'); assert.equal(created.item.name, 'Gantt integration');
   const raw = await root.collection('access_tokens').getOne(created.item.id);
   assert.equal(raw.ownerId, accounts.manager.id, 'client-supplied owner ids are ignored');
+  await root.collection('access_tokens').update(created.item.id, { scope: '' });
   const database = new DatabaseSync(nodePath.join(directory, 'pb_data', 'data.db'), { readOnly: true });
   assert.equal(database.prepare('SELECT tokenHash FROM access_tokens WHERE id = ?').get(created.item.id).tokenHash, createHash('sha256').update(created.token).digest('hex'));
   database.close();
   assert.equal(JSON.stringify(raw).includes(created.token), false, 'plain token is never stored');
   const list = await send(clients.manager, '/api/access-tokens');
   assert.equal(list.items.length, 1); assert.equal(list.items[0].token, undefined); assert.equal(list.items[0].tokenHash, undefined);
+  assert.equal(list.items[0].scope, 'gantt', 'legacy tokens retain the Gantt scope');
   assert.equal((await send(clients.other, '/api/access-tokens')).items.length, 0);
   await assert.rejects(send(clients.other, '/api/access-tokens/' + created.item.id, 'DELETE'), denied(404));
   await assert.rejects(clients.manager.collection('access_tokens').getFullList(), denied(403));
@@ -75,6 +77,82 @@ try {
   await assert.rejects(send(token, '/api/access-tokens', 'POST', { name: 'no delegation' }), denied(401));
   await assert.rejects(send(token, '/api/newsletters', 'POST', { title: 'no newsletter access' }), denied(401));
   await assert.rejects(send(token, '/api/projects', 'POST', { title: 'no project creation' }), denied(403));
+
+  const newsletters = '/api/v1/newsletters';
+  const articles = root.collection('newsletters');
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const content = '<p dir="rtl">גיליון <strong>completebody</strong></p>';
+  const published = await articles.create({
+    title: 'Issue <one>', author: 'Editor & writer', status: 'published', content,
+    coverImage: 'data:image/png;base64,' + png,
+    bookmarkedByUserIds: [accounts.other.id],
+    presentationPreviewFiles: [new File([Buffer.from(png, 'base64')], 'slide.png', { type: 'image/png' })],
+  });
+  const draft = await articles.create({ title: 'Draft', status: 'draft', content, createdById: accounts.author.id });
+  const anonymous = new PocketBase(origin);
+  const readSite = await send(clients.viewer, '/api/access-tokens', 'POST', { name: 'Newsletter reader', scope: 'site' });
+  const readerSite = tokenClient(readSite.token);
+  const writeSite = await send(clients.viewer, '/api/access-tokens', 'POST', { name: 'Community writer', scope: 'site', access: 'write' });
+  const writerSite = tokenClient(writeSite.token);
+  const managerSite = tokenClient((await send(clients.manager, '/api/access-tokens', 'POST', { name: 'Member access', scope: 'site', access: 'write' })).token);
+  assert.equal(readSite.item.access, 'read');
+  assert.equal(readSite.item.scope, 'site');
+  await assert.rejects(send(anonymous, newsletters), denied(401));
+  await assert.rejects(send(token, newsletters), denied(403));
+  await assert.rejects(send(readerSite, '/api/projects'), denied(403));
+  await assert.rejects(send(writerSite, '/api/access-tokens'), denied(401));
+  await assert.rejects(send(writerSite, '/api/newsletters', 'POST', { title: 'Denied' }), denied(401));
+  await assert.rejects(anonymous.collection('newsletters').getOne(draft.id), denied(404));
+  assert.equal((await clients.author.collection('newsletters').getOne(draft.id)).id, draft.id);
+  const found = await send(readerSite, newsletters + '?q=completebody&perPage=1');
+  assert.equal(found.totalItems, 1);
+  assert.deepEqual(found.items.map(item => item.id), [published.id]);
+  assert.equal(found.items[0].content, undefined);
+  const detail = await send(readerSite, newsletters + '/' + published.id);
+  assert.equal(detail.content, content);
+  assert.equal(detail.bookmarkedByUserIds, undefined);
+  assert.deepEqual(detail.presentationFiles, []);
+  assert.equal(detail.presentationPreviewFiles.length, 1);
+  const preview = await fetch(origin + detail.presentationPreviewFiles[0].path);
+  assert.equal(preview.status, 200);
+  assert.equal(Buffer.from(await preview.arrayBuffer()).toString('base64'), png);
+  assert.equal(detail.pagePath, found.items[0].pagePath);
+  await assert.rejects(send(managerSite, newsletters + '/' + draft.id), denied(404));
+  const pageResponse = await fetch(origin + detail.pagePath, { headers: { Authorization: 'Bearer ' + readSite.token } });
+  assert.equal(pageResponse.status, 200);
+  assert.match(pageResponse.headers.get('content-type'), /^text\/html/);
+  assert.match(pageResponse.headers.get('content-security-policy'), /^sandbox;/);
+  assert.match(pageResponse.headers.get('cache-control'), /no-store/);
+  const html = await pageResponse.text();
+  assert.match(html, /^<!doctype html>/);
+  assert.ok(html.includes('<h1>Issue &lt;one&gt;</h1>'));
+  assert.ok(html.includes(content));
+  assert.ok(html.includes('src="data:image/png;base64,' + png + '"'));
+  await assert.rejects(send(clients.author, newsletters + '/' + draft.id + '/page'), denied(404));
+
+  const community = '/api/community';
+  assert.equal((await send(readerSite, community + '/me')).profile.userId, accounts.viewer.id);
+  assert.equal((await send(managerSite, community + '/me')).canModerate, false);
+  await assert.rejects(send(readerSite, community + '/posts', 'POST', { body: 'Denied' }), denied(403));
+  await assert.rejects(send(token, community + '/feed'), denied(403));
+  await assert.rejects(send(managerSite, community + '/moderation/reports'), denied(401));
+  const post = await send(writerSite, community + '/posts', 'POST', { body: 'Integration post', clientId: 'integration-post' });
+  assert.equal(post.author.userId, accounts.viewer.id);
+  assert.equal((await send(readerSite, community + '/feed?tab=following')).items[0].id, post.id);
+  const thread = community + '/posts/' + post.id;
+  await assert.rejects(send(managerSite, thread, 'PATCH', { body: 'Denied' }), denied(403));
+  await assert.rejects(send(managerSite, thread, 'DELETE'), denied(403));
+  await assert.rejects(send(readerSite, thread + '/bookmark', 'POST'), denied(403));
+  assert.equal((await send(writerSite, thread + '/bookmark', 'POST')).active, true);
+  assert.deepEqual((await send(readerSite, community + '/bookmarks')).items.map(item => item.id), [post.id]);
+  assert.deepEqual((await send(managerSite, community + '/bookmarks')).items, []);
+  const reply = await send(writerSite, community + '/posts', 'POST', { body: 'Integration reply', parentId: post.id });
+  assert.equal((await send(readerSite, thread)).replies[0].id, reply.id);
+  await send(writerSite, community + '/posts/' + reply.id, 'DELETE');
+  await send(clients.viewer, '/api/access-tokens/' + writeSite.item.id, 'DELETE');
+  await assert.rejects(send(writerSite, community + '/feed'), denied(401));
+  assert.ok((await send(anonymous, community + '/feed')).items.some(item => item.id === post.id));
+
   const tasks = [
     { id: 'first', name: 'First', startDate: '2026-11-15', durationDays: 2, status: 'pending', progress: 0 },
     { id: 'done', name: 'Done', startDate: '2026-11-15', durationDays: 1, status: 'completed', progress: 100 },
@@ -139,10 +217,10 @@ try {
   await root.collection('users').delete(accounts.general.id);
   await assert.rejects(send(tokenClient(generalToken), path + '/tasks'), denied(401));
   await assert.rejects(send(tokenClient('nlpat_' + 'A'.repeat(48)), path + '/tasks'), denied(401));
-  for (const body of [{name:''},{name:'bad',access:'admin'},{name:'bad',expiresInDays:0},{name:'bad',expiresInDays:366}]) await assert.rejects(send(clients.other, '/api/access-tokens','POST',body), denied(400));
+  for (const body of [{name:''},{name:'bad',scope:'everything'},{name:'bad',access:'admin'},{name:'bad',expiresInDays:0},{name:'bad',expiresInDays:366}]) await assert.rejects(send(clients.other, '/api/access-tokens','POST',body), denied(400));
   for(let i=0;i<20;i++) await send(clients.other,'/api/access-tokens','POST',{name:'token '+i});
   await assert.rejects(send(clients.other,'/api/access-tokens','POST',{name:'over limit'}), denied(400));
-  console.log('PASS: role-gated token creation, hashed storage, owner isolation, scoped project access, Gantt CRUD, atomic progress updates, concurrent writes, read-only tokens, expiry, revocation, and immediate role changes.');
+  console.log('PASS: scoped tokens, published article JSON and HTML, community participation and isolation, legacy Gantt access, concurrent Gantt updates, expiry, and revocation.');
 } catch (error) {
   console.error('Access-token integration failed:', error.status, error.stack || error.message, JSON.stringify(error.response || {}), logs.slice(-3000));
   process.exitCode = 1;

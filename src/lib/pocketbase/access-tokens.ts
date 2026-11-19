@@ -2,11 +2,13 @@ import { getPocketBase } from './client';
 import { readScope } from './read-cache';
 
 export type ApiTokenAccess = 'read' | 'write';
+export type ApiTokenScope = 'site' | 'gantt';
 export interface ApiAccessToken {
   id: string;
   name: string;
   prefix: string;
   access: ApiTokenAccess;
+  scope: ApiTokenScope;
   createdAt: string;
   expiresAt: string;
   lastUsedAt: string;
@@ -14,6 +16,7 @@ export interface ApiAccessToken {
 }
 export interface CreateApiAccessToken {
   name: string;
+  scope: ApiTokenScope;
   access: ApiTokenAccess;
   expiresInDays: number;
 }

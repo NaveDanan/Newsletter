@@ -48,7 +48,7 @@ function viewerContext(e) {
   var c = core();
   return {
     id: c.getAuthId(e.auth),
-    role: c.getAuthRole(e.auth),
+    role: c.getViewerRole(e),
   };
 }
 
@@ -145,7 +145,8 @@ function claimMedia(app, ownerId, mediaIds, existingPostId) {
 function createPost(e) {
   var c = core();
   var app = e.app;
-  var profile = c.requireProfile(app, e.auth);
+  var profile = c.requireProfile(e);
+  var role = c.getViewerRole(e);
   var authorId = profile.getString('userId');
   var body = e.requestInfo().body || {};
 
@@ -172,7 +173,7 @@ function createPost(e) {
     });
     if (duplicate) {
       // A retried request must not produce a second post.
-      return content().serializePosts(app, [duplicate], authorId, c.getAuthRole(e.auth))[0];
+      return content().serializePosts(app, [duplicate], authorId, role)[0];
     }
   }
 
@@ -210,7 +211,7 @@ function createPost(e) {
 
   var linkPreview = null;
   if (parsed.urls.length && !media.length && !quoted) {
-    linkPreview = content().fetchLinkPreview(app, parsed.urls[0]);
+    linkPreview = content().fetchLinkPreview(app, parsed.urls[0], require(__hooks + '/lib/access-tokens.js').isSiteTokenRequest(e));
     if (linkPreview && linkPreview.status !== 'ok') {
       linkPreview = null;
     }
@@ -290,7 +291,7 @@ function createPost(e) {
     $app.logger().warn('community: hashtag update skipped', 'error', String(err));
   }
 
-  return content().serializePosts(app, [created], authorId, c.getAuthRole(e.auth))[0];
+  return content().serializePosts(app, [created], authorId, role)[0];
 }
 
 function updatePost(e, postId) {
@@ -352,7 +353,7 @@ function updatePost(e, postId) {
   var linkPreview = c.readJson(post, 'linkPreview', null);
   if (parsed.urls.length && !newMediaIds.length && !quotedPostId) {
     if (!linkPreview || linkPreview.url !== parsed.urls[0]) {
-      linkPreview = content().fetchLinkPreview(app, parsed.urls[0]);
+      linkPreview = content().fetchLinkPreview(app, parsed.urls[0], require(__hooks + '/lib/access-tokens.js').isSiteTokenRequest(e));
       if (linkPreview && linkPreview.status !== 'ok') {
         linkPreview = null;
       }
@@ -502,7 +503,7 @@ function deletePost(e, postId) {
 function toggleJoin(e, options) {
   var c = core();
   var app = e.app;
-  var profile = c.requireProfile(app, e.auth);
+  var profile = c.requireProfile(e);
   var userId = profile.getString('userId');
   var postId = c.asText(options.postId);
 
@@ -738,7 +739,7 @@ function rsvpEvent(e, postId) {
 function toggleFollow(e, handle) {
   var c = core();
   var app = e.app;
-  var profile = c.requireProfile(app, e.auth);
+  var profile = c.requireProfile(e);
   var followerId = profile.getString('userId');
 
   c.enforceRateLimit(app, 'follow', followerId);
@@ -1056,7 +1057,7 @@ function getProfile(e, handle) {
 function updateProfile(e) {
   var c = core();
   var app = e.app;
-  var profile = c.requireProfile(app, e.auth);
+  var profile = c.requireProfile(e);
   var userId = profile.getString('userId');
 
   c.enforceRateLimit(app, 'profile', userId);
@@ -1561,7 +1562,7 @@ function getTrends(e) {
 function createReport(e) {
   var c = core();
   var app = e.app;
-  var profile = c.requireProfile(app, e.auth);
+  var profile = c.requireProfile(e);
   var reporterId = profile.getString('userId');
 
   c.enforceRateLimit(app, 'report', reporterId);
@@ -1625,7 +1626,7 @@ function createReport(e) {
 function toggleBlock(e, handle) {
   var c = core();
   var app = e.app;
-  var profile = c.requireProfile(app, e.auth);
+  var profile = c.requireProfile(e);
   var userId = profile.getString('userId');
   var target = c.findProfileByHandle(app, handle);
 

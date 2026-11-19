@@ -818,10 +818,14 @@ function ensureProfile(app, userId) {
   return profile;
 }
 
-function requireProfile(app, auth) {
-  var userId = requireAuth(auth);
-  var profile = ensureProfile(app, userId);
-  if (profile.getBool('isSuspended') && !canModerate(getAuthRole(auth))) {
+function getViewerRole(e) {
+  return require(__hooks + '/lib/access-tokens.js').isSiteTokenRequest(e) ? 'viewer' : getAuthRole(e.auth);
+}
+
+function requireProfile(e) {
+  var userId = requireAuth(e.auth);
+  var profile = ensureProfile(e.app, userId);
+  if (profile.getBool('isSuspended') && !canModerate(getViewerRole(e))) {
     throw new ForbiddenError('This account cannot post in the community.');
   }
   return profile;
@@ -959,6 +963,7 @@ module.exports = {
   isHandleTaken: isHandleTaken,
   ensureProfile: ensureProfile,
   requireProfile: requireProfile,
+  getViewerRole: getViewerRole,
   profileAvatarUrl: profileAvatarUrl,
   serializeProfile: serializeProfile,
 };

@@ -22,6 +22,7 @@
 - **Newsletter Management:** Curate and write professional newsletters with a built-in rich text editor.
 - **Community profiles:** New accounts receive an `@nickname` from the part of their email before `@` (for example, `purple@njlabs.com` becomes `@purple`). Unsupported characters are normalized to underscores; reserved or already-used nicknames receive a suffix. Existing nicknames are retained. Members cannot edit nicknames; a PocketBase administrator can change them directly in `community_profiles`.
 - **Gantt API tokens:** Managers and higher roles can generate expiring, revocable personal tokens in Profile to read or update Gantt tasks and project progress. See [Gantt API usage](docs/gantt-api.md).
+- **Newsletter and community API tokens:** Signed-in members can create tokens in Profile for published article JSON and full HTML pages, community feeds, and actions such as posting, replying, and bookmarking. See the [integration reference](public/docs/site-api.html).
 - **Projects & Goals:** Maintain progress across concurrent efforts. Track key milestones.
 - **Gantt Edior:** Powerful interactive timeline to organize project schedules at scale.
 - **Data Spreadsheets:** Advanced management grids to bulk-update and import tasks seamlessly.

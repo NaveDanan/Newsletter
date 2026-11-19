@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Newsletter &amp; community API</title>
+  <style>
+    :root { color-scheme: light dark; font: 1rem/1.6 system-ui, sans-serif; }
+    body { max-width: 56rem; margin: 2.5rem auto; padding: 0 1.25rem; }
+    h1, h2 { line-height: 1.2; }
+    h2 { margin-top: 2rem; }
+    pre { padding: 1rem; overflow: auto; background: color-mix(in srgb, CanvasText 7%, Canvas); }
+    td, th { border-bottom: 1px solid GrayText; padding: .5rem; text-align: left; vertical-align: top; }
+    table { border-collapse: collapse; width: 100%; }
+    code { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Newsletter &amp; community API</h1>
+  <p>Fetch published articles and use the community from scripts or integrations.</p>
+  <nav aria-label="Contents">
+    <a href="#authentication">Authentication</a> ·
+    <a href="#newsletters">Newsletters</a> ·
+    <a href="#community">Community</a> ·
+    <a href="/docs/gantt-api.html">Gantt API</a>
+  </nav>
+
+  <h2 id="authentication">Authentication</h2>
+  <p>Open <strong>Profile → API access tokens</strong> and create a <strong>Newsletter &amp; community</strong> token. Choose <strong>Read only</strong> for article retrieval and community reads, or <strong>Read and write</strong> for community actions. Copy the token when it appears. Revoke it from the same screen to end access.</p>
+  <p>Use your site’s origin and send the token in the header on every authenticated request. Community requests act as the token owner with member permissions. Moderation requires a moderator’s website session.</p>
+  <pre><code>Authorization: Bearer &lt;token&gt;</code></pre>
+  <p>A missing credential on a protected endpoint, or an invalid, expired, or revoked token, returns <code>401</code>. A token with the wrong scope or insufficient write access returns <code>403</code> on routes that accept personal tokens.</p>
+
+  <h2 id="newsletters">Newsletters</h2>
+  <table>
+    <thead><tr><th scope="col">Method and path</th><th scope="col">Response</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /api/v1/newsletters</code></td><td>Summaries with <code>page</code>, <code>perPage</code>, <code>totalItems</code>, <code>totalPages</code>, and <code>items</code>. Supports <code>q</code> for full-text search and <code>feed=latest|top|discussions|bookmarks</code>. Pages start at 1. Page size defaults to 50 and is capped at 100.</td></tr>
+      <tr><td><code>GET /api/v1/newsletters/{id}</code></td><td>Article metadata, complete article body in <code>content</code> (HTML), and presentation and preview file links.</td></tr>
+      <tr><td><code>GET /api/v1/newsletters/{id}/page</code></td><td>A complete <code>text/html</code> article document with title, byline, cover, formatted body, and presentation links. The document disables scripts and interactive embeds. Page and JSON detail requests return <code>404</code> for unpublished articles.</td></tr>
+    </tbody>
+  </table>
+  <p>Use <code>pagePath</code> from the list or detail response to fetch the HTML document. The response includes a sandbox policy. Preserve that policy when serving the document, and resolve root-relative images and file links against the newsletter site when displaying a local copy.</p>
+  <pre><code>curl -fsS -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  "$NEWSLETTER_ORIGIN/api/v1/newsletters?q=release&amp;perPage=10"
+
+curl -fsS -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  "$NEWSLETTER_ORIGIN/api/v1/newsletters/$ARTICLE_ID/page" -o article.html</code></pre>
+
+  <h2 id="community">Community</h2>
+  <p>Prefix these paths with <code>/api/community</code>. Paginated lists include <code>items</code>, <code>hasMore</code>, and <code>cursor</code>. Pass the returned cursor as <code>?cursor=...</code> for the next page, alongside the original filters. Thread responses put the page’s replies in <code>replies</code>.</p>
+  <table>
+    <thead><tr><th scope="col">Method and path</th><th scope="col">Action</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /feed?tab=latest</code></td><td>Read the feed. Tabs are <code>latest</code>, <code>for-you</code>, and <code>following</code>.</td></tr>
+      <tr><td><code>GET /posts/{id}</code></td><td>Read a post, its ancestors, and a page of replies.</td></tr>
+      <tr><td><code>GET /search?q={term}&amp;type=posts</code><br><code>GET /hashtags/{tag}</code><br><code>GET /trends</code></td><td>Find posts, people, or hashtags. Search types are <code>posts</code>, <code>people</code>, and <code>hashtags</code>.</td></tr>
+      <tr><td><code>GET /me</code><br><code>GET /profiles/{handle}</code><br><code>GET /profiles/{handle}/{posts|followers|following}</code></td><td>Read the signed-in member’s profile, public profiles, posts, and connections. Handles omit the leading <code>@</code>.</td></tr>
+      <tr><td><code>GET /bookmarks</code><br><code>GET /notifications</code></td><td>Read the token owner’s bookmarks or notifications.</td></tr>
+      <tr><td><code>POST /posts</code></td><td>Create a post with <code>body</code>. Pass <code>parentId</code> to reply or <code>quotedPostId</code> to quote. Reuse the same <code>clientId</code> when retrying post creation. Link cards can reuse cached previews.</td></tr>
+      <tr><td><code>PATCH /posts/{id}</code><br><code>DELETE /posts/{id}</code></td><td>Edit or delete the token owner’s post.</td></tr>
+      <tr><td><code>POST /posts/{id}/{like|repost|bookmark}</code><br><code>POST /profiles/{handle}/{follow|block}</code></td><td>Toggle the interaction. A repeated request reverses the prior action.</td></tr>
+      <tr><td><code>POST /posts/{id}/vote</code><br><code>POST /posts/{id}/rsvp</code></td><td>Vote with <code>{"optionId":"…"}</code>, or toggle attendance for an event with an empty body.</td></tr>
+      <tr><td><code>POST /media</code><br><code>PATCH /me</code></td><td>Upload a multipart <code>file</code> and include the returned ID in the post’s <code>mediaIds</code>. Update profile fields such as <code>displayName</code> and <code>bio</code> through <code>/me</code>.</td></tr>
+      <tr><td><code>POST /notifications/read</code><br><code>POST /reports</code></td><td>Mark notifications read with <code>{"ids":[…]}</code>, or pass an empty array to mark all read. Report a post with <code>postId</code> or an account with <code>handle</code>, plus a <code>reason</code> and optional <code>details</code>.</td></tr>
+    </tbody>
+  </table>
+  <pre><code>curl -fsS -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"body":"A post from my integration","clientId":"my-post-001"}' \
+  "$NEWSLETTER_ORIGIN/api/community/posts"</code></pre>
+</main>
+</body>
+</html>

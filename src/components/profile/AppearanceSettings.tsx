@@ -1,7 +1,11 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ACCENT_PRESETS, useTheme, type AccentKey, type Theme } from '@/context/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { HEX_COLOR } from '@/context/appearance';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 const THEME_OPTIONS: { value: Theme; Icon: typeof Monitor }[] = [
@@ -15,14 +19,32 @@ const ACCENT_KEYS = Object.keys(ACCENT_PRESETS) as Exclude<AccentKey, 'custom'>[
 const PILL_FOCUS =
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-card)]';
 
-/**
- * Theme and accent pickers for the profile page. ThemeContext applies each
- * choice instantly and saves it to the signed-in account, so this stays purely
- * presentational; the whole app recolouring is the confirmation.
- */
 export function AppearanceSettings() {
   const { theme, setTheme, accentKey, customHex, setAccentColor } = useTheme();
   const { t } = useLocale();
+  const picker = useRef<HTMLInputElement>(null);
+  const [hexDraft, setHexDraft] = useState<string | null>(null);
+  const [invalidHex, setInvalidHex] = useState(false);
+
+  useEffect(() => {
+    // Keep the native dialog in control while it emits input events.
+    // Only write to the swatch when the color changed elsewhere.
+    const color = customHex.toLowerCase();
+    if (picker.current && picker.current.value !== color) picker.current.value = color;
+  }, [customHex]);
+
+  function applyHex(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const value = (hexDraft ?? customHex).trim().toLowerCase();
+    const hex = value.startsWith('#') ? value : '#' + value;
+    if (!HEX_COLOR.test(hex)) {
+      setInvalidHex(true);
+      return;
+    }
+    setAccentColor('custom', hex);
+    setHexDraft(null);
+    setInvalidHex(false);
+  }
 
   return (
     <Card className="border-[var(--border-subtle)] bg-[var(--bg-card)] rounded-3xl shadow-[var(--shadow-card)]">
@@ -89,7 +111,11 @@ export function AppearanceSettings() {
                   type="button"
                   role="radio"
                   aria-checked={selected}
-                  onClick={() => setAccentColor(key)}
+                  onClick={() => {
+                    setHexDraft(null);
+                    setInvalidHex(false);
+                    setAccentColor(key);
+                  }}
                   className={cn(
                     'flex items-center gap-2 rounded-full border py-1.5 pe-3.5 ps-2 text-xs font-semibold transition-colors',
                     PILL_FOCUS,
@@ -109,33 +135,60 @@ export function AppearanceSettings() {
             })}
           </div>
 
-          <div
+          <form
+            onSubmit={applyHex}
             className={cn(
-              'flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors',
+              'flex flex-wrap items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors',
               accentKey === 'custom'
                 ? 'border-[var(--primary-accent)] bg-[var(--bg-pill-hover)]'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-pill)]',
             )}
           >
             <input
+              ref={picker}
               id="appearance-accent-custom"
               type="color"
-              value={customHex}
-              onChange={(event) => setAccentColor('custom', event.target.value)}
+              defaultValue={customHex}
+              onInput={(event) => {
+                setHexDraft(null);
+                setInvalidHex(false);
+                setAccentColor('custom', event.currentTarget.value);
+              }}
               className={cn('size-8 shrink-0 cursor-pointer rounded-full border-none bg-transparent p-0', PILL_FOCUS)}
             />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <label
                 htmlFor="appearance-accent-custom"
                 className="block cursor-pointer text-xs font-semibold text-[var(--text-primary)]"
               >
                 {t('profile.appearance.accent.custom')}
               </label>
-              <span className="font-mono text-[11px] uppercase text-[var(--text-secondary)]" dir="ltr">
-                {customHex}
-              </span>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <Input
+                  type="text"
+                  value={hexDraft ?? customHex}
+                  onChange={(event) => {
+                    setHexDraft(event.target.value);
+                    setInvalidHex(false);
+                  }}
+                  aria-label={t('profile.appearance.hexLabel')}
+                  aria-invalid={invalidHex}
+                  aria-describedby={invalidHex ? 'appearance-hex-error' : undefined}
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  dir="ltr"
+                  className="h-8 w-28 font-mono uppercase"
+                />
+                <Button type="submit" variant="outline" size="sm">{t('profile.appearance.hexApply')}</Button>
+              </div>
+              {invalidHex && (
+                <p id="appearance-hex-error" role="alert" className="mt-1 text-xs text-[var(--text-primary)]">
+                  {t('profile.appearance.hexError')}
+                </p>
+              )}
             </div>
-          </div>
+          </form>
         </section>
       </CardContent>
     </Card>

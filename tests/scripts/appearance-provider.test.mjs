@@ -189,3 +189,73 @@ test('a late write from a previous account cannot replace the new account appear
   assert.equal(final.theme, 'light');
   assert.equal(final.accentKey, 'cyan');
 });
+
+test('the custom swatch accepts repeated native input and the HEX field applies only valid colors', () => {
+  const filename = path.join(root, 'src/components/profile/AppearanceSettings.tsx');
+  const code = ts.transpileModule(readFileSync(filename, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const exports = {};
+  const theme = {
+    theme: 'system', accentKey: 'red', customHex: '#19e2f6',
+    setAccentColor(key, hex) { this.accentKey = key; this.customHex = hex; },
+  };
+  theme.setAccentColor = theme.setAccentColor.bind(theme);
+  const swatch = { value: theme.customHex };
+  const state = [];
+  let cursor = 0;
+  const jsx = (type, props) => ({ type, props });
+  const mocks = {
+    react: {
+      useRef: () => ({ current: swatch }),
+      useEffect: effect => effect(),
+      useState(initial) {
+        const index = cursor++;
+        if (!(index in state)) state[index] = initial;
+        return [state[index], next => { state[index] = next; }];
+      },
+    },
+    'react/jsx-runtime': { jsx, jsxs: jsx },
+    '@/context/ThemeContext': { ACCENT_PRESETS: {}, useTheme: () => theme },
+    '@/context/appearance': { HEX_COLOR: /^#[0-9a-fA-F]{6}$/ },
+    '@/contexts/LocaleContext': { useLocale: () => ({ t: key => key }) },
+    '@/lib/utils': { cn: (...values) => values.join(' ') },
+    '@/components/ui/input': { Input: 'hex-input' },
+  };
+  vm.runInNewContext(code, { exports, require: id => mocks[id] ?? {} }, { filename });
+
+  function render() {
+    cursor = 0;
+    const nodes = [];
+    function visit(node) {
+      if (Array.isArray(node)) return node.forEach(visit);
+      if (!node?.props) return;
+      nodes.push(node);
+      visit(node.props.children);
+    }
+    visit(exports.AppearanceSettings());
+    return {
+      picker: nodes.find(node => node.props.type === 'color').props,
+      hex: nodes.find(node => node.type === 'hex-input').props,
+      form: nodes.find(node => node.type === 'form').props,
+    };
+  }
+
+  for (const color of ['#11aabb', '#22bbcc']) {
+    const { picker } = render();
+    assert.equal(picker.value, undefined, 'React leaves the native swatch uncontrolled');
+    swatch.value = color;
+    picker.onInput({ currentTarget: swatch });
+    assert.equal(render().hex.value, color);
+  }
+  render().hex.onChange({ target: { value: ' C0FFEE ' } });
+  render().form.onSubmit({ preventDefault() {} });
+  assert.equal(theme.customHex, '#c0ffee');
+  assert.equal(render().hex.value, '#c0ffee');
+  assert.equal(swatch.value, '#c0ffee');
+
+  render().hex.onChange({ target: { value: '#123x' } });
+  render().form.onSubmit({ preventDefault() {} });
+  assert.equal(render().hex['aria-invalid'], true);
+  assert.equal(theme.customHex, '#c0ffee');
+});

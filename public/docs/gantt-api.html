@@ -83,7 +83,7 @@
 
   .topbar { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; }
   .topbar-inner { max-width: 1180px; margin: 0 auto; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-  .brand { font-weight: 800; letter-spacing: .01em; }
+  .brand { font-weight: 800; letter-spacing: .01em; color: inherit; text-decoration: none; }
   .brand span { font-weight: 500; color: var(--text-2); }
 
   .shell { max-width: 1180px; margin: 0 auto; padding: 32px 24px 96px; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 48px; }
@@ -170,8 +170,8 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <span class="brand">AI-BREAK <span>· Developer docs</span></span>
-    <a href="/profile">Back to profile</a>
+    <a class="brand" href="/docs/">AI-BREAK <span>· Developer docs</span></a>
+    <a href="/docs/">All API docs</a>
   </div>
 </header>
 

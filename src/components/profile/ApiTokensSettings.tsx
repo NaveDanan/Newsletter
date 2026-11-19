@@ -29,6 +29,11 @@ export function ApiTokensSettings({ canCreateGanttToken }: { canCreateGanttToken
   const activeRef = useRef(false);
 
   useEffect(() => {
+    // Links from /docs land here; the card renders after the page loads, so the browser cannot scroll to it.
+    if (window.location.hash === '#api-tokens') document.getElementById('api-tokens')?.scrollIntoView();
+  }, []);
+
+  useEffect(() => {
     activeRef.current = true;
     let active = true;
     void fetchApiAccessTokens().then(items => {
@@ -76,11 +81,12 @@ export function ApiTokensSettings({ canCreateGanttToken }: { canCreateGanttToken
   };
 
   return (
-    <Card className="rounded-3xl border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
+    <Card id="api-tokens" className="scroll-mt-24 rounded-3xl border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
       <CardHeader>
         <CardTitle className="text-base font-bold text-[var(--text-primary)]">{t('apiTokens.title')}</CardTitle>
         <CardDescription className="text-[var(--text-secondary)]">{t('apiTokens.hint')}</CardDescription>
         <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold text-[var(--primary-accent)]">
+          <a href="/docs/" target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">{t('apiTokens.docsHub')}</a>
           <a href="/docs/site-api.html" target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">{t('apiTokens.siteDocs')}</a>
           {canCreateGanttToken ? <a href="/docs/gantt-api.html" target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">{t('apiTokens.ganttDocs')}</a> : null}
         </div>

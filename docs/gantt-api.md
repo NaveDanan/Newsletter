@@ -36,6 +36,8 @@ Use the website's API base URL. On the current MMEMS deployment, the frontend pr
 
 Read-only tokens support GET requests. These tokens cannot create projects, change project-sharing permissions, manage tokens, modify accounts, or write newsletters/community posts. Token creation and revocation require a normal signed-in website session.
 
+Managers, general managers, and administrators can also choose **Newsletter & Gantt authoring**. This scope uses the same project permissions and lets a read-and-write token create a project with `POST /api/projects` and edit it with `PATCH /api/projects/{projectId}`. Send a `title` on create and optionally include an initial `gantt`. To replace a chart, send the complete `gantt` and the `expectedUpdatedAt` from the project's latest `updated` field. A stale value returns 409. Use task endpoints for individual task edits. Project sharing and task deletion are outside this scope.
+
 The all-tasks response contains `items`, `totalItems`, and `projectCount`. Every task includes `projectId` and `projectTitle` alongside its Gantt fields. A task's `id` belongs to its project; always use both identifiers when changing it.
 
 ## Fetch all tasks

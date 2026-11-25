@@ -23,6 +23,7 @@
     <a href="/docs/">All API docs</a> ·
     <a href="#authentication">Authentication</a> ·
     <a href="#newsletters">Newsletters</a> ·
+    <a href="#authoring">Article authoring</a> ·
     <a href="#community">Community</a> ·
     <a href="/docs/gantt-api.html">Gantt API</a>
   </nav>
@@ -48,6 +49,19 @@
 
 curl -fsS -H "Authorization: Bearer $NEWSLETTER_API_TOKEN" \
   "$NEWSLETTER_ORIGIN/api/v1/newsletters/$ARTICLE_ID/page" -o article.html</code></pre>
+
+  <h2 id="authoring">Article authoring</h2>
+  <p>Authors and managers can choose <strong>Newsletter &amp; Gantt authoring</strong> in <strong>Profile → API access tokens</strong>. A read-and-write token can create drafts, edit articles the account owns, and publish them by setting <code>status</code> to <code>published</code>. Administrators can edit all articles. Managers can use the same token for <a href="/docs/gantt-api.html#permissions">Gantt projects</a>.</p>
+  <table>
+    <thead><tr><th scope="col">Method and path</th><th scope="col">Use</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /api/v1/authoring/status</code></td><td>Check the authoring token. <code>gantt</code> reports whether the account can work with projects.</td></tr>
+      <tr><td><code>GET /api/newsletters?view=summary&amp;compact=1</code></td><td>List accessible newsletters, including drafts. Supports <code>q</code>, <code>status</code>, <code>page</code> and <code>perPage</code>.</td></tr>
+      <tr><td><code>GET /api/newsletters/{id}?contentOffset=0</code></td><td>Read article HTML in chunks. Pass <code>nextContentOffset</code> to continue until it is null.</td></tr>
+      <tr><td><code>POST /api/newsletters</code></td><td>Create an article with <code>title</code> and <code>content</code>. The default status is <code>draft</code>. The token owner becomes the authoring owner.</td></tr>
+      <tr><td><code>PATCH /api/newsletters/{id}</code></td><td>Send only the fields to change, such as <code>title</code>, <code>subtitle</code>, <code>content</code>, <code>tags</code>, or <code>status</code>. Sending <code>content</code> replaces the HTML body.</td></tr>
+    </tbody>
+  </table>
 
   <h2 id="community">Community</h2>
   <p>Prefix these paths with <code>/api/community</code>. Paginated lists include <code>items</code>, <code>hasMore</code>, and <code>cursor</code>. Pass the returned cursor as <code>?cursor=...</code> for the next page, alongside the original filters. Thread responses put the page’s replies in <code>replies</code>.</p>

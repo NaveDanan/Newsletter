@@ -270,6 +270,7 @@
 
     <section id="tokens">
       <h2>Create and manage tokens</h2>
+      <p>To create or edit a Gantt project with an API token, choose <strong>Newsletter &amp; Gantt authoring</strong> and <strong>Read and write</strong>. Use <code>POST /api/projects</code> to create a project and <code>PATCH /api/projects/{projectId}</code> to update it. To replace the complete <code>gantt</code> object, also send <code>expectedUpdatedAt</code> from the version you read. A stale value returns <code>409</code>. This token covers task creation and editing, subject to existing project permissions.</p>
       <h3>Create a token</h3>
       <ol>
         <li>Sign in to the website with your normal account.</li>

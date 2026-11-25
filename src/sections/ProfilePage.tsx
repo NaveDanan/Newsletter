@@ -2,7 +2,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { ArrowLeft01Icon, GlobeIcon } from '@hugeicons/core-free-icons';
 import { ManagerHeader } from '@/components/ManagerHeader';
 import { ApiTokensSettings } from '@/components/profile/ApiTokensSettings';
-import { canCreateGanttApiToken } from '@/lib/auth/permissions';
+import { canCreateGanttApiToken, canCreateNewsletter } from '@/lib/auth/permissions';
 import { AppearanceSettings } from '@/components/profile/AppearanceSettings';
 import { NotificationPreferences } from '@/components/profile/NotificationPreferences';
 import { ProfileIdentityEditor } from '@/components/profile/ProfileIdentityEditor';
@@ -133,7 +133,7 @@ export function ProfilePage({ onBack, onHomeClick, onManagerClick, onProfileClic
           </CardContent>
         </Card>
 
-        <ApiTokensSettings key={`${user.id}:${user.role}`} canCreateGanttToken={canCreateGanttApiToken(user.role)} />
+        <ApiTokensSettings key={`${user.id}:${user.role}`} canCreateGanttToken={canCreateGanttApiToken(user.role)} canCreateAuthoringToken={canCreateNewsletter(user.role)} />
 
         <AppearanceSettings />
 

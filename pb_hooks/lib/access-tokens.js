@@ -2,12 +2,16 @@ var COLLECTION = 'access_tokens';
 var PREFIX = 'nlpat_';
 var MANAGER_ROLES = ['manager', 'general_manager', 'admin'];
 var SITE_TOKEN_CONTEXT = 'newsletter.siteToken';
+var AUTHORING_TOKEN_CONTEXT = 'newsletter.authoringToken';
 
 function isMember(user) {
   return Boolean(user && user.collection().name === 'users');
 }
 function isManager(user) {
   return isMember(user) && MANAGER_ROLES.indexOf(user.getString('role')) !== -1;
+}
+function isAuthor(user) {
+  return isManager(user) || (isMember(user) && user.getString('role') === 'author');
 }
 function timestamp(value) { return Date.parse(String(value || '').replace(' ', 'T')); }
 function publicToken(record) {
@@ -27,8 +31,9 @@ function create(e) {
   var body = e.requestInfo().body || {};
   var name = typeof body.name === 'string' ? body.name.trim() : '';
   var scope = body.scope === undefined ? 'gantt' : body.scope;
-  if (['gantt', 'site'].indexOf(scope) === -1) throw new BadRequestError('Choose a valid API token scope.');
+  if (['gantt', 'site', 'authoring'].indexOf(scope) === -1) throw new BadRequestError('Choose a valid API token scope.');
   if (scope === 'gantt' && !isManager(e.auth)) throw new ForbiddenError('Only managers and administrators can create Gantt API tokens.');
+  if (scope === 'authoring' && !isAuthor(e.auth)) throw new ForbiddenError('A newsletter authoring role is required.');
   var access = body.access === undefined ? (scope === 'gantt' ? 'write' : 'read') : body.access;
   var days = body.expiresInDays === undefined ? 90 : body.expiresInDays;
   if (!name || name.length > 80) throw new BadRequestError('Provide a token name of 1 to 80 characters.');
@@ -82,16 +87,27 @@ function authenticateRequest(e, scope) {
   var user;
   try { user = e.app.findRecordById('users', record.getString('ownerId')); }
   catch (_) { throw new UnauthorizedError('API token account is unavailable.'); }
-  if ((record.getString('scope') || 'gantt') !== scope) throw new ForbiddenError('This API token is for a different API scope.');
+  var tokenScope = record.getString('scope') || 'gantt';
+  var authoring = tokenScope === 'authoring';
+  if (scope === 'authoring' && !authoring) return e.next();
+  if (tokenScope !== scope && !(scope === 'gantt' && authoring)) throw new ForbiddenError('This API token is for a different API scope.');
   var method = e.request.method.toUpperCase();
+  var path = e.request.url.path;
+  if (authoring && !isAuthor(user)) throw new ForbiddenError('The token owner no longer has a newsletter authoring role.');
   if (scope === 'gantt') {
     if (!isManager(user)) throw new ForbiddenError('The token owner no longer has manager access.');
-    if (!allowedTokenRoute(method, e.request.url.path)) throw new ForbiddenError('This API token is limited to Gantt tasks and project progress.');
+    var projectWrite = authoring && ((method === 'POST' && path === '/api/projects') || (method === 'PATCH' && /^\/api\/projects\/[^/]+$/.test(path)));
+    if ((!allowedTokenRoute(method, path) && !projectWrite) || (authoring && method === 'DELETE')) throw new ForbiddenError('This API token cannot use this project route.');
   }
   if (method !== 'GET' && record.getString('access') !== 'write') throw new ForbiddenError('This API token has read-only access.');
   e.auth = user;
   if (scope === 'site') {
     e.set(SITE_TOKEN_CONTEXT, true);
+  }
+  if (authoring) {
+    e.set(AUTHORING_TOKEN_CONTEXT, true);
+  }
+  if (scope === 'site' || authoring) {
     e.response.header().set('Cache-Control', 'private, no-store');
   }
   // Record activity at most once per minute; token material is never persisted.
@@ -105,6 +121,12 @@ module.exports = {
   list: list, create: create, revoke: revoke,
   authenticateProjectRequest: function (e) { return authenticateRequest(e, 'gantt'); },
   authenticateSiteRequest: function (e) { return authenticateRequest(e, 'site'); },
+  authenticateAuthoringRequest: function (e) { return authenticateRequest(e, 'authoring'); },
+  isAuthoringTokenRequest: function (e) { return e.get(AUTHORING_TOKEN_CONTEXT) === true; },
+  authoringStatus: function (e) {
+    if (e.get(AUTHORING_TOKEN_CONTEXT) !== true) throw new UnauthorizedError('A Newsletter authoring API token is required.');
+    return e.json(200, { gantt: isManager(e.auth) });
+  },
   isSiteTokenRequest: function (e) { return e.get(SITE_TOKEN_CONTEXT) === true; },
   allowedTokenRoute: allowedTokenRoute,
 };

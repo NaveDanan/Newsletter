@@ -11,7 +11,7 @@ import { createApiAccessToken, fetchApiAccessTokens, revokeApiAccessToken, type 
 const fieldClass = 'h-10 w-full rounded-full border-[var(--border-subtle)] bg-[var(--bg-input)] px-4 text-[var(--text-primary)]';
 const buttonClass = 'rounded-full border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-pill-hover)]';
 
-export function ApiTokensSettings({ canCreateGanttToken }: { canCreateGanttToken: boolean }) {
+export function ApiTokensSettings({ canCreateGanttToken, canCreateAuthoringToken }: { canCreateGanttToken: boolean; canCreateAuthoringToken: boolean }) {
   const { t, formatDate } = useLocale();
   const [tokens, setTokens] = useState<ApiAccessToken[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,19 +93,20 @@ export function ApiTokensSettings({ canCreateGanttToken }: { canCreateGanttToken
       </CardHeader>
       <CardContent className="space-y-5">
         <form onSubmit={event => { void create(event); }} className="space-y-3">
-          <div className={canCreateGanttToken ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3 sm:grid-cols-3'}>
+          <div className={canCreateAuthoringToken ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3 sm:grid-cols-3'}>
             <div className="space-y-2">
               <Label htmlFor="api-token-name" className="text-[var(--text-primary)]">{t('apiTokens.name')}</Label>
               <Input id="api-token-name" value={name} onChange={event => setName(event.target.value)} maxLength={80} required disabled={busy} autoComplete="off" placeholder={t('apiTokens.namePlaceholder')} className={fieldClass} />
             </div>
-            {canCreateGanttToken ? (
+            {canCreateAuthoringToken ? (
               <div className="space-y-2">
                 <Label htmlFor="api-token-scope" className="text-[var(--text-primary)]">{t('apiTokens.scope')}</Label>
-                <Select value={scope} onValueChange={value => setScope(value === 'gantt' ? 'gantt' : 'site')} disabled={busy}>
+                <Select value={scope} onValueChange={value => setScope(value as ApiTokenScope)} disabled={busy}>
                   <SelectTrigger id="api-token-scope" className={fieldClass}><SelectValue /></SelectTrigger>
                   <SelectContent className="border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)]">
                     <SelectItem value="site">{t('apiTokens.site')}</SelectItem>
-                    <SelectItem value="gantt">{t('apiTokens.gantt')}</SelectItem>
+                    <SelectItem value="authoring">{t('apiTokens.authoring')}</SelectItem>
+                    {canCreateGanttToken && <SelectItem value="gantt">{t('apiTokens.gantt')}</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -155,7 +156,7 @@ export function ApiTokensSettings({ canCreateGanttToken }: { canCreateGanttToken
                   <p className="break-words text-sm font-semibold text-[var(--text-primary)]">{item.name}</p>
                   <p className="text-xs text-[var(--text-secondary)]">
                     <span dir="ltr" className="font-mono">{item.prefix}…</span>{' · '}
-                    {t(item.scope === 'site' ? 'apiTokens.site' : 'apiTokens.gantt')}{' · '}
+                    {t('apiTokens.' + item.scope)}{' · '}
                     {t(item.access === 'read' ? 'apiTokens.read' : 'apiTokens.write')}{' · '}
                     {t(item.expired ? 'apiTokens.expired' : 'apiTokens.expires', { date: formatDate(item.expiresAt) })}
                   </p>

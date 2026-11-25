@@ -2,7 +2,7 @@ import { getPocketBase } from './client';
 import { readScope } from './read-cache';
 
 export type ApiTokenAccess = 'read' | 'write';
-export type ApiTokenScope = 'site' | 'gantt';
+export type ApiTokenScope = 'site' | 'gantt' | 'authoring';
 export interface ApiAccessToken {
   id: string;
   name: string;

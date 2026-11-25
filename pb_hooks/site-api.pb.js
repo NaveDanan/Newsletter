@@ -3,6 +3,10 @@ function authenticateNewsletterToken(e) {
   return require(__hooks + '/lib/access-tokens.js').authenticateSiteRequest(e);
 }
 
+routerAdd('GET', '/api/v1/authoring/status', function (e) {
+  return require(__hooks + '/lib/access-tokens.js').authoringStatus(e);
+}, function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateAuthoringRequest(e); }, $apis.requireAuth('users'), $apis.skipSuccessActivityLog());
+
 routerAdd('GET', '/api/v1/newsletters', function (e) {
   return require(__hooks + '/lib/newsletter-api.js').list(e);
 }, authenticateNewsletterToken, $apis.requireAuth('users'), $apis.skipSuccessActivityLog());

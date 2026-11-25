@@ -10,7 +10,7 @@ export const ACCESS_TOKENS_SCHEMA = {
     text('tokenHash', 64, { required: true, hidden: true }),
     text('prefix', 16, { required: true }),
     { name: 'access', type: 'select', required: true, maxSelect: 1, values: ['read', 'write'] },
-    { name: 'scope', type: 'select', maxSelect: 1, values: ['gantt', 'site'] },
+    { name: 'scope', type: 'select', maxSelect: 1, values: ['gantt', 'site', 'authoring'] },
     { name: 'expiresAt', type: 'date', required: true },
     { name: 'lastUsedAt', type: 'date' },
   ],

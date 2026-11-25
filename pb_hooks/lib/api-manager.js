@@ -282,7 +282,7 @@ function normalizeGantt(rawGantt) {
     tasks: asArray(source.tasks).map(function (task) { return normalizeTask(task); }),
     resources: asArray(source.resources),
     roles: asArray(source.roles),
-    zoom: source.zoom === 'week' || source.zoom === 'month' ? source.zoom : 'day',
+    zoom: includes(['day', 'week', 'month', 'quarter'], source.zoom) ? source.zoom : 'day',
     lastEditedAt: typeof source.lastEditedAt === 'string' ? source.lastEditedAt : null,
   };
 }
@@ -887,8 +887,14 @@ function handleNewsletterCreate(e) {
     throw new ForbiddenError('A newsletter authoring role is required.');
   }
 
-  var record = createRecord(e.app, 'newsletters', buildNewsletterPayload(e.requestInfo().body || {}, e.auth));
-  return e.json(201, serializeRecord(record));
+  var payload = buildNewsletterPayload(e.requestInfo().body || {}, e.auth);
+  if (isAuthoringTokenRequest(e)) payload.createdById = getAuthId(e.auth);
+  var record = createRecord(e.app, 'newsletters', payload);
+  return e.json(201, isAuthoringTokenRequest(e) ? authoringRecord(record) : serializeRecord(record));
+}
+
+function authoringRecord(record) {
+  return { id: record.id, title: record.getString('title'), status: record.getString('status'), updated: record.getString('updated') };
 }
 
 function handleNewsletterGet(e) {
@@ -897,6 +903,20 @@ function handleNewsletterGet(e) {
     throw new ForbiddenError('Newsletter access denied.');
   }
 
+  var offset = getQueryValue(e, 'contentOffset', '');
+  if (offset !== '' && isAuthoringTokenRequest(e)) {
+    if (!/^\d{1,9}$/.test(offset)) throw new BadRequestError('Invalid content offset.');
+    var content = record.getString('content');
+    var start = Number(offset);
+    var end = Math.min(start + 8000, content.length);
+    if (end < content.length && /[\uD800-\uDBFF]/.test(content.charAt(end - 1))) end--;
+    var article = authoringRecord(record);
+    article.subtitle = record.getString('subtitle').slice(0, 500);
+    article.author = record.getString('author').slice(0, 255);
+    article.content = content.slice(start, end);
+    article.nextContentOffset = end < content.length ? end : null;
+    return e.json(200, article);
+  }
   return e.json(200, serializeRecord(record));
 }
 
@@ -907,7 +927,8 @@ function handleNewsletterPatch(e) {
   }
 
   setRecordValues(record, buildNewsletterPayload(e.requestInfo().body || {}, e.auth, record));
-  return e.json(200, serializeRecord(saveRecord(e.app, record)));
+  var saved = saveRecord(e.app, record);
+  return e.json(200, isAuthoringTokenRequest(e) ? authoringRecord(saved) : serializeRecord(saved));
 }
 
 function handleNewsletterDelete(e) {
@@ -940,18 +961,23 @@ function handleNewsletterMakeDraft(e) {
   return e.json(200, serializeRecord(saveRecord(e.app, record)));
 }
 
+function isAuthoringTokenRequest(e) {
+  return typeof e.get === 'function' && require(__hooks + '/lib/access-tokens.js').isAuthoringTokenRequest(e);
+}
+
 function registerNewsletterRoutes(routerAdd, appApis) {
+  var authenticateAuthoring = function (e) { return require(__hooks + '/lib/access-tokens.js').authenticateAuthoringRequest(e); };
   routerAdd('GET', '/api/newsletters', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleNewsletterList(e);
-  }, appApis.skipSuccessActivityLog());
+  }, authenticateAuthoring, appApis.skipSuccessActivityLog());
 
   routerAdd('POST', '/api/newsletters', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleNewsletterCreate(e);
-  }, appApis.bodyLimit(0), appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, appApis.bodyLimit(0), authenticateAuthoring, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('GET', '/api/newsletters/{id}', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleNewsletterGet(e);
-  }, appApis.skipSuccessActivityLog());
+  }, authenticateAuthoring, appApis.skipSuccessActivityLog());
 
   routerAdd('GET', '/api/newsletters/{id}/cover', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleNewsletterCover(e);
@@ -959,7 +985,7 @@ function registerNewsletterRoutes(routerAdd, appApis) {
 
   routerAdd('PATCH', '/api/newsletters/{id}', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleNewsletterPatch(e);
-  }, appApis.bodyLimit(0), appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
+  }, appApis.bodyLimit(0), authenticateAuthoring, appApis.requireAuth('users'), appApis.skipSuccessActivityLog());
 
   routerAdd('DELETE', '/api/newsletters/{id}', function (e) {
     return require(__hooks + '/lib/api-manager.js').handleNewsletterDelete(e);
@@ -1036,19 +1062,45 @@ function handleProjectList(e) {
   var records = listRecords(e.app, 'projects', '', '-created', 0, 0).filter(function (record) {
     return canAccessProject(e.auth, record);
   });
-  return e.json(200, { items: records.map(serializeRecord) });
+  var summary = getQueryValue(e, 'view', '') === 'summary' && isAuthoringTokenRequest(e);
+  return e.json(200, { items: records.map(summary ? authoringRecord : serializeRecord) });
 }
 
 function handleProjectCreate(e) {
-  var record = createRecord(e.app, 'projects', buildProjectPayload(e.requestInfo().body || {}, e.auth));
-  return e.json(201, serializeRecord(record));
+  var payload = buildProjectPayload(e.requestInfo().body || {}, e.auth);
+  if (isAuthoringTokenRequest(e)) payload.allowedUserIds = [];
+  var record = createRecord(e.app, 'projects', payload);
+  return e.json(201, isAuthoringTokenRequest(e) ? authoringRecord(record) : serializeRecord(record));
 }
 
 function handleProjectGet(e) {
-  return e.json(200, serializeRecord(getProjectOrDeny(e, getPathValue(e, 'projectId'))));
+  var record = getProjectOrDeny(e, getPathValue(e, 'projectId'));
+  var project = serializeRecord(record);
+  if (isAuthoringTokenRequest(e)) {
+    project.updated = record.getString('updated');
+    project.description = record.getString('description').slice(0, 4000);
+    project.gantt = getProjectGantt(record);
+  }
+  return e.json(200, project);
 }
 
 function handleProjectPatch(e) {
+  if (isAuthoringTokenRequest(e)) {
+    var body = e.requestInfo().body || {};
+    if (Object.prototype.hasOwnProperty.call(body, 'allowedUserIds')) throw new ForbiddenError('API tokens cannot change project sharing.');
+    var updated;
+    e.app.runInTransaction(function (tx) {
+      var record = getProjectOrDeny({ app: tx, auth: e.auth }, getPathValue(e, 'projectId'));
+      var payload = buildProjectPayload(body, e.auth, record);
+      if (payload.gantt) {
+        if (asString(body.expectedUpdatedAt) !== record.getString('updated')) throw new ApiError(409, 'The project changed. Fetch it again before replacing its Gantt.');
+        payload.gantt.lastEditedAt = nowIso();
+      }
+      setRecordValues(record, payload);
+      updated = authoringRecord(saveRecord(tx, record));
+    });
+    return e.json(200, updated);
+  }
   var record = getProjectOrDeny(e, getPathValue(e, 'projectId'));
   setRecordValues(record, buildProjectPayload(e.requestInfo().body || {}, e.auth, record));
   return e.json(200, serializeRecord(saveRecord(e.app, record)));

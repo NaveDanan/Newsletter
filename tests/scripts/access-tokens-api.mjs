@@ -164,6 +164,57 @@ try {
   assert.deepEqual(new Set(all.items.map(t => t.projectId)), new Set([own.id, shared.id]));
   await assert.rejects(send(token, `/api/projects/${privateProject.id}/tasks`), denied(403));
   await assert.rejects(send(token, `/api/projects/${own.id}`, 'PATCH', { allowedUserIds: [accounts.other.id] }), denied(403));
+
+  const issueAuthoring = (account, access = 'write') => send(clients[account], '/api/access-tokens', 'POST', { name: 'Authoring integration', scope: 'authoring', access });
+  await assert.rejects(issueAuthoring('viewer'), denied(403));
+  const authoringToken = await issueAuthoring('manager');
+  const authoring = tokenClient(authoringToken.token);
+  const authorOnly = tokenClient((await issueAuthoring('author')).token);
+  const authoringRead = tokenClient((await issueAuthoring('manager', 'read')).token);
+  const status = '/api/v1/authoring/status';
+  assert.deepEqual(await send(authoring, status), { gantt: true });
+  assert.deepEqual(await send(authorOnly, status), { gantt: false });
+  await assert.rejects(send(clients.manager, status), denied(401));
+  await assert.rejects(send(token, status), denied(401));
+  await assert.rejects(send(authorOnly, '/api/projects'), denied(403));
+  await assert.rejects(send(authoring, '/api/community/me'), denied(403));
+  await assert.rejects(send(authoringRead, '/api/newsletters', 'POST', { title: 'Denied' }), denied(403));
+  await assert.rejects(send(authoring, '/api/newsletters/' + published.id, 'PATCH', { title: 'Denied' }), denied(403));
+  const authored = await send(authoring, '/api/newsletters', 'POST', {
+    title: 'Manager article', content: 'a'.repeat(7999) + '🥳end', createdById: accounts.admin.id,
+  });
+  const articlePath = '/api/newsletters/' + authored.id;
+  assert.equal(authored.status, 'draft');
+  assert.equal((await articles.getOne(authored.id)).createdById, accounts.manager.id);
+  const part = await send(authoring, articlePath + '?contentOffset=0');
+  assert.equal(part.content.length, 7999);
+  assert.equal((await send(authoring, articlePath + '?contentOffset=' + part.nextContentOffset)).content, '🥳end');
+  assert.ok((await send(authoringRead, '/api/newsletters?view=summary&status=draft&q=Manager')).items.some(item => item.id === authored.id));
+  await assert.rejects(send(authorOnly, articlePath), denied(403));
+  assert.equal((await send(authoring, articlePath, 'PATCH', { title: 'Edited article' })).title, 'Edited article');
+  await assert.rejects(send(authoring, articlePath, 'DELETE'), denied(401));
+
+  await assert.rejects(send(authoringRead, '/api/projects', 'POST', { title: 'Denied' }), denied(403));
+  const chart = { tasks: [], resources: [], roles: [], zoom: 'week' };
+  const added = await send(authoring, '/api/projects', 'POST', { title: 'Authoring project', gantt: chart, allowedUserIds: [accounts.other.id] });
+  const addedProject = '/api/projects/' + added.id;
+  const original = await send(authoringRead, addedProject);
+  assert.deepEqual(original.allowedUserIds, []);
+  assert.ok((await send(authoringRead, '/api/projects?view=summary')).items.some(item => item.id === added.id && item.gantt === undefined));
+  await assert.rejects(send(authoring, addedProject, 'PATCH', { allowedUserIds: [accounts.other.id] }), denied(403));
+  await assert.rejects(send(authoring, '/api/projects/' + privateProject.id, 'PATCH', { title: 'Denied' }), denied(403));
+  const edited = await send(authoring, addedProject, 'PATCH', { gantt: { ...chart, zoom: 'quarter' }, expectedUpdatedAt: original.updated });
+  assert.equal((await send(authoringRead, addedProject)).gantt.zoom, 'quarter');
+  assert.equal((await send(authoring, addedProject, 'PATCH', { title: 'Edited project' })).title, 'Edited project');
+  await assert.rejects(send(authoring, addedProject, 'PATCH', { gantt: chart, expectedUpdatedAt: original.updated }), denied(409));
+  assert.notEqual(edited.updated, original.updated);
+  const authoredTask = await send(authoring, addedProject + '/tasks', 'POST', { name: 'Task', startDate: '2026-11-15' });
+  assert.equal((await send(authoring, addedProject + '/tasks/' + authoredTask.id, 'PATCH', { progress: 65 })).progress, 65);
+  await assert.rejects(send(authoring, addedProject + '/tasks/' + authoredTask.id, 'DELETE'), denied(403));
+  await send(clients.manager, '/api/access-tokens/' + authoringToken.item.id, 'DELETE');
+  await assert.rejects(send(authoring, status), denied(401));
+  await root.collection('projects').delete(added.id);
+
   await assert.rejects(send(token, '/api/projects/missingproject1/progress'), denied(404));
   const path = `/api/projects/${own.id}`;
   const task = await send(token, path + '/tasks', 'POST', { id: 'external', name: 'External task', startDate: '2026-11-15', durationDays: 2 });
@@ -220,7 +271,7 @@ try {
   for (const body of [{name:''},{name:'bad',scope:'everything'},{name:'bad',access:'admin'},{name:'bad',expiresInDays:0},{name:'bad',expiresInDays:366}]) await assert.rejects(send(clients.other, '/api/access-tokens','POST',body), denied(400));
   for(let i=0;i<20;i++) await send(clients.other,'/api/access-tokens','POST',{name:'token '+i});
   await assert.rejects(send(clients.other,'/api/access-tokens','POST',{name:'over limit'}), denied(400));
-  console.log('PASS: scoped tokens, published article JSON and HTML, community participation and isolation, legacy Gantt access, concurrent Gantt updates, expiry, and revocation.');
+  console.log('PASS: article and Gantt authoring, token scope and role isolation, published articles, community, concurrent Gantt updates, expiry, and revocation.');
 } catch (error) {
   console.error('Access-token integration failed:', error.status, error.stack || error.message, JSON.stringify(error.response || {}), logs.slice(-3000));
   process.exitCode = 1;
